@@ -1,0 +1,379 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Tabelas do Sistema
+
+model Plan {
+  id               String   @id @default(cuid())
+  name             String
+  type             String   // 'pessoal' | 'empresarial'
+  transactionLimit Int
+  userLimit        Int      @default(0)
+  storageLimitMb   Int?
+  priceMonthly     Decimal?
+  features         Json     @default("{}")
+  createdAt        DateTime @default(now()) @map("created_at")
+  users            User[]
+
+  @@map("plans")
+}
+
+model User {
+  id               String    @id @default(cuid())
+  email            String    @unique
+  name             String
+  planId           String?   @map("plan_id")
+  plan             Plan?     @relation(fields: [planId], references: [id])
+  defaultCurrency  String    @default("BRL") @map("default_currency")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  
+  // Relacionamentos
+  settings         UserSettings?
+  accounts         Account[]
+  categories       Category[]
+  transactions     Transaction[]
+  transfers        Transfer[]
+  recurrences      Recurrence[]
+  costCenters      CostCenter[]
+  projects         Project[]
+  contacts         Contact[]
+  tags             Tag[]
+  investmentTransactions InvestmentTransaction[]
+  portfolios       Portfolio[]
+  
+  @@map("users")
+}
+
+model UserSettings {
+  id                    String    @id @default(cuid())
+  userId                String    @unique @map("user_id")
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  enableCompetenceDate  Boolean   @default(false) @map("enable_competence_date")
+  requireCostCenter     Boolean   @default(false) @map("require_cost_center")
+  requireProject        Boolean   @default(false) @map("require_project")
+  requireContact        Boolean   @default(false) @map("require_contact")
+  requireTag            Boolean   @default(false) @map("require_tag")
+  requireSubcategory    Boolean   @default(false) @map("require_subcategory")
+  deletePasswordHash    String?   @map("delete_password_hash")
+  installmentDefault    String    @default("VALOR_PARCELA") @map("installment_default")
+  
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  
+  @@map("user_settings")
+}
+
+// Contas e Cartões
+
+model Account {
+  id                String    @id @default(cuid())
+  userId            String    @map("user_id")
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name              String
+  type              String    // 'CORRENTE' | 'POUPANCA' | 'INVESTIMENTO' | 'CARTAO' | 'CARTEIRA'
+  initialBalance    Decimal   @default(0) @map("initial_balance") @db.Decimal(15, 2)
+  currency          String    @default("BRL")
+  icon              String?
+  isActive          Boolean   @default(true) @map("is_active")
+  bankConnectionId  String?   @map("bank_connection_id")
+  
+  createdAt         DateTime  @default(now()) @map("created_at")
+  
+  // Relacionamentos
+  transactions      Transaction[]
+  creditCards       CreditCard[]
+  transfersOrigin   Transfer[] @relation("TransferOrigin")
+  transfersDest    Transfer[] @relation("TransferDestination")
+  investmentTransactions InvestmentTransaction[]
+  
+  @@map("accounts")
+}
+
+model CreditCard {
+  id            String    @id @default(cuid())
+  accountId     String    @map("account_id")
+  account       Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  
+  creditLimit   Decimal?  @map("credit_limit") @db.Decimal(15, 2)
+  closingDay    Int?      @map("closing_day")
+  dueDay        Int?      @map("due_day")
+  
+  createdAt     DateTime  @default(now()) @map("created_at")
+  
+  @@map("credit_cards")
+}
+
+// Categorias e Tags
+
+model Category {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name      String
+  type      String    // 'RECEITA' | 'DESPESA'
+  parentId  String?   @map("parent_id")
+  parent    Category? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryHierarchy")
+  
+  createdAt DateTime  @default(now()) @map("created_at")
+  
+  // Relacionamentos
+  transactions Transaction[]
+  splitTransactions SplitTransaction[]
+  
+  @@map("categories")
+}
+
+model Tag {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name      String
+  color     String?
+  
+  // Relacionamentos
+  transactionTags TransactionTag[]
+  transactions Transaction[]
+  
+  @@map("tags")
+}
+
+// Transações
+
+model Transaction {
+  id               String    @id @default(cuid())
+  userId           String    @map("user_id")
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  accountId        String?   @map("account_id")
+  account          Account?  @relation(fields: [accountId], references: [id])
+  categoryId       String?   @map("category_id")
+  category         Category? @relation(fields: [categoryId], references: [id])
+  recurrenceId     String?   @map("recurrence_id")
+  recurrence       Recurrence? @relation(fields: [recurrenceId], references: [id])
+  centerId         String?   @map("center_id")
+  center           CostCenter? @relation(fields: [centerId], references: [id])
+  projectId        String?   @map("project_id")
+  project          Project?  @relation(fields: [projectId], references: [id])
+  contactId        String?   @map("contact_id")
+  contact          Contact?  @relation(fields: [contactId], references: [id])
+  
+  description      String
+  amount           Decimal   @db.Decimal(15, 2)
+  type             String    // 'RECEITA' | 'DESPESA' | 'TRANSFERENCIA'
+  status           String    @default("PENDENTE") // 'PENDENTE' | 'CONFIRMADO' | 'CONCILIADO'
+  dueDate          DateTime  @map("due_date") @db.Date
+  paymentDate      DateTime? @map("payment_date") @db.Date
+  competenceDate   DateTime? @map("competence_date") @db.Date
+  regime           String    @default("CAIXA") // 'CAIXA' | 'COMPETENCIA'
+  isRecurring      Boolean   @default(false) @map("is_recurring")
+  attachmentUrl    String?   @map("attachment_url")
+  notes            String?
+  
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  
+  // Relacionamentos
+  splitTransactions SplitTransaction[]
+  transactionTags  TransactionTag[]
+  tags             Tag[]
+  
+  @@map("transactions")
+}
+
+model SplitTransaction {
+  id            String    @id @default(cuid())
+  transactionId String   @map("transaction_id")
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  
+  categoryId    String?   @map("category_id")
+  category      Category? @relation(fields: [categoryId], references: [id])
+  centerId      String?   @map("center_id")
+  center        CostCenter? @relation(fields: [centerId], references: [id])
+  projectId     String?   @map("project_id")
+  project       Project?  @relation(fields: [projectId], references: [id])
+  contactId     String?   @map("contact_id")
+  contact       Contact?  @relation(fields: [contactId], references: [id])
+  
+  amount        Decimal   @db.Decimal(15, 2)
+  type          String    // 'RECEITA' | 'DESPESA'
+  description   String?
+  
+  @@map("split_transactions")
+}
+
+model Recurrence {
+  id                  String    @id @default(cuid())
+  userId              String    @map("user_id")
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type                String    // 'FIXA' | 'PARCELADA'
+  frequency           String?   // 'SEMANAL' | 'MENSAL' | 'ANUAL'
+  totalInstallments   Int?      @map("total_installments")
+  currentInstallment  Int       @default(1) @map("current_installment")
+  endDate             DateTime? @map("end_date") @db.Date
+  
+  createdAt           DateTime  @default(now()) @map("created_at")
+  
+  // Relacionamentos
+  transactions        Transaction[]
+  
+  @@map("recurrences")
+}
+
+// Módulo Empresarial
+
+model CostCenter {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name      String
+  type      String    @default("CUSTO") // 'CUSTO' | 'LUCRO'
+  isActive  Boolean   @default(true) @map("is_active")
+  
+  // Relacionamentos
+  transactions Transaction[]
+  splitTransactions SplitTransaction[]
+  
+  @@map("cost_centers")
+}
+
+model Project {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name      String
+  status    String    @default("ATIVO") // 'ATIVO' | 'CONCLUIDO' | 'CANCELADO'
+  
+  createdAt DateTime  @default(now()) @map("created_at")
+  
+  // Relacionamentos
+  transactions Transaction[]
+  splitTransactions SplitTransaction[]
+  
+  @@map("projects")
+}
+
+model Contact {
+  id           String    @id @default(cuid())
+  userId       String    @map("user_id")
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name         String
+  type         String    // 'CLIENTE' | 'FORNECEDOR' | 'AMBOS'
+  email        String?
+  phone        String?
+  customFields Json      @default("{}") @map("custom_fields")
+  
+  // Relacionamentos
+  transactions Transaction[]
+  splitTransactions SplitTransaction[]
+  
+  @@map("contacts")
+}
+
+// Transferências
+
+model Transfer {
+  id                 String    @id @default(cuid())
+  userId             String    @map("user_id")
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  originAccountId    String    @map("origin_account_id")
+  originAccount      Account   @relation("TransferOrigin", fields: [originAccountId], references: [id])
+  destinationAccountId String  @map("destination_account_id")
+  destinationAccount Account  @relation("TransferDestination", fields: [destinationAccountId], references: [id])
+  
+  amount             Decimal   @db.Decimal(15, 2)
+  date               DateTime  @db.Date
+  notes              String?
+  
+  createdAt          DateTime  @default(now()) @map("created_at")
+  
+  @@map("transfers")
+}
+
+// Investimentos
+
+model Asset {
+  id        String    @id @default(cuid())
+  ticker    String?
+  name      String
+  type      String    // 'ACAO_B3' | 'ACAO_NYSE' | 'ACAO_NASDAQ' | 'OPCAO' | 'FII' | 'ETF' | 'FUTURO' | 'CRIPTO' | 'CDB' | 'LCA' | 'LCI' | 'LCM' | 'LCH' | 'DEBENTURE' | 'TESOURO' | 'POUPANCA' | 'FUNDO' | 'PREVIDENCIA' | 'CAPITALIZACAO' | 'MOEDA' | 'BEM_IMOVEL' | 'BEM_VEICULO' | 'BEM_OUTRO'
+  sector    String?
+  currency  String    @default("BRL")
+  
+  createdAt DateTime  @default(now()) @map("created_at")
+  
+  // Relacionamentos
+  investmentTransactions InvestmentTransaction[]
+  portfolios Portfolio[]
+  
+  @@map("assets")
+}
+
+model InvestmentTransaction {
+  id          String    @id @default(cuid())
+  userId      String    @map("user_id")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  assetId     String?   @map("asset_id")
+  asset       Asset?    @relation(fields: [assetId], references: [id])
+  accountId   String?   @map("account_id")
+  account     Account?  @relation(fields: [accountId], references: [id])
+  
+  type        String    // 'COMPRA' | 'VENDA' | 'DIVIDENDO' | 'JCP' | 'BONIFICACAO' | 'DESDOBRAMENTO' | 'GRUPAMENTO'
+  quantity    Decimal?  @db.Decimal(15, 8)
+  unitPrice   Decimal?  @map("unit_price") @db.Decimal(15, 8)
+  fees        Decimal   @default(0) @db.Decimal(15, 2)
+  date        DateTime  @db.Date
+  notes       String?
+  
+  createdAt   DateTime  @default(now()) @map("created_at")
+  
+  @@map("investment_transactions")
+}
+
+model Portfolio {
+  id            String    @id @default(cuid())
+  userId        String    @map("user_id")
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  assetId       String    @map("asset_id")
+  asset         Asset     @relation(fields: [assetId], references: [id])
+  
+  totalQuantity Decimal   @default(0) @map("total_quantity") @db.Decimal(15, 8)
+  averagePrice  Decimal   @default(0) @map("average_price") @db.Decimal(15, 8)
+  
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  
+  @@unique([userId, assetId])
+  @@map("portfolios")
+}
+
+// Tabela de relacionamento many-to-many para Tags
+
+model TransactionTag {
+  transactionId String    @map("transaction_id")
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  tagId         String    @map("tag_id")
+  tag           Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  
+  @@id([transactionId, tagId])
+  @@map("transaction_tags")
+}
