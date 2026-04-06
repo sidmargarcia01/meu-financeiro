@@ -52,34 +52,42 @@ export async function withAuth(
   request: NextRequest,
   handler: (request: NextRequest, user: AuthUser) => Promise<NextResponse>
 ): Promise<NextResponse> {
-  // Extrair token da requisição
+  // Prioridade 1: headers injetados pelo middleware Next.js (Supabase session)
+  const userId = request.headers.get('x-user-id')
+  const userEmail = request.headers.get('x-user-email')
+
+  if (userId) {
+    const user: AuthUser = {
+      id: userId,
+      email: userEmail ?? '',
+    }
+    return handler(request, user)
+  }
+
+  // Prioridade 2: Bearer JWT (fallback para chamadas diretas à API)
   const token = extractToken(request)
-  
+
   if (!token) {
     return NextResponse.json(
       { error: 'Token não fornecido' },
       { status: 401 }
     )
   }
-  
-  // Verificar token
+
   const payload = verifyToken(token)
-  
+
   if (!payload) {
     return NextResponse.json(
       { error: 'Token inválido ou expirado' },
       { status: 401 }
     )
   }
-  
-  // Buscar dados completos do usuário no Supabase
-  // TODO: Implementar busca no banco quando tivermos o repositório
+
   const user: AuthUser = {
     id: payload.userId,
     email: payload.email,
   }
-  
-  // Executar handler com usuário autenticado
+
   return handler(request, user)
 }
 

@@ -85,9 +85,10 @@ export async function middleware(req: NextRequest) {
       )
     }
 
-    // Adicionar ID do usuário ao header para uso nas APIs
+    // Adicionar dados do usuário ao header para uso nas APIs
     const requestHeaders = new Headers(req.headers)
     requestHeaders.set('x-user-id', session.user.id)
+    requestHeaders.set('x-user-email', session.user.email ?? '')
 
     return NextResponse.next({
       request: {
