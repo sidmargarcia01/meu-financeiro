@@ -1,304 +1,205 @@
 /**
  * CAMADA: Service
  * MÓDULO: Dashboard
- * RESPONSABILIDADE: Regras de negócio para dashboard e relatórios
- * NÃO DEVE: Acessar banco de dados diretamente
- * DEPENDE DE: TransactionRepository, CategoryRepository, AccountRepository
+ * RESPONSABILIDADE: Agregar dados de múltiplos repositórios para o dashboard
+ * NÃO DEVE: Acessar banco de dados diretamente, importar Prisma ou Supabase,
+ *            reimplementar regras já existentes em outros services
+ * DEPENDE DE: accountRepository, transactionRepository
  */
 
-import { TransactionRepository } from '@/repositories/transactionRepository'
-import { CategoryRepository } from '@/repositories/categoryRepository'
-import { AccountRepository } from '@/repositories/accountRepository'
-import { globalCache } from '@/utils/cache'
+import { accountRepository } from '@/repositories/accountRepository'
+import { transactionRepository } from '@/repositories/transactionRepository'
 
-export interface DashboardSummary {
-  totalBalance: number
-  projectedBalance: number
-  monthIncome: number
-  monthExpense: number
-  monthNet: number
-  lastMonthIncome: number
-  lastMonthExpense: number
-  lastMonthNet: number
-  incomeVariation: number
-  expenseVariation: number
-  netVariation: number
-}
+class DashboardService {
+  // ─── WIDGET 1: SALDO CONSOLIDADO ───────────────────────────────────────────
 
-export interface CategorySummary {
-  categoryId: string
-  categoryName: string
-  categoryColor?: string
-  categoryIcon?: string
-  total: number
-  percentage: number
-  transactionCount: number
-}
-
-export interface AccountSummary {
-  accountId: string
-  accountName: string
-  accountType: string
-  currentBalance: number
-  projectedBalance: number
-  monthIncome: number
-  monthExpense: number
-}
-
-export interface RecentTransaction {
-  id: string
-  description: string
-  amount: number
-  type: 'RECEITA' | 'DESPESA' | 'TRANSFERENCIA'
-  status: 'PENDENTE' | 'CONFIRMADO' | 'CONCILIADO'
-  dueDate: string
-  accountName: string
-  categoryName?: string
-  tags?: string[]
-}
-
-export class DashboardService {
-  constructor(
-    private transactionRepository: TransactionRepository = new TransactionRepository(),
-    private categoryRepository: CategoryRepository = new CategoryRepository(),
-    private accountRepository: AccountRepository = new AccountRepository()
-  ) {}
-
-  async getDashboardSummary(userId: string): Promise<DashboardSummary> {
-    // Gerar chave de cache
-    const cacheKey = globalCache.generateKey('dashboard_summary', { userId })
+  async getSaldoConsolidado(userId: string) {
+    // Buscar todas as contas ativas
+    const accounts = await accountRepository.findAllByUser(userId, false)
     
-    // Tentar obter do cache
-    const cached = globalCache.get<DashboardSummary>(cacheKey)
-    if (cached) {
-      return cached
-    }
-    
-    const now = new Date()
-    const currentMonth = now.getMonth()
-    const currentYear = now.getFullYear()
-    
-    const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1
-    const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear
-    
-    // Paralelizar queries independentes
-    const [accounts, currentMonthTransactions, lastMonthTransactions] = await Promise.all([
-      this.accountRepository.listWithBalances(userId),
-      this.transactionRepository.list(userId, {
-        startDate: new Date(currentYear, currentMonth, 1).toISOString(),
-        endDate: new Date(currentYear, currentMonth + 1, 0).toISOString()
-      }),
-      this.transactionRepository.list(userId, {
-        startDate: new Date(lastMonthYear, lastMonth, 1).toISOString(),
-        endDate: new Date(lastMonthYear, lastMonth + 1, 0).toISOString()
-      })
-    ])
-    
-    // Calcular saldos
-    const totalBalance = accounts.reduce((sum, account) => sum + account.currentBalance, 0)
-    const projectedBalance = accounts.reduce((sum, account) => sum + account.projectedBalance, 0)
-    
-    // Agregar por tipo em uma única passada
-    const aggregateByType = (transactions: any[]) => {
-      return transactions.reduce((acc, t) => {
-        if (t.type === 'RECEITA') {
-          acc.income += t.amount
-        } else if (t.type === 'DESPESA') {
-          acc.expense += t.amount
-        }
-        return acc
-      }, { income: 0, expense: 0 })
-    }
-    
-    const currentMonthAgg = aggregateByType(currentMonthTransactions || [])
-    const lastMonthAgg = aggregateByType(lastMonthTransactions || [])
-    
-    const monthIncome = currentMonthAgg.income
-    const monthExpense = currentMonthAgg.expense
-    const monthNet = monthIncome - monthExpense
-    
-    const lastMonthIncome = lastMonthAgg.income
-    const lastMonthExpense = lastMonthAgg.expense
-    const lastMonthNet = lastMonthIncome - lastMonthExpense
-    
-    // Variações percentuais
-    const incomeVariation = lastMonthIncome > 0 
-      ? ((monthIncome - lastMonthIncome) / lastMonthIncome) * 100 
-      : 0
-    
-    const expenseVariation = lastMonthExpense > 0 
-      ? ((monthExpense - lastMonthExpense) / lastMonthExpense) * 100 
-      : 0
-    
-    const netVariation = lastMonthNet > 0 
-      ? ((monthNet - lastMonthNet) / Math.abs(lastMonthNet)) * 100 
-      : 0
-    
-    const result = {
-      totalBalance,
-      projectedBalance,
-      monthIncome,
-      monthExpense,
-      monthNet,
-      lastMonthIncome,
-      lastMonthExpense,
-      lastMonthNet,
-      incomeVariation,
-      expenseVariation,
-      netVariation
-    }
-    
-    // Salvar no cache por 5 minutos
-    globalCache.set(cacheKey, result, 5 * 60 * 1000)
-    
-    return result
-  }
-
-  async getCategorySummary(userId: string, type?: 'RECEITA' | 'DESPESA'): Promise<CategorySummary[]> {
-    const now = new Date()
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-    
-    const transactions = await this.transactionRepository.list(userId, {
-      startDate: monthStart.toISOString(),
-      endDate: monthEnd.toISOString(),
-      type
-    })
-    
-    // Agrupar por categoria
-    const categoryMap = new Map<string, {
-      total: number
-      count: number
-      categoryId: string
-    }>()
-    
-    transactions.forEach(transaction => {
-      if (transaction.categoryId) {
-        const existing = categoryMap.get(transaction.categoryId) || {
-          total: 0,
-          count: 0,
-          categoryId: transaction.categoryId
-        }
-        
-        existing.total += transaction.amount
-        existing.count += 1
-        
-        categoryMap.set(transaction.categoryId, existing)
+    if (accounts.length === 0) {
+      return {
+        total_projetado: 0,
+        total_confirmado: 0,
+        por_conta: []
       }
-    })
+    }
     
-    // Buscar informações das categorias
-    const categoryIds = Array.from(categoryMap.keys())
-    const categories = await Promise.all(
-      categoryIds.map(id => this.categoryRepository.findById(id, userId))
-    )
-    
-    const total = Array.from(categoryMap.values()).reduce((sum, cat) => sum + cat.total, 0)
-    
-    return Array.from(categoryMap.entries())
-      .map(([categoryId, data]) => {
-        const category = categories.find(c => c?.id === categoryId)
-        
-        return {
-          categoryId,
-          categoryName: category?.name || 'Sem categoria',
-          categoryColor: category?.color,
-          categoryIcon: category?.icon,
-          total: data.total,
-          percentage: total > 0 ? (data.total / total) * 100 : 0,
-          transactionCount: data.count
-        }
-      })
-      .sort((a, b) => b.total - a.total)
-  }
-
-  async getAccountSummary(userId: string): Promise<AccountSummary[]> {
-    const now = new Date()
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-    
-    const accounts = await this.accountRepository.listWithBalances(userId)
-    
-    return Promise.all(
+    // Para cada conta, buscar saldos
+    const porConta = await Promise.all(
       accounts.map(async account => {
-        const transactions = await this.transactionRepository.list(userId, {
-          accountId: account.id,
-          startDate: monthStart.toISOString(),
-          endDate: monthEnd.toISOString()
-        })
+        // Buscar saldo projetado (todas as transações)
+        const projetado = await transactionRepository.sumByAccount(account.id)
         
-        const monthIncome = transactions
-          .filter(t => t.type === 'RECEITA')
-          .reduce((sum, t) => sum + t.amount, 0)
-        
-        const monthExpense = transactions
-          .filter(t => t.type === 'DESPESA')
-          .reduce((sum, t) => sum + t.amount, 0)
+        // Buscar saldo confirmado (apenas transações confirmadas)
+        const confirmado = await transactionRepository.sumByAccount(account.id, ['CONFIRMADO', 'CONCILIADO'])
         
         return {
-          accountId: account.id,
-          accountName: account.name,
-          accountType: account.type,
-          currentBalance: account.currentBalance,
-          projectedBalance: account.projectedBalance,
-          monthIncome,
-          monthExpense
+          account_id: account.id,
+          account_name: account.name,
+          projetado,
+          confirmado,
+          currency: account.currency || 'BRL'
         }
       })
     )
+    
+    // Calcular totais
+    const total_projetado = porConta.reduce((sum, conta) => sum + conta.projetado, 0)
+    const total_confirmado = porConta.reduce((sum, conta) => sum + conta.confirmado, 0)
+    
+    return {
+      total_projetado,
+      total_confirmado,
+      por_conta: porConta
+    }
   }
 
-  async getRecentTransactions(userId: string, limit: number = 10): Promise<RecentTransaction[]> {
-    const transactions = await this.transactionRepository.list(userId, {
-      limit
-    })
+  // ─── WIDGET 2: RESUMO MENSAL ──────────────────────────────────────────────
+
+  async getResumoMensal(userId: string, mes?: number, ano?: number) {
+    // Usar mês e ano correntes se não informados
+    const agora = new Date()
+    const mesAtual = mes || agora.getMonth() + 1
+    const anoAtual = ano || agora.getFullYear()
     
-    return transactions.map(transaction => ({
-      id: transaction.id,
-      description: transaction.description,
-      amount: transaction.amount,
-      type: transaction.type,
-      status: transaction.status,
-      dueDate: transaction.dueDate.toISOString(),
-      accountName: transaction.account?.name || 'Conta desconhecida',
-      categoryName: transaction.category?.name,
-      tags: transaction.tags?.map((t: any) => t.name) || []
-    }))
+    // Buscar resumo do mês corrente
+    const resumoAtual = await transactionRepository.getMonthlySummary(userId, mesAtual, anoAtual)
+    
+    // Buscar resumo do mês anterior para comparativo
+    let mesAnterior = mesAtual - 1
+    let anoAnterior = anoAtual
+    
+    if (mesAnterior === 0) {
+      mesAnterior = 12
+      anoAnterior = anoAtual - 1
+    }
+    
+    const resumoAnterior = await transactionRepository.getMonthlySummary(userId, mesAnterior, anoAnterior)
+    
+    // Calcular variações percentuais
+    const variacaoReceitas = resumoAnterior.receitas > 0 
+      ? ((resumoAtual.receitas - resumoAnterior.receitas) / resumoAnterior.receitas) * 100 
+      : 0
+    
+    const variacaoDespesas = resumoAnterior.despesas > 0 
+      ? ((resumoAtual.despesas - resumoAnterior.despesas) / resumoAnterior.despesas) * 100 
+      : 0
+    
+    return {
+      receitas: resumoAtual.receitas,
+      despesas: resumoAtual.despesas,
+      saldo: resumoAtual.receitas - resumoAtual.despesas,
+      comparativo: {
+        variacao_receitas: variacaoReceitas,
+        variacao_despesas: variacaoDespesas
+      }
+    }
   }
 
-  async getMonthlyEvolution(userId: string, months: number = 12): Promise<any[]> {
-    const evolution = []
-    const now = new Date()
+  // ─── WIDGET 3: FLUXO DE CAIXA ────────────────────────────────────────────
+
+  async getFluxoCaixa(userId: string, meses: number = 6) {
+    const mesesArray = []
+    const agora = new Date()
     
-    for (let i = months - 1; i >= 0; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const year = date.getFullYear()
-      const month = date.getMonth()
-      
-      const monthStart = new Date(year, month, 1)
-      const monthEnd = new Date(year, month + 1, 0)
-      
-      const transactions = await this.transactionRepository.list(userId, {
-        startDate: monthStart.toISOString(),
-        endDate: monthEnd.toISOString()
-      })
-      
-      const income = transactions
-        .filter(t => t.type === 'RECEITA')
-        .reduce((sum, t) => sum + t.amount, 0)
-      
-      const expense = transactions
-        .filter(t => t.type === 'DESPESA')
-        .reduce((sum, t) => sum + t.amount, 0)
-      
-      evolution.push({
-        month: monthStart.toISOString(),
-        income,
-        expense,
-        net: income - expense
+    // Gerar array com os últimos N meses
+    for (let i = meses - 1; i >= 0; i--) {
+      const data = new Date(agora.getFullYear(), agora.getMonth() - i, 1)
+      mesesArray.push({
+        mes: data.getMonth() + 1,
+        ano: data.getFullYear()
       })
     }
     
-    return evolution
+    // Para cada mês, buscar dados
+    const dadosMeses = await Promise.all(
+      mesesArray.map(async ({ mes, ano }) => {
+        const resumo = await transactionRepository.getMonthlySummary(userId, mes, ano)
+        
+        return {
+          mes,
+          ano,
+          receitas: resumo.receitas,
+          despesas: resumo.despesas,
+          saldo: resumo.receitas - resumo.despesas
+        }
+      })
+    )
+    
+    return {
+      meses: dadosMeses
+    }
+  }
+
+  // ─── WIDGET 4: LANÇAMENTOS PRÓXIMOS ──────────────────────────────────────
+
+  async getLancamentosProximos(userId: string) {
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+    
+    // Calcular o range de datas: de 30 dias atrás até 7 dias à frente
+    const dataInicio = new Date(hoje)
+    dataInicio.setDate(dataInicio.getDate() - 30)
+    
+    const dataFim = new Date(hoje)
+    dataFim.setDate(dataFim.getDate() + 7)
+    
+    // Buscar lançamentos pendentes no período
+    const lancamentos = await transactionRepository.findUpcoming(userId, {
+      status: 'PENDENTE',
+      dateFrom: dataInicio.toISOString().split('T')[0],
+      dateTo: dataFim.toISOString().split('T')[0]
+    })
+    
+    // Separar vencidos dos próximos
+    const vencidos = lancamentos.filter(l => {
+      const dataVencimento = new Date(l.dueDate)
+      dataVencimento.setHours(0, 0, 0, 0)
+      return dataVencimento < hoje
+    })
+    
+    const proximos7Dias = lancamentos.filter(l => {
+      const dataVencimento = new Date(l.dueDate)
+      dataVencimento.setHours(0, 0, 0, 0)
+      return dataVencimento >= hoje && dataVencimento <= dataFim
+    })
+    
+    return {
+      vencidos,
+      proximos_7_dias: proximos7Dias
+    }
+  }
+
+  // ─── WIDGET 5: DISTRIBUIÇÃO POR CATEGORIA ────────────────────────────────
+
+  async getDistribuicaoCategorias(userId: string, mes: number, ano: number) {
+    // Buscar somatório por categoria de despesas
+    const dadosCategorias = await transactionRepository.sumByCategory(userId, {
+      type: 'DESPESA',
+      mes,
+      ano
+    })
+    
+    // Calcular total de despesas
+    const totalDespesas = dadosCategorias.reduce((sum, cat) => sum + cat.total, 0)
+    
+    // Calcular percentual de cada categoria
+    const categorias = dadosCategorias.map(cat => ({
+      category_id: cat.category_id,
+      category_name: cat.category_name,
+      total: cat.total,
+      percentual: totalDespesas > 0 ? Math.round((cat.total / totalDespesas) * 100) : 0
+    }))
+    
+    // Ordenar do maior para o menor
+    categorias.sort((a, b) => b.total - a.total)
+    
+    return {
+      total_despesas: totalDespesas,
+      categorias
+    }
   }
 }
+
+export const dashboardService = new DashboardService()

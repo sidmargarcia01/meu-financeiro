@@ -3,10 +3,10 @@
  * MÓDULO: Account
  * RESPONSABILIDADE: Acesso ao banco de dados para contas
  * NÃO DEVE: Conter regras de negócio ou validação
- * DEPENDE DE: Prisma, Account models
+ * DEPENDE DE: Supabase, Account models
  */
 
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase'
 import { 
   Account, 
   AccountWithBalance, 
@@ -25,115 +25,175 @@ export class AccountRepository {
     icon?: string
     bankConnectionId?: string
   }): Promise<Account> {
-    const account = await prisma.account.create({
-      data,
-    })
+    const { data: account, error } = await supabase
+      .from('accounts')
+      .insert({
+        user_id: data.userId,
+        name: data.name,
+        type: data.type,
+        initial_balance: data.initialBalance || 0,
+        currency: data.currency || 'BRL',
+        icon: data.icon,
+        bank_connection_id: data.bankConnectionId,
+        is_active: true
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
     
     return {
-      ...account,
-      initialBalance: Number(account.initialBalance)
-    } as Account
+      id: account.id,
+      userId: account.user_id,
+      name: account.name,
+      type: account.type,
+      initialBalance: Number(account.initial_balance),
+      currency: account.currency,
+      icon: account.icon,
+      isActive: account.is_active,
+      bankConnectionId: account.bank_connection_id,
+      createdAt: new Date(account.created_at)
+    }
   }
 
   // Buscar conta por ID
   async findById(id: string, userId: string): Promise<Account | null> {
-    const account = await prisma.account.findFirst({
-      where: { 
-        id,
-        userId 
-      },
-    })
+    const { data: account, error } = await supabase
+      .from('accounts')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single()
     
-    if (!account) return null
+    if (error || !account) return null
     
     return {
-      ...account,
-      initialBalance: Number(account.initialBalance)
-    } as Account
+      id: account.id,
+      userId: account.user_id,
+      name: account.name,
+      type: account.type,
+      initialBalance: Number(account.initial_balance),
+      currency: account.currency,
+      icon: account.icon,
+      isActive: account.is_active,
+      bankConnectionId: account.bank_connection_id,
+      createdAt: new Date(account.created_at)
+    }
   }
 
   // Buscar conta com cartão de crédito
   async findByIdWithCreditCard(id: string, userId: string): Promise<AccountWithCreditCard | null> {
-    const account = await prisma.account.findFirst({
-      where: { 
-        id,
-        userId 
-      },
-      include: {
-        creditCards: true,
-      },
-    })
+    const { data: account, error } = await supabase
+      .from('accounts')
+      .select(`
+        *,
+        credit_cards(*)
+      `)
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single()
     
-    if (!account) return null
+    if (error || !account) return null
     
-    const creditCard = account.creditCards[0] || null
+    const creditCard = (account.credit_cards as any[])?.[0] || null
     
     return {
-      ...account,
-      initialBalance: Number(account.initialBalance),
+      id: account.id,
+      userId: account.user_id,
+      name: account.name,
+      type: account.type,
+      initialBalance: Number(account.initial_balance),
+      currency: account.currency,
+      icon: account.icon,
+      isActive: account.is_active,
+      bankConnectionId: account.bank_connection_id,
+      createdAt: new Date(account.created_at),
       creditCard: creditCard ? {
-        ...creditCard,
-        creditLimit: creditCard.creditLimit ? Number(creditCard.creditLimit) : undefined
+        id: creditCard.id,
+        accountId: creditCard.account_id,
+        creditLimit: creditCard.credit_limit ? Number(creditCard.credit_limit) : undefined,
+        closingDay: creditCard.closing_day,
+        dueDay: creditCard.due_day,
+        createdAt: new Date(creditCard.created_at)
       } : undefined
-    } as AccountWithCreditCard
+    }
   }
 
   // Listar contas do usuário
   async list(userId: string, activeOnly: boolean = true): Promise<Account[]> {
-    const where: any = { userId }
-    if (activeOnly) where.isActive = true
+    let query = supabase
+      .from('accounts')
+      .select('*')
+      .eq('user_id', userId)
+      .order('type', { ascending: true })
+      .order('name', { ascending: true })
     
-    const accounts = await prisma.account.findMany({
-      where,
-      orderBy: [
-        { type: 'asc' },
-        { name: 'asc' },
-      ],
-    })
+    if (activeOnly) {
+      query = query.eq('is_active', true)
+    }
     
-    return accounts.map(account => ({
-      ...account,
-      initialBalance: Number(account.initialBalance)
-    })) as Account[]
+    const { data: accounts, error } = await query
+    
+    if (error) throw error
+    
+    return (accounts || []).map(account => ({
+      id: account.id,
+      userId: account.user_id,
+      name: account.name,
+      type: account.type,
+      initialBalance: Number(account.initial_balance),
+      currency: account.currency,
+      icon: account.icon,
+      isActive: account.is_active,
+      bankConnectionId: account.bank_connection_id,
+      createdAt: new Date(account.created_at)
+    }))
   }
 
   // Listar contas com saldos
   async listWithBalances(userId: string): Promise<AccountWithBalance[]> {
-    const accounts = await prisma.account.findMany({
-      where: { 
-        userId,
-        isActive: true 
-      },
-      include: {
-        transactions: {
-          select: {
-            amount: true,
-            status: true,
-          },
-        },
-      },
-      orderBy: [
-        { type: 'asc' },
-        { name: 'asc' },
-      ],
-    })
+    const { data: accounts, error } = await supabase
+      .from('accounts')
+      .select(`
+        *,
+        transactions (
+          amount,
+          status
+        )
+      `)
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('type', { ascending: true })
+      .order('name', { ascending: true })
+    
+    if (error) throw error
     
     // Calcular saldos
-    return accounts.map((account: any) => {
-      const projectedBalance = account.transactions.reduce(
+    return (accounts || []).map((account: any) => {
+      const transactions = account.transactions || []
+      const projectedBalance = transactions.reduce(
         (sum: number, t: any) => sum + Number(t.amount), 
-        Number(account.initialBalance)
+        Number(account.initial_balance)
       )
       
-      const confirmedBalance = account.transactions
-        .filter((t: any) => t.status === 'CONFIRMADO' || t.status === 'CONCILIADO')
-        .reduce((sum: number, t: any) => sum + Number(t.amount), Number(account.initialBalance))
+      const confirmedBalance = transactions
+        .filter((t: any) => ['CONFIRMADO', 'CONCILIADO'].includes(t.status))
+        .reduce((sum: number, t: any) => sum + Number(t.amount), Number(account.initial_balance))
       
       return {
-        ...account,
+        id: account.id,
+        userId: account.user_id,
+        name: account.name,
+        type: account.type,
+        initialBalance: Number(account.initial_balance),
+        currency: account.currency,
+        icon: account.icon,
+        isActive: account.is_active,
+        bankConnectionId: account.bank_connection_id,
         currentBalance: projectedBalance,
         projectedBalance,
         confirmedBalance,
+        createdAt: new Date(account.created_at)
       }
     })
   }
@@ -151,28 +211,46 @@ export class AccountRepository {
       bankConnectionId?: string
     }>
   ): Promise<Account> {
-    const account = await prisma.account.update({
-      where: { 
-        id,
-        userId 
-      },
-      data,
-    })
+    const { data: account, error } = await supabase
+      .from('accounts')
+      .update({
+        name: data.name,
+        type: data.type,
+        currency: data.currency,
+        icon: data.icon,
+        is_active: data.isActive,
+        bank_connection_id: data.bankConnectionId
+      })
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select()
+      .single()
+    
+    if (error) throw error
     
     return {
-      ...account,
-      initialBalance: Number(account.initialBalance)
-    } as Account
+      id: account.id,
+      userId: account.user_id,
+      name: account.name,
+      type: account.type,
+      initialBalance: Number(account.initial_balance),
+      currency: account.currency,
+      icon: account.icon,
+      isActive: account.is_active,
+      bankConnectionId: account.bank_connection_id,
+      createdAt: new Date(account.created_at)
+    }
   }
 
   // Excluir conta
   async delete(id: string, userId: string): Promise<void> {
-    await prisma.account.delete({
-      where: { 
-        id,
-        userId 
-      },
-    })
+    const { error } = await supabase
+      .from('accounts')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', userId)
+    
+    if (error) throw error
   }
 
   // Criar cartão de crédito
@@ -182,35 +260,47 @@ export class AccountRepository {
     closingDay: number
     dueDay: number
   }): Promise<CreditCard> {
-    const creditCard = await prisma.creditCard.create({
-      data,
-    })
+    const { data: creditCard, error } = await supabase
+      .from('credit_cards')
+      .insert({
+        account_id: data.accountId,
+        credit_limit: data.creditLimit,
+        closing_day: data.closingDay,
+        due_day: data.dueDay
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
     
     return {
-      ...creditCard,
-      creditLimit: creditCard.creditLimit ? Number(creditCard.creditLimit) : undefined
-    } as CreditCard
+      id: creditCard.id,
+      accountId: creditCard.account_id,
+      creditLimit: creditCard.credit_limit ? Number(creditCard.credit_limit) : undefined,
+      closingDay: creditCard.closing_day,
+      dueDay: creditCard.due_day,
+      createdAt: new Date(creditCard.created_at)
+    }
   }
 
   // Buscar cartão de crédito por ID
   async findCreditCardById(id: string): Promise<CreditCard | null> {
-    const creditCard = await prisma.creditCard.findUnique({
-      where: { id },
-      include: {
-        account: {
-          select: {
-            userId: true,
-          },
-        },
-      },
-    })
+    const { data: creditCard, error } = await supabase
+      .from('credit_cards')
+      .select('*')
+      .eq('id', id)
+      .single()
     
-    if (!creditCard) return null
+    if (error || !creditCard) return null
     
     return {
-      ...creditCard,
-      creditLimit: creditCard.creditLimit ? Number(creditCard.creditLimit) : undefined
-    } as CreditCard
+      id: creditCard.id,
+      accountId: creditCard.account_id,
+      creditLimit: creditCard.credit_limit ? Number(creditCard.credit_limit) : undefined,
+      closingDay: creditCard.closing_day,
+      dueDay: creditCard.due_day,
+      createdAt: new Date(creditCard.created_at)
+    }
   }
 
   // Atualizar cartão de crédito
@@ -222,90 +312,160 @@ export class AccountRepository {
       dueDay?: number
     }>
   ): Promise<CreditCard> {
-    const creditCard = await prisma.creditCard.update({
-      where: { id },
-      data,
-    })
+    const { data: creditCard, error } = await supabase
+      .from('credit_cards')
+      .update({
+        credit_limit: data.creditLimit,
+        closing_day: data.closingDay,
+        due_day: data.dueDay
+      })
+      .eq('id', id)
+      .select()
+      .single()
+    
+    if (error) throw error
     
     return {
-      ...creditCard,
-      creditLimit: creditCard.creditLimit ? Number(creditCard.creditLimit) : undefined
-    } as CreditCard
+      id: creditCard.id,
+      accountId: creditCard.account_id,
+      creditLimit: creditCard.credit_limit ? Number(creditCard.credit_limit) : undefined,
+      closingDay: creditCard.closing_day,
+      dueDay: creditCard.due_day,
+      createdAt: new Date(creditCard.created_at)
+    }
   }
 
   // Excluir cartão de crédito
   async deleteCreditCard(id: string): Promise<void> {
-    await prisma.creditCard.delete({
-      where: { id },
-    })
+    const { error } = await supabase
+      .from('credit_cards')
+      .delete()
+      .eq('id', id)
+    
+    if (error) throw error
   }
 
-  // Buscar cartão por account ID
+  // Buscar cartão de crédito por ID da conta
   async findCreditCardByAccountId(accountId: string): Promise<CreditCard | null> {
-    const creditCard = await prisma.creditCard.findFirst({
-      where: { accountId },
-    })
-
-    if (!creditCard) return null
+    const { data: creditCard, error } = await supabase
+      .from('credit_cards')
+      .select('*')
+      .eq('account_id', accountId)
+      .single()
+    
+    if (error || !creditCard) return null
     
     return {
-      ...creditCard,
-      creditLimit: creditCard.creditLimit ? Number(creditCard.creditLimit) : undefined
-    } as CreditCard
+      id: creditCard.id,
+      accountId: creditCard.account_id,
+      creditLimit: creditCard.credit_limit ? Number(creditCard.credit_limit) : undefined,
+      closingDay: creditCard.closing_day,
+      dueDay: creditCard.due_day,
+      createdAt: new Date(creditCard.created_at)
+    }
   }
 
-  // Verificar se conta existe e pertence ao usuário
+  // Verificar se conta existe
   async exists(id: string, userId: string): Promise<boolean> {
-    const account = await prisma.account.findFirst({
-      where: { 
-        id,
-        userId 
-      },
-      select: { id: true },
-    })
+    const { data: account, error } = await supabase
+      .from('accounts')
+      .select('id')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single()
     
-    return !!account
+    return !error && !!account
   }
 
   // Buscar contas por tipo
   async findByType(
-    userId: string, 
+    userId: string,
     type: 'CORRENTE' | 'POUPANCA' | 'INVESTIMENTO' | 'CARTAO' | 'CARTEIRA'
   ): Promise<Account[]> {
-    const accounts = await prisma.account.findMany({
-      where: { 
-        userId,
-        type,
-        isActive: true 
-      },
-      orderBy: { name: 'asc' },
-    })
+    const { data: accounts, error } = await supabase
+      .from('accounts')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('type', type)
+      .eq('is_active', true)
+      .order('name', { ascending: true })
     
-    return accounts.map(account => ({
-      ...account,
-      initialBalance: Number(account.initialBalance)
-    })) as Account[]
+    if (error) throw error
+    
+    return (accounts || []).map((account: any) => ({
+      id: account.id,
+      userId: account.user_id,
+      name: account.name,
+      type: account.type,
+      initialBalance: Number(account.initial_balance),
+      currency: account.currency,
+      icon: account.icon,
+      isActive: account.is_active,
+      bankConnectionId: account.bank_connection_id,
+      createdAt: new Date(account.created_at)
+    }))
   }
 
   // Contar contas do usuário
   async count(userId: string, activeOnly: boolean = true): Promise<number> {
-    const where: any = { userId }
-    if (activeOnly) where.isActive = true
+    let query = supabase
+      .from('accounts')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
     
-    const count = await prisma.account.count({ where })
+    if (activeOnly) {
+      query = query.eq('is_active', true)
+    }
     
-    return count
+    const { count, error } = await query
+    
+    if (error) throw error
+    
+    return count || 0
   }
 
-  // Verificar se conta tem transações vinculadas
+  // Verificar se conta possui transações
   async hasTransactions(accountId: string): Promise<boolean> {
-    const count = await prisma.transaction.count({
-      where: { accountId },
-    })
+    const { count, error } = await supabase
+      .from('transactions')
+      .select('*', { count: 'exact', head: true })
+      .eq('account_id', accountId)
     
-    return count > 0
+    if (error) throw error
+    
+    return (count || 0) > 0
+  }
+
+  // Buscar todas as contas de um usuário
+  async findAllByUser(userId: string, includeArchived = false): Promise<Account[]> {
+    let query = supabase
+      .from('accounts')
+      .select('*')
+      .eq('user_id', userId)
+      .order('type', { ascending: true })
+      .order('name', { ascending: true })
+    
+    if (!includeArchived) {
+      query = query.eq('is_active', true)
+    }
+    
+    const { data: accounts, error } = await query
+    
+    if (error) throw error
+    
+    return (accounts || []).map((account: any) => ({
+      id: account.id,
+      userId: account.user_id,
+      name: account.name,
+      type: account.type,
+      initialBalance: Number(account.initial_balance),
+      currency: account.currency,
+      icon: account.icon,
+      isActive: account.is_active,
+      bankConnectionId: account.bank_connection_id,
+      createdAt: new Date(account.created_at)
+    }))
   }
 }
 
-// Exportar instância singleton
 export const accountRepository = new AccountRepository()

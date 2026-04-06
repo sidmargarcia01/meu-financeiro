@@ -7,6 +7,8 @@
  */
 
 import { AccountRepository } from '@/repositories/accountRepository'
+import { TransactionRepository } from '@/repositories/transactionRepository'
+import { UserRepository } from '@/repositories/userRepository'
 import { createAccountSchema, updateAccountSchema, createCreditCardSchema } from '@/models/account'
 import type { z } from 'zod'
 
@@ -16,7 +18,9 @@ type CreateCreditCardInput = z.infer<typeof createCreditCardSchema>
 
 export class AccountService {
   constructor(
-    private accountRepository: AccountRepository = new AccountRepository()
+    private accountRepository: AccountRepository = new AccountRepository(),
+    private transactionRepository: TransactionRepository = new TransactionRepository(),
+    private userRepository: UserRepository = new UserRepository()
   ) {}
 
   async create(userId: string, data: z.infer<typeof createAccountSchema>) {
@@ -86,7 +90,7 @@ export class AccountService {
     // Verificar se há transações vinculadas
     const hasTransactions = await this.accountRepository.hasTransactions(accountId)
     if (hasTransactions) {
-      throw new Error('Não é possível excluir conta com transações vinculadas')
+      throw new Error('Conta possui lançamentos e não pode ser excluída. Arquive-a em vez de excluir.')
     }
     
     return this.accountRepository.delete(accountId, userId)
@@ -154,6 +158,36 @@ export class AccountService {
     return this.accountRepository.findByType(userId, type)
   }
 
+  // Calcular saldo projetado e confirmado
+  async calculateBalance(accountId: string, userId: string) {
+    // Buscar conta para verificar ownership e obter saldo inicial
+    const account = await this.accountRepository.findById(accountId, userId)
+    if (!account) {
+      throw new Error('Conta não encontrada')
+    }
+
+    // Calcular saldo projetado (soma PENDENTE + CONFIRMADO + CONCILIADO)
+    const projectedSum = await this.transactionRepository.sumByAccount(
+      accountId, 
+      ['PENDENTE', 'CONFIRMADO', 'CONCILIADO']
+    )
+
+    // Calcular saldo confirmado (soma apenas CONFIRMADO + CONCILIADO)
+    const confirmedSum = await this.transactionRepository.sumByAccount(
+      accountId, 
+      ['CONFIRMADO', 'CONCILIADO']
+    )
+
+    // Saldo inicial + somas
+    const projected = account.initialBalance + projectedSum
+    const confirmed = account.initialBalance + confirmedSum
+
+    return {
+      projected,
+      confirmed
+    }
+  }
+
   // Métodos privados
 
   private validateAccountData(data: CreateAccountInput) {
@@ -175,8 +209,14 @@ export class AccountService {
   }
 
   private async getMaxAccountsForUser(userId: string): Promise<number> {
-    // TODO: Implementar busca real do plano do usuário
-    // Por enquanto, retorna um valor padrão
-    return 10
+    // Buscar plano do usuário
+    const plan = await this.userRepository.getUserPlan(userId)
+    
+    // Se não tem plano, é admin - sem limite
+    if (!plan || !plan.userLimit) {
+      return Number.MAX_SAFE_INTEGER
+    }
+    
+    return plan.userLimit
   }
 }

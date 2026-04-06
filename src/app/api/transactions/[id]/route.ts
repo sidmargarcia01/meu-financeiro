@@ -1,14 +1,16 @@
 /**
  * CAMADA: Routes
  * MÓDULO: Transactions
- * RESPONSABILIDADE: Endpoint para obter transação específica
+ * RESPONSABILIDADE: Endpoints GET | PUT | DELETE | PATCH para transação específica
  * NÃO DEVE: Conter lógica de negócio complexa
  * DEPENDE DE: Next.js, middlewares, TransactionService
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/middlewares/auth'
+import { withValidation } from '@/middlewares/validation'
 import { TransactionService } from '@/services/transactionService'
+import { updateTransactionSchema } from '@/models/transaction'
 
 const transactionService = new TransactionService()
 
@@ -19,21 +21,78 @@ export async function GET(
   return withAuth(request, async (req, user) => {
     try {
       const transaction = await transactionService.getTransaction(user.id, params.id)
-      
       if (!transaction) {
-        return NextResponse.json(
-          { error: 'Transação não encontrada' },
-          { status: 404 }
-        )
+        return NextResponse.json({ error: 'Transação não encontrada' }, { status: 404 })
       }
-      
       return NextResponse.json(transaction)
     } catch (error) {
-      console.error('Erro ao obter transação:', error)
-      return NextResponse.json(
-        { error: 'Erro ao obter transação' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Erro ao obter transação' }, { status: 500 })
+    }
+  })
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  return withAuth(request, async (req, user) => {
+    return withValidation(req, updateTransactionSchema, async (req, data) => {
+      try {
+        const transaction = await transactionService.updateTransaction(user.id, params.id, data)
+        return NextResponse.json(transaction)
+      } catch (error: any) {
+        if (error.message?.includes('não encontrada')) {
+          return NextResponse.json({ error: error.message }, { status: 404 })
+        }
+        return NextResponse.json({ error: 'Erro ao atualizar transação' }, { status: 500 })
+      }
+    })
+  })
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  return withAuth(request, async (req, user) => {
+    try {
+      await transactionService.deleteTransaction(user.id, params.id)
+      return NextResponse.json({ success: true })
+    } catch (error: any) {
+      if (error.message?.includes('não encontrada')) {
+        return NextResponse.json({ error: error.message }, { status: 404 })
+      }
+      return NextResponse.json({ error: 'Erro ao excluir transação' }, { status: 500 })
+    }
+  })
+}
+
+// PATCH /api/transactions/[id] — ação semântica via ?action=confirm|reconcile
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  return withAuth(request, async (req, user) => {
+    try {
+      const { searchParams } = new URL(req.url)
+      const action = searchParams.get('action')
+
+      if (action === 'confirm') {
+        const transaction = await transactionService.confirmTransaction(user.id, params.id)
+        return NextResponse.json(transaction)
+      }
+
+      if (action === 'reconcile') {
+        const transaction = await transactionService.reconcileTransaction(user.id, params.id)
+        return NextResponse.json(transaction)
+      }
+
+      return NextResponse.json({ error: 'Ação inválida. Use ?action=confirm ou ?action=reconcile' }, { status: 400 })
+    } catch (error: any) {
+      if (error.message?.includes('não encontrada')) {
+        return NextResponse.json({ error: error.message }, { status: 404 })
+      }
+      return NextResponse.json({ error: 'Erro ao processar ação' }, { status: 500 })
     }
   })
 }

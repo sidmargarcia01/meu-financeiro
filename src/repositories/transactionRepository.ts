@@ -89,6 +89,80 @@ export class TransactionRepository {
     } as Transaction
   }
 
+  // Criar múltiplas transações
+  async createMany(transactions: {
+    userId: string
+    accountId?: string
+    categoryId?: string
+    recurrenceId?: string
+    centerId?: string
+    projectId?: string
+    contactId?: string
+    description: string
+    amount: number
+    type: 'RECEITA' | 'DESPESA' | 'TRANSFERENCIA'
+    status?: 'PENDENTE' | 'CONFIRMADO' | 'CONCILIADO'
+    dueDate: Date
+    paymentDate?: Date
+    competenceDate?: Date
+    regime?: 'CAIXA' | 'COMPETENCIA'
+    isRecurring?: boolean
+    attachmentUrl?: string
+    notes?: string
+  }[]): Promise<Transaction[]> {
+    const transactionsToInsert = transactions.map(t => ({
+      user_id: t.userId,
+      account_id: t.accountId,
+      category_id: t.categoryId,
+      recurrence_id: t.recurrenceId,
+      center_id: t.centerId,
+      project_id: t.projectId,
+      contact_id: t.contactId,
+      description: t.description,
+      amount: t.amount,
+      type: t.type,
+      status: t.status || 'PENDENTE',
+      due_date: t.dueDate.toISOString().split('T')[0],
+      payment_date: t.paymentDate?.toISOString().split('T')[0],
+      competence_date: t.competenceDate?.toISOString().split('T')[0],
+      regime: t.regime || 'CAIXA',
+      is_recurring: t.isRecurring || false,
+      attachment_url: t.attachmentUrl,
+      notes: t.notes,
+    }))
+
+    const { data, error } = await supabase
+      .from('transactions')
+      .insert(transactionsToInsert)
+      .select()
+    
+    if (error) throw error
+    
+    return (data || []).map((transaction: any) => ({
+      id: transaction.id,
+      userId: transaction.user_id,
+      accountId: transaction.account_id,
+      categoryId: transaction.category_id,
+      recurrenceId: transaction.recurrence_id,
+      centerId: transaction.center_id,
+      projectId: transaction.project_id,
+      contactId: transaction.contact_id,
+      description: transaction.description,
+      amount: Number(transaction.amount),
+      type: transaction.type,
+      status: transaction.status,
+      dueDate: transaction.due_date,
+      paymentDate: transaction.payment_date,
+      competenceDate: transaction.competence_date,
+      regime: transaction.regime,
+      isRecurring: transaction.is_recurring,
+      attachmentUrl: transaction.attachment_url,
+      notes: transaction.notes,
+      createdAt: transaction.created_at,
+      updatedAt: transaction.updated_at,
+    } as Transaction))
+  }
+
   // Verificar se transação existe
   async exists(id: string, userId: string): Promise<boolean> {
     const { data, error } = await supabase
@@ -139,47 +213,6 @@ export class TransactionRepository {
     const { data, error } = await query
     if (error) throw error
     return data || []
-  }
-
-  // Resumo mensal
-  async getMonthlySummary(userId: string, months: number = 12): Promise<any[]> {
-    const summary = []
-    const now = new Date()
-    
-    for (let i = months - 1; i >= 0; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const year = date.getFullYear()
-      const month = date.getMonth()
-      
-      const monthStart = new Date(year, month, 1)
-      const monthEnd = new Date(year, month + 1, 0)
-      
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('amount, type')
-        .eq('user_id', userId)
-        .gte('due_date', monthStart.toISOString())
-        .lte('due_date', monthEnd.toISOString())
-      
-      if (error) throw error
-      
-      const income = (data || [])
-        .filter(t => t.type === 'RECEITA')
-        .reduce((sum, t) => sum + t.amount, 0)
-      
-      const expense = (data || [])
-        .filter(t => t.type === 'DESPESA')
-        .reduce((sum, t) => sum + t.amount, 0)
-      
-      summary.push({
-        month: monthStart.toISOString(),
-        income,
-        expense,
-        net: income - expense
-      })
-    }
-    
-    return summary
   }
 
   // Buscar saldos por conta
@@ -353,4 +386,210 @@ export class TransactionRepository {
       } : undefined,
     } as TransactionWithRelations
   }
+
+  // Somar valores por conta e status
+  // eslint-disable-next-line prefer-const
+  async sumByAccount(accountId: string, statusFilter?: string[]): Promise<number> {
+    let query = supabase
+      .from('transactions')
+      .select('amount, type')
+      .eq('account_id', accountId)
+    
+    if (statusFilter && statusFilter.length > 0) {
+      query = query.in('status', statusFilter)
+    }
+    
+    const { data, error } = await query
+    
+    if (error) throw error
+    
+    if (!data || data.length === 0) return 0
+    
+    return data.reduce((sum, transaction) => {
+      const amount = Number(transaction.amount)
+      return transaction.type === 'RECEITA' ? sum + amount : sum - amount
+    }, 0)
+  }
+
+  // Contar transações do usuário no mês
+  async countByUserMonth(userId: string, month: number, year: number): Promise<number> {
+    const startDate = new Date(year, month - 1, 1)
+    const endDate = new Date(year, month, 0)
+    
+    const { count, error } = await supabase
+      .from('transactions')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('due_date', startDate.toISOString().split('T')[0])
+      .lte('due_date', endDate.toISOString().split('T')[0])
+    
+    if (error) throw error
+    
+    return count || 0
+  }
+
+  /**
+   * MÉTODO: findUpcoming
+   * RESPONSABILIDADE: Buscar lançamentos próximos ao vencimento ou vencidos
+   * NÃO DEVE: Conter lógica de classificação (vencido vs próximo) — isso é do service
+   */
+  async findUpcoming(
+    userId: string,
+    filters: { status: string; dateFrom: string; dateTo: string }
+  ): Promise<Transaction[]> {
+    const query = supabase
+      .from('transactions')
+      .select(`
+        *,
+        account:accounts(id,name,type),
+        category:categories(id,name,type),
+        center:cost_centers(id,name,type),
+        project:projects(id,name,status),
+        contact:contacts(id,name,type)
+      `)
+      .eq('user_id', userId)
+      .eq('status', filters.status)
+      .gte('due_date', filters.dateFrom)
+      .lte('due_date', filters.dateTo)
+      .order('due_date', { ascending: true })
+
+    const { data, error } = await query
+
+    if (error) throw error
+
+    return (data || []).map((transaction: any) => ({
+      id: transaction.id,
+      userId: transaction.user_id,
+      accountId: transaction.account_id,
+      categoryId: transaction.category_id,
+      recurrenceId: transaction.recurrence_id,
+      centerId: transaction.center_id,
+      projectId: transaction.project_id,
+      contactId: transaction.contact_id,
+      description: transaction.description,
+      amount: Number(transaction.amount),
+      type: transaction.type,
+      status: transaction.status,
+      dueDate: transaction.due_date,
+      paymentDate: transaction.payment_date,
+      competenceDate: transaction.competence_date,
+      regime: transaction.regime,
+      isRecurring: transaction.is_recurring,
+      attachmentUrl: transaction.attachment_url,
+      notes: transaction.notes,
+      createdAt: transaction.created_at,
+      updatedAt: transaction.updated_at,
+      account: transaction.account ? {
+        id: transaction.account.id,
+        name: transaction.account.name,
+        type: transaction.account.type as 'CORRENTE' | 'POUPANCA' | 'INVESTIMENTO' | 'CARTAO' | 'CARTEIRA'
+      } : undefined,
+      category: transaction.category ? {
+        id: transaction.category.id,
+        name: transaction.category.name,
+        type: transaction.category.type as 'RECEITA' | 'DESPESA'
+      } : undefined,
+      center: transaction.center ? {
+        id: transaction.center.id,
+        name: transaction.center.name,
+        type: transaction.center.type
+      } : undefined,
+      project: transaction.project ? {
+        id: transaction.project.id,
+        name: transaction.project.name,
+        status: transaction.project.status
+      } : undefined,
+      contact: transaction.contact ? {
+        id: transaction.contact.id,
+        name: transaction.contact.name,
+        type: transaction.contact.type
+      } : undefined,
+    } as Transaction))
+  }
+
+  /**
+   * MÉTODO: sumByCategory
+   * RESPONSABILIDADE: Somar lançamentos agrupados por categoria
+   * NÃO DEVE: Calcular percentuais — isso é do service
+   */
+  async sumByCategory(
+    userId: string,
+    filters: { type: 'RECEITA' | 'DESPESA'; mes: number; ano: number }
+  ): Promise<Array<{ category_id: string; category_name: string; total: number }>> {
+    const startDate = new Date(filters.ano, filters.mes - 1, 1)
+    const endDate = new Date(filters.ano, filters.mes, 0)
+
+    const { data, error } = await supabase
+      .from('transactions')
+      .select(`
+        categories!inner(id, name),
+        amount
+      `)
+      .eq('user_id', userId)
+      .eq('type', filters.type)
+      .gte('due_date', startDate.toISOString().split('T')[0])
+      .lte('due_date', endDate.toISOString().split('T')[0])
+      .not('category_id', 'is', null)
+
+    if (error) throw error
+
+    // Agrupar por categoria e somar valores
+    const categoryMap = new Map<string, { category_id: string; category_name: string; total: number }>()
+
+    ;(data || []).forEach((item: any) => {
+      const categoryId = item.categories.id
+      const categoryName = item.categories.name
+      const amount = Number(item.amount)
+
+      if (categoryMap.has(categoryId)) {
+        const existing = categoryMap.get(categoryId)!
+        existing.total += amount
+      } else {
+        categoryMap.set(categoryId, {
+          category_id: categoryId,
+          category_name: categoryName,
+          total: amount
+        })
+      }
+    })
+
+    return Array.from(categoryMap.values())
+  }
+
+  // Sobrecarga do método getMonthlySummary para aceitar mês e ano específicos
+  async getMonthlySummary(userId: string, month: number, year: number): Promise<{
+    receitas: number
+    despesas: number
+    mes: number
+    ano: number
+  }> {
+    const startDate = new Date(year, month - 1, 1)
+    const endDate = new Date(year, month, 0)
+
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('amount, type')
+      .eq('user_id', userId)
+      .gte('due_date', startDate.toISOString().split('T')[0])
+      .lte('due_date', endDate.toISOString().split('T')[0])
+
+    if (error) throw error
+
+    const receitas = (data || [])
+      .filter(t => t.type === 'RECEITA')
+      .reduce((sum, t) => sum + Number(t.amount), 0)
+
+    const despesas = (data || [])
+      .filter(t => t.type === 'DESPESA')
+      .reduce((sum, t) => sum + Number(t.amount), 0)
+
+    return {
+      receitas,
+      despesas,
+      mes: month,
+      ano: year
+    }
+  }
 }
+
+export const transactionRepository = new TransactionRepository()

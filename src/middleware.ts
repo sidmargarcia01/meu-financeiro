@@ -26,10 +26,17 @@ export async function middleware(req: NextRequest) {
   } = await supabase.auth.getSession()
 
   // Rotas protegidas que requerem autenticação
-  const protectedRoutes = ['/dashboard', '/api/accounts', '/api/transactions', '/api/categories']
+  const protectedRoutes = [
+    '/dashboard', '/transactions', '/registers', '/reports',
+    '/investments', '/business', '/settings', '/tools',
+    '/api/accounts', '/api/transactions', '/api/categories',
+    '/api/dashboard', '/api/settings', '/api/reports',
+    '/api/investments', '/api/cost-centers', '/api/projects',
+    '/api/contacts', '/api/tags', '/api/import',
+  ]
   
   // Rotas de autenticação que não devem ser acessadas quando logado
-  const authRoutes = ['/login', '/register']
+  const authRoutes = ['/login', '/register', '/cadastro', '/recuperar-senha']
 
   const { pathname } = req.nextUrl
 

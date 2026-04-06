@@ -115,7 +115,81 @@ export class PlanService {
     }
     
     const features = plan.features as Record<string, any>
-    return features[feature] === true
+    
+    // Features específicas por tipo de plano
+    const planFeatures = {
+      'gratuito': [
+        'basic_reports',
+        'manual_entry',
+        'single_user'
+      ],
+      'pessoal': [
+        'basic_reports',
+        'manual_entry',
+        'file_import',
+        'single_user',
+        'email_reports'
+      ],
+      'profissional': [
+        'basic_reports',
+        'advanced_reports',
+        'manual_entry',
+        'file_import',
+        'api_access',
+        'multi_user',
+        'email_reports',
+        'custom_categories'
+      ],
+      'empresarial': [
+        'basic_reports',
+        'advanced_reports',
+        'custom_reports',
+        'manual_entry',
+        'file_import',
+        'api_access',
+        'multi_user',
+        'email_reports',
+        'custom_categories',
+        'audit_log',
+        'integrations'
+      ]
+    }
+    
+    // Se a feature está na lista do plano, permite
+    const allowedFeatures = planFeatures[plan.type as keyof typeof planFeatures] || []
+    return allowedFeatures.includes(feature) || features[feature] === true
+  }
+
+  // Verificar se usuário pode acessar funcionalidade específica
+  async canAccessFeature(
+    userId: string, 
+    feature: string, 
+    context?: { 
+      currentUsage?: number
+      requiredLimit?: number
+    }
+  ): Promise<{ allowed: boolean; reason?: string }> {
+    const hasFeature = await this.hasFeature(userId, feature)
+    
+    if (!hasFeature) {
+      const plan = await this.userRepository.getUserPlan(userId)
+      return {
+        allowed: false,
+        reason: `Feature "${feature}" não disponível no plano ${plan?.name || 'gratuito'}`
+      }
+    }
+    
+    // Verificar limites específicos se fornecido contexto
+    if (context && context.currentUsage && context.requiredLimit) {
+      if (context.currentUsage >= context.requiredLimit) {
+        return {
+          allowed: false,
+          reason: 'Limite atingido para esta funcionalidade'
+        }
+      }
+    }
+    
+    return { allowed: true }
   }
 
   async upgradePlan(userId: string, newPlanId: string): Promise<void> {

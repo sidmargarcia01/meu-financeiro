@@ -3,185 +3,188 @@
  * MÓDULO: Category
  * RESPONSABILIDADE: Acesso ao banco de dados para categorias
  * NÃO DEVE: Conter regras de negócio ou validação
- * DEPENDE DE: Prisma, Category models
+ * DEPENDE DE: Supabase, Category models
  */
 
-import { prisma } from '@/lib/prisma'
-
-interface Category {
-  id: string
-  userId: string
-  name: string
-  type: 'RECEITA' | 'DESPESA'
-  parentId?: string
-  description?: string
-  color?: string
-  icon?: string
-  isActive?: boolean
-  createdAt: Date
-}
-
-interface CategoryWithChildren extends Category {
-  children?: CategoryWithChildren[]
-}
+import { supabase } from '@/lib/supabase'
+import { 
+  Category, 
+  CategoryWithChildren,
+  CategoryTree 
+} from '@/models/category'
 
 export class CategoryRepository {
   // Criar categoria
   async create(data: {
     userId: string
     name: string
-    type: 'RECEITA' | 'DESPESA'
-    parentId?: string
     description?: string
     color?: string
     icon?: string
+    parentId?: string
+    type: 'RECEITA' | 'DESPESA'
     isActive?: boolean
   }): Promise<Category> {
-    const category = await prisma.category.create({
-      data,
-    })
+    const { data: category, error } = await supabase
+      .from('categories')
+      .insert({
+        user_id: data.userId,
+        name: data.name,
+        description: data.description,
+        color: data.color,
+        icon: data.icon,
+        parent_id: data.parentId,
+        type: data.type,
+        is_active: data.isActive ?? true
+      })
+      .select()
+      .single()
     
-    return category as Category
+    if (error) throw error
+    
+    return {
+      id: category.id,
+      userId: category.user_id,
+      name: category.name,
+      description: category.description,
+      color: category.color,
+      icon: category.icon,
+      parentId: category.parent_id,
+      type: category.type,
+      isActive: category.is_active,
+      createdAt: new Date(category.created_at),
+      updatedAt: new Date(category.updated_at)
+    }
+  }
+
+  // Buscar categoria por nome
+  async findByName(userId: string, name: string): Promise<Category | null> {
+    const { data: category, error } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('name', name)
+      .eq('is_active', true)
+      .single()
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null // Não encontrado
+      }
+      throw error
+    }
+
+    return category
   }
 
   // Buscar categoria por ID
   async findById(id: string, userId: string): Promise<Category | null> {
-    const category = await prisma.category.findFirst({
-      where: { 
-        id,
-        userId 
-      },
-    })
+    const { data: category, error } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single()
     
-    return category as Category | null
+    if (error || !category) return null
+    
+    return {
+      id: category.id,
+      userId: category.user_id,
+      name: category.name,
+      description: category.description,
+      color: category.color,
+      icon: category.icon,
+      parentId: category.parent_id,
+      type: category.type,
+      isActive: category.is_active,
+      createdAt: new Date(category.created_at),
+      updatedAt: new Date(category.updated_at)
+    }
   }
 
   // Listar categorias do usuário
-  async list(
-    userId: string, 
-    includeInactive: boolean = false
-  ): Promise<Category[]> {
-    const where: any = { userId }
-    if (!includeInactive) where.isActive = true
+  async findAllByUser(userId: string): Promise<Category[]> {
+    const { data: categories, error } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('type', { ascending: true })
+      .order('name', { ascending: true })
     
-    const categories = await prisma.category.findMany({
-      where,
-      orderBy: [
-        { type: 'asc' },
-        { name: 'asc' },
-      ],
-    })
+    if (error) throw error
     
-    return categories as Category[]
+    return (categories || []).map((category: any) => ({
+      id: category.id,
+      userId: category.user_id,
+      name: category.name,
+      description: category.description,
+      color: category.color,
+      icon: category.icon,
+      parentId: category.parent_id,
+      type: category.type,
+      isActive: category.is_active,
+      createdAt: new Date(category.created_at),
+      updatedAt: new Date(category.updated_at)
+    }))
   }
 
-  // Buscar categorias por tipo
-  async findByType(userId: string, type: 'RECEITA' | 'DESPESA'): Promise<Category[]> {
-    const categories = await prisma.category.findMany({
-      where: {
-        userId,
-        type
-      },
-      orderBy: { name: 'asc' }
-    })
+  // Listar categorias com hierarquia
+  async getHierarchy(userId: string): Promise<CategoryWithChildren[]> {
+    const { data: categories, error } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('type', { ascending: true })
+      .order('name', { ascending: true })
     
-    return categories as Category[]
-  }
-
-  // Buscar ancestrais de uma categoria
-  async getAncestors(categoryId: string): Promise<Category[]> {
-    const ancestors: Category[] = []
-    let current = await this.findById(categoryId, '') // userId vazio para buscar qualquer
+    if (error) throw error
     
-    while (current?.parentId) {
-      const parent = await prisma.category.findUnique({
-        where: { id: current.parentId }
-      })
-      
-      if (parent) {
-        ancestors.push(parent as Category)
-        current = parent as Category
-      } else {
-        break
-      }
-    }
-    
-    return ancestors
-  }
-
-  // Listar categorias em árvore (com hierarquia)
-  async listTree(
-    userId: string, 
-    type?: 'RECEITA' | 'DESPESA'
-  ): Promise<CategoryWithChildren[]> {
-    const where: any = { userId }
-    if (type) where.type = type
-    
-    // Buscar todas categorias
-    const categories = await prisma.category.findMany({
-      where,
-      orderBy: [
-        { type: 'asc' },
-        { name: 'asc' },
-      ],
-    })
-    
-    // Construir árvore
-    const categoryMap = new Map()
-    const roots: CategoryWithChildren[] = []
-    
-    // Criar mapa
-    categories.forEach((category: any) => {
-      categoryMap.set(category.id, { ...category, children: [] })
-    })
+    const allCategories = (categories || []).map((category: any) => ({
+      id: category.id,
+      userId: category.user_id,
+      name: category.name,
+      description: category.description,
+      color: category.color,
+      icon: category.icon,
+      parentId: category.parent_id,
+      type: category.type,
+      isActive: category.is_active,
+      createdAt: new Date(category.created_at),
+      updatedAt: new Date(category.updated_at)
+    }))
     
     // Construir hierarquia
-    categories.forEach((category: any) => {
-      const categoryWithChildren = categoryMap.get(category.id)
+    const categoryMap = new Map<string, CategoryWithChildren>()
+    const rootCategories: CategoryWithChildren[] = []
+    
+    // Primeiro, criar mapa de todas as categorias
+    allCategories.forEach(category => {
+      categoryMap.set(category.id, {
+        ...category,
+        children: [],
+        level: 0
+      })
+    })
+    
+    // Depois, construir hierarquia
+    allCategories.forEach(category => {
+      const categoryWithChildren = categoryMap.get(category.id)!
       
       if (category.parentId) {
         const parent = categoryMap.get(category.parentId)
         if (parent) {
           parent.children.push(categoryWithChildren)
+          categoryWithChildren.level = parent.level + 1
         }
       } else {
-        roots.push(categoryWithChildren)
+        rootCategories.push(categoryWithChildren)
       }
     })
     
-    return roots
-  }
-
-  // Listar categorias raiz (sem pai)
-  async listRoot(
-    userId: string, 
-    type?: 'RECEITA' | 'DESPESA'
-  ): Promise<Category[]> {
-    const where: any = { 
-      userId,
-      parentId: null 
-    }
-    if (type) where.type = type
-    
-    const categories = await prisma.category.findMany({
-      where,
-      orderBy: { name: 'asc' },
-    })
-    
-    return categories as Category[]
-  }
-
-  // Listar subcategorias de uma categoria
-  async listChildren(parentId: string, userId: string): Promise<Category[]> {
-    const categories = await prisma.category.findMany({
-      where: { 
-        parentId,
-        userId 
-      },
-      orderBy: { name: 'asc' }
-    })
-    
-    return categories as Category[]
+    return rootCategories
   }
 
   // Atualizar categoria
@@ -190,95 +193,220 @@ export class CategoryRepository {
     userId: string,
     data: Partial<{
       name?: string
-      type?: 'RECEITA' | 'DESPESA'
+      description?: string
+      color?: string
+      icon?: string
       parentId?: string
+      type?: 'RECEITA' | 'DESPESA'
+      isActive?: boolean
     }>
   ): Promise<Category> {
-    const category = await prisma.category.update({
-      where: { 
-        id,
-        userId 
-      },
-      data,
-    })
+    const { data: category, error } = await supabase
+      .from('categories')
+      .update({
+        name: data.name,
+        description: data.description,
+        color: data.color,
+        icon: data.icon,
+        parent_id: data.parentId,
+        type: data.type,
+        is_active: data.isActive
+      })
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select()
+      .single()
     
-    return category as Category
+    if (error) throw error
+    
+    return {
+      id: category.id,
+      userId: category.user_id,
+      name: category.name,
+      description: category.description,
+      color: category.color,
+      icon: category.icon,
+      parentId: category.parent_id,
+      type: category.type,
+      isActive: category.is_active,
+      createdAt: new Date(category.created_at),
+      updatedAt: new Date(category.updated_at)
+    }
   }
 
   // Excluir categoria
   async delete(id: string, userId: string): Promise<void> {
-    await prisma.category.delete({
-      where: { 
-        id,
-        userId 
-      },
-    })
-  }
-
-  // Verificar se categoria tem transações vinculadas
-  async hasTransactions(id: string): Promise<boolean> {
-    const count = await prisma.transaction.count({
-      where: { categoryId: id },
-    })
+    const { error } = await supabase
+      .from('categories')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', userId)
     
-    return count > 0
+    if (error) throw error
   }
 
-  // Verificar se categoria tem filhos
-  async hasChildren(id: string): Promise<boolean> {
-    const count = await prisma.category.count({
-      where: { parentId: id },
-    })
-    
-    return count > 0
-  }
-
-  // Verificar se categoria existe e pertence ao usuário
+  // Verificar se categoria existe
   async exists(id: string, userId: string): Promise<boolean> {
-    const category = await prisma.category.findFirst({
-      where: { 
-        id,
-        userId 
-      },
-      select: { id: true },
-    })
+    const { data: category, error } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single()
     
-    return !!category
+    return !error && !!category
   }
 
-  // Buscar categoria por nome
-  async findByName(
-    name: string, 
-    userId: string, 
-    type?: 'RECEITA' | 'DESPESA'
-  ): Promise<Category | null> {
-    const where: any = { 
-      name: { 
-        equals: name, 
-        mode: 'insensitive' 
-      },
-      userId 
+  // Buscar categorias por tipo
+  async findByType(
+    userId: string,
+    type: 'RECEITA' | 'DESPESA'
+  ): Promise<Category[]> {
+    const { data: categories, error } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('type', type)
+      .eq('is_active', true)
+      .order('name', { ascending: true })
+    
+    if (error) throw error
+    
+    return (categories || []).map((category: any) => ({
+      id: category.id,
+      userId: category.user_id,
+      name: category.name,
+      description: category.description,
+      color: category.color,
+      icon: category.icon,
+      parentId: category.parent_id,
+      type: category.type,
+      isActive: category.is_active,
+      createdAt: new Date(category.created_at),
+      updatedAt: new Date(category.updated_at)
+    }))
+  }
+
+  // Buscar categorias pai (sem parent_id)
+  async findParentCategories(userId: string): Promise<Category[]> {
+    const { data: categories, error } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('user_id', userId)
+      .is('parent_id', null)
+      .eq('is_active', true)
+      .order('type', { ascending: true })
+      .order('name', { ascending: true })
+    
+    if (error) throw error
+    
+    return (categories || []).map((category: any) => ({
+      id: category.id,
+      userId: category.user_id,
+      name: category.name,
+      description: category.description,
+      color: category.color,
+      icon: category.icon,
+      parentId: category.parent_id,
+      type: category.type,
+      isActive: category.is_active,
+      createdAt: new Date(category.created_at),
+      updatedAt: new Date(category.updated_at)
+    }))
+  }
+
+  // Buscar categorias filhas de um pai
+  async findChildCategories(parentId: string): Promise<Category[]> {
+    const { data: categories, error } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('parent_id', parentId)
+      .eq('is_active', true)
+      .order('name', { ascending: true })
+    
+    if (error) throw error
+    
+    return (categories || []).map((category: any) => ({
+      id: category.id,
+      userId: category.user_id,
+      name: category.name,
+      description: category.description,
+      color: category.color,
+      icon: category.icon,
+      parentId: category.parent_id,
+      type: category.type,
+      isActive: category.is_active,
+      createdAt: new Date(category.created_at),
+      updatedAt: new Date(category.updated_at)
+    }))
+  }
+
+  // Verificar se categoria possui transações
+  async hasTransactions(categoryId: string): Promise<boolean> {
+    const { count, error } = await supabase
+      .from('transactions')
+      .select('*', { count: 'exact', head: true })
+      .eq('category_id', categoryId)
+    
+    if (error) throw error
+    
+    return (count || 0) > 0
+  }
+
+  // Verificar se categoria possui filhos
+  async hasChildren(categoryId: string): Promise<boolean> {
+    const { count, error } = await supabase
+      .from('categories')
+      .select('*', { count: 'exact', head: true })
+      .eq('parent_id', categoryId)
+      .eq('is_active', true)
+    
+    if (error) throw error
+    
+    return (count || 0) > 0
+  }
+
+  // Contar categorias do usuário
+  async count(userId: string, activeOnly: boolean = true): Promise<number> {
+    let query = supabase
+      .from('categories')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+    
+    if (activeOnly) {
+      query = query.eq('is_active', true)
     }
-    if (type) where.type = type
     
-    const category = await prisma.category.findFirst({
-      where,
-    })
+    const { count, error } = await query
     
-    return category as Category | null
+    if (error) throw error
+    
+    return count || 0
   }
 
-  // Mover subcategorias para outra categoria pai
-  async moveChildrenToParent(
-    oldParentId: string, 
-    newParentId?: string
-  ): Promise<void> {
-    await prisma.category.updateMany({
-      where: { parentId: oldParentId },
-      data: { parentId: newParentId },
-    })
+  // Buscar todas as categorias de um usuário
+  async findAllByUserAll(userId: string): Promise<Category[]> {
+    const { data: categories, error } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('user_id', userId)
+      .order('type', { ascending: true })
+      .order('name', { ascending: true })
+    
+    if (error) throw error
+    
+    return (categories || []).map((category: any) => ({
+      id: category.id,
+      userId: category.user_id,
+      name: category.name,
+      description: category.description,
+      color: category.color,
+      icon: category.icon,
+      parentId: category.parent_id,
+      type: category.type,
+      isActive: category.is_active,
+      createdAt: new Date(category.created_at),
+      updatedAt: new Date(category.updated_at)
+    }))
   }
 }
-
-// Exportar instância singleton
-export const categoryRepository = new CategoryRepository()

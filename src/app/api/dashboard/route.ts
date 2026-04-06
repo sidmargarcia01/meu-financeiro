@@ -8,55 +8,70 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/middlewares/auth'
-import { DashboardService } from '@/services/dashboardService'
+import { dashboardService } from '@/services/dashboardService'
 
-const dashboardService = new DashboardService()
-
-// GET /api/dashboard/summary - Resumo geral do dashboard
+// GET /api/dashboard - Endpoint consolidado do dashboard
 export async function GET(request: NextRequest) {
   return withAuth(request, async (req, user) => {
     try {
       const { searchParams } = new URL(req.url)
-      const type = searchParams.get('type') as 'summary' | 'categories' | 'accounts' | 'recent' | 'evolution' || 'summary'
+      const widget = searchParams.get('widget') || 'all'
       
-      switch (type) {
-        case 'summary':
-          const summary = await dashboardService.getDashboardSummary(user.id)
-          return NextResponse.json(summary)
+      switch (widget) {
+        case 'saldo':
+          const saldo = await dashboardService.getSaldoConsolidado(user.id)
+          return NextResponse.json(saldo)
           
-        case 'categories':
-          const categoryType = searchParams.get('categoryType') as 'RECEITA' | 'DESPESA' | undefined
-          const categories = await dashboardService.getCategorySummary(user.id, categoryType)
-          return NextResponse.json(categories)
+        case 'resumo-mensal':
+          const mes = searchParams.get('mes') ? parseInt(searchParams.get('mes')!) : undefined
+          const ano = searchParams.get('ano') ? parseInt(searchParams.get('ano')!) : undefined
+          const resumo = await dashboardService.getResumoMensal(user.id, mes, ano)
+          return NextResponse.json(resumo)
           
-        case 'accounts':
-          const accounts = await dashboardService.getAccountSummary(user.id)
-          return NextResponse.json(accounts)
+        case 'fluxo-caixa':
+          const meses = searchParams.get('meses') ? parseInt(searchParams.get('meses')!) : 6
+          const fluxo = await dashboardService.getFluxoCaixa(user.id, meses)
+          return NextResponse.json(fluxo)
           
-        case 'recent':
-          const limit = parseInt(searchParams.get('limit') || '10')
-          const recent = await dashboardService.getRecentTransactions(user.id, limit)
-          return NextResponse.json(recent)
+        case 'lancamentos-proximos':
+          const lancamentos = await dashboardService.getLancamentosProximos(user.id)
+          return NextResponse.json(lancamentos)
           
-        case 'evolution':
-          const months = parseInt(searchParams.get('months') || '12')
-          const evolution = await dashboardService.getMonthlyEvolution(user.id, months)
-          return NextResponse.json(evolution)
+        case 'categorias':
+          const mesParam = searchParams.get('mes')
+          const anoParam = searchParams.get('ano')
+          const catMes = mesParam ? parseInt(mesParam) : new Date().getMonth() + 1
+          const catAno = anoParam ? parseInt(anoParam) : new Date().getFullYear()
+          const categorias = await dashboardService.getDistribuicaoCategorias(user.id, catMes, catAno)
+          return NextResponse.json(categorias)
           
+        case 'all':
         default:
-          // Retorna todos os dados se não especificado
-          const [summaryData, categoriesData, accountsData, recentData] = await Promise.all([
-            dashboardService.getDashboardSummary(user.id),
-            dashboardService.getCategorySummary(user.id),
-            dashboardService.getAccountSummary(user.id),
-            dashboardService.getRecentTransactions(user.id, 5)
+          // Retorna todos os widgets se não especificado
+          const [
+            saldoData,
+            resumoData,
+            fluxoData,
+            lancamentosData,
+            categoriasData
+          ] = await Promise.all([
+            dashboardService.getSaldoConsolidado(user.id),
+            dashboardService.getResumoMensal(user.id),
+            dashboardService.getFluxoCaixa(user.id, 6),
+            dashboardService.getLancamentosProximos(user.id),
+            dashboardService.getDistribuicaoCategorias(
+              user.id,
+              new Date().getMonth() + 1,
+              new Date().getFullYear()
+            )
           ])
           
           return NextResponse.json({
-            summary: summaryData,
-            categories: categoriesData,
-            accounts: accountsData,
-            recent: recentData
+            saldo: saldoData,
+            resumoMensal: resumoData,
+            fluxoCaixa: fluxoData,
+            lancamentosProximos: lancamentosData,
+            categorias: categoriasData
           })
       }
     } catch (error) {
