@@ -8,15 +8,33 @@
  * ✅ Revisado: Não
  */
 
-import { createClient } from '@supabase/supabase-js'
+import { createServerClient } from '@supabase/auth-helpers-nextjs'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next()
-  const supabase = createClient(
+  let res = NextResponse.next({ request: { headers: req.headers } })
+
+  const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return req.cookies.get(name)?.value
+        },
+        set(name: string, value: string, options: Record<string, unknown>) {
+          req.cookies.set(name, value)
+          res = NextResponse.next({ request: { headers: req.headers } })
+          res.cookies.set(name, value, options as Parameters<typeof res.cookies.set>[2])
+        },
+        remove(name: string, options: Record<string, unknown>) {
+          req.cookies.set(name, '')
+          res = NextResponse.next({ request: { headers: req.headers } })
+          res.cookies.set(name, '', { ...options, maxAge: 0 } as Parameters<typeof res.cookies.set>[2])
+        },
+      },
+    }
   )
 
   // Refresh session if expired - required for Server Components
