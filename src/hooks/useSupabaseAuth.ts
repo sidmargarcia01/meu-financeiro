@@ -52,13 +52,22 @@ export function useSupabaseAuth(): UseSupabaseAuthReturn {
 
     getInitialSession()
 
-    // Escutar mudanças na autenticação
+    // Escutar mudanças na autenticação e sincronizar cookie
     const {
       data: { subscription }
     } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
+
+      if (typeof document !== 'undefined') {
+        if (session?.access_token) {
+          const maxAge = session.expires_in ?? 3600
+          document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=${maxAge}; SameSite=Lax`
+        } else {
+          document.cookie = 'sb-access-token=; path=/; max-age=0'
+        }
+      }
     })
 
     return () => subscription.unsubscribe()
@@ -67,15 +76,15 @@ export function useSupabaseAuth(): UseSupabaseAuthReturn {
   const signIn = async (email: string, password: string) => {
     try {
       setError(null)
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      })
-      
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+
       if (error) {
         setError(error)
+      } else if (data.session?.access_token && typeof document !== 'undefined') {
+        const maxAge = data.session.expires_in ?? 3600
+        document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=${maxAge}; SameSite=Lax`
       }
-      
+
       return { error }
     } catch (err) {
       const authError = new Error('Erro ao fazer login') as AuthError
