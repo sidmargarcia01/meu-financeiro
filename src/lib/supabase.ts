@@ -6,16 +6,9 @@
  * DEPENDE DE: @supabase/supabase-js
  */
 
-import { createClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/auth-helpers-nextjs'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key'
 
-if (typeof window === 'undefined' && (
-  supabaseUrl === 'https://placeholder.supabase.co' ||
-  supabaseAnonKey === 'placeholder-anon-key'
-)) {
-  console.warn('[supabase] Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY no .env.local')
-}
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey)
