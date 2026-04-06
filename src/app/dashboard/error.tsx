@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect } from 'react'
-import { Box, Typography, Button, Alert, Container } from '@mui/material'
 
 export default function DashboardError({
   error,
@@ -15,25 +14,17 @@ export default function DashboardError({
   }, [error])
 
   return (
-    <Container maxWidth="md" sx={{ mt: 8 }}>
-      <Alert severity="error" sx={{ mb: 2 }}>
-        <Typography variant="h6" gutterBottom>
-          Erro no Dashboard
-        </Typography>
-        <Typography variant="body2" sx={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap', mb: 1 }}>
-          {error.message}
-        </Typography>
-        {error.digest && (
-          <Typography variant="caption" color="text.secondary">
-            Digest: {error.digest}
-          </Typography>
-        )}
-      </Alert>
-      <Box mt={2}>
-        <Button variant="contained" onClick={reset}>
-          Tentar novamente
-        </Button>
-      </Box>
-    </Container>
+    <div style={{ padding: 32, fontFamily: 'monospace' }}>
+      <h2 style={{ color: 'red' }}>Erro no Dashboard</h2>
+      <pre style={{ background: '#fee', padding: 16, borderRadius: 8, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+        {error.message}
+        {'\n\n'}
+        {error.stack}
+      </pre>
+      {error.digest && <p>Digest: {error.digest}</p>}
+      <button onClick={reset} style={{ marginTop: 16, padding: '8px 16px' }}>
+        Tentar novamente
+      </button>
+    </div>
   )
 }
