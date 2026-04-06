@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
 import { config } from '@/config'
 import { AuthUser } from '@/models/common'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 // Interface para payload JWT
 interface JWTPayload {
@@ -52,16 +53,18 @@ export async function withAuth(
   request: NextRequest,
   handler: (request: NextRequest, user: AuthUser) => Promise<NextResponse>
 ): Promise<NextResponse> {
-  // Prioridade 1: headers injetados pelo middleware Next.js (Supabase session)
-  const userId = request.headers.get('x-user-id')
-  const userEmail = request.headers.get('x-user-email')
+  // Prioridade 1: cookie sb-access-token (Supabase JWT do browser)
+  const cookieToken = request.cookies.get('sb-access-token')?.value
 
-  if (userId) {
-    const user: AuthUser = {
-      id: userId,
-      email: userEmail ?? '',
+  if (cookieToken && supabaseAdmin) {
+    const { data: { user: supaUser }, error } = await supabaseAdmin.auth.getUser(cookieToken)
+    if (!error && supaUser) {
+      const user: AuthUser = {
+        id: supaUser.id,
+        email: supaUser.email ?? '',
+      }
+      return handler(request, user)
     }
-    return handler(request, user)
   }
 
   // Prioridade 2: Bearer JWT (fallback para chamadas diretas à API)
@@ -69,7 +72,7 @@ export async function withAuth(
 
   if (!token) {
     return NextResponse.json(
-      { error: 'Token não fornecido' },
+      { error: 'Não autorizado' },
       { status: 401 }
     )
   }
