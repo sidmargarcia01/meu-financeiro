@@ -27,7 +27,30 @@ const fetchFluxo = async (meses?: number): Promise<FluxoMes[]> => {
   const url = `/api/dashboard/fluxo-caixa${params.toString() ? `?${params}` : ''}`
   const res = await fetch(url)
   if (!res.ok) throw new Error('Erro ao buscar fluxo de caixa')
-  return res.json()
+  const json = await res.json()
+
+  // A API retorna { meses: [...] } — extrair o array
+  const items: Array<Record<string, unknown>> = Array.isArray(json)
+    ? json
+    : Array.isArray(json?.meses)
+      ? json.meses
+      : []
+
+  let acumulado = 0
+  return items.map((item) => {
+    const receitas = Number(item.receitas || 0)
+    const despesas = Number(item.despesas || 0)
+    const saldo = Number(item.saldo ?? (receitas - despesas))
+    acumulado += saldo
+    return {
+      mes: String(item.mes || ''),
+      ano: Number(item.ano || 0),
+      receitas,
+      despesas,
+      saldo,
+      acumulado,
+    }
+  })
 }
 
 export function useFluxoCaixa(params?: UseFluxoCaixaParams) {
@@ -39,7 +62,7 @@ export function useFluxoCaixa(params?: UseFluxoCaixaParams) {
   })
 
   return {
-    data: data ?? null,
+    data: data ?? [],
     loading: isLoading,
     error: error ? (error as Error).message : null,
     refetch,

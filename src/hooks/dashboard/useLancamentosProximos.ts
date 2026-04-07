@@ -15,16 +15,58 @@ export interface Lancamento {
   type: 'RECEITA' | 'DESPESA'
   status: string
   due_date: string
+  dueDate?: string
   account_name: string
   category_name?: string
   days_until_due: number
   is_overdue: boolean
 }
 
+interface LancamentosApiResponse {
+  vencidos: Array<Record<string, unknown>>
+  proximos_7_dias: Array<Record<string, unknown>>
+}
+
 const fetchLancamentos = async (): Promise<Lancamento[]> => {
   const res = await fetch('/api/dashboard/lancamentos-proximos')
   if (!res.ok) throw new Error('Erro ao buscar lançamentos próximos')
-  return res.json()
+  const json = await res.json()
+
+  // A API retorna { vencidos: [...], proximos_7_dias: [...] }
+  if (json && !Array.isArray(json) && (json.vencidos || json.proximos_7_dias)) {
+    const resp = json as LancamentosApiResponse
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+
+    const mapItem = (item: Record<string, unknown>, isOverdue: boolean): Lancamento => {
+      const dueDate = String(item.dueDate || item.due_date || '')
+      const target = new Date(dueDate)
+      target.setHours(0, 0, 0, 0)
+      const diffDays = Math.round((target.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24))
+
+      return {
+        id: String(item.id || ''),
+        description: String(item.description || ''),
+        amount: Number(item.amount || 0),
+        type: (item.type as 'RECEITA' | 'DESPESA') || 'DESPESA',
+        status: String(item.status || ''),
+        due_date: dueDate,
+        account_name: String(item.account_name || item.accountName || ''),
+        category_name: item.category_name ? String(item.category_name) : item.categoryName ? String(item.categoryName) : undefined,
+        days_until_due: diffDays,
+        is_overdue: isOverdue,
+      }
+    }
+
+    const vencidos = (resp.vencidos || []).map(i => mapItem(i, true))
+    const proximos = (resp.proximos_7_dias || []).map(i => mapItem(i, false))
+    return [...vencidos, ...proximos]
+  }
+
+  // Fallback: já é array
+  if (Array.isArray(json)) return json
+
+  return []
 }
 
 export function useLancamentosProximos() {
@@ -36,7 +78,7 @@ export function useLancamentosProximos() {
   })
 
   return {
-    data: data ?? null,
+    data: data ?? [],
     loading: isLoading,
     error: error ? (error as Error).message : null,
     refetch,

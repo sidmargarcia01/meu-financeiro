@@ -26,7 +26,12 @@ const fetchCategorias = async (mes: number, ano: number): Promise<Categoria[]> =
   const params = new URLSearchParams({ mes: mes.toString(), ano: ano.toString() })
   const res = await fetch(`/api/dashboard/categorias?${params}`)
   if (!res.ok) throw new Error('Erro ao buscar distribuição por categorias')
-  return res.json()
+  const json = await res.json()
+
+  // A API retorna { total_despesas, categorias: [...] } — extrair o array
+  if (Array.isArray(json)) return json
+  if (json && Array.isArray(json.categorias)) return json.categorias
+  return []
 }
 
 export function useDistribuicaoCategorias(params: UseDistribuicaoCategoriasParams) {
@@ -38,7 +43,7 @@ export function useDistribuicaoCategorias(params: UseDistribuicaoCategoriasParam
   })
 
   return {
-    data: data ?? null,
+    data: data ?? [],
     loading: isLoading,
     error: error ? (error as Error).message : null,
     refetch,
