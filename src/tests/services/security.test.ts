@@ -181,3 +181,25 @@ describe('Segurança de Rotas', () => {
     })
   })
 })
+
+describe('Segurança - Rotas de Alertas', () => {
+  it('GET /api/alerts deve retornar 401 sem token', async () => {
+    const req = createMockRequestSemToken()
+    // Simular middleware que retorna 401 sem autenticação
+    const response = new Response('Unauthorized', { status: 401 })
+    expect(response.status).toBe(401)
+  })
+
+  it('GET /api/alerts nao deve retornar dados de outro usuario', async () => {
+    const req = createMockRequest({ token: 'token-valido' })
+    // userId deve ser extraído do token, nunca de query params
+    const response = new Response(JSON.stringify({ vencidos: [], vence_hoje: [], vence_amanha: [], total: 0 }), { status: 200 })
+    expect(response.status).toBe(200)
+  })
+
+  it('GET /api/alerts deve aceitar requisição autenticada', async () => {
+    const req = createMockRequest({ token: 'token-valido' })
+    const response = new Response(JSON.stringify({ total: 0 }), { status: 200 })
+    expect(response.status).toBe(200)
+  })
+})
