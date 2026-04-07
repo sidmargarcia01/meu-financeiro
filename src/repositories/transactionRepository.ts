@@ -508,6 +508,44 @@ export class TransactionRepository {
   }
 
   /**
+   * MÉTODO: search
+   * RESPONSABILIDADE: Buscar transações por descrição (busca global)
+   * NÃO DEVE: Conter lógica de ranking — isso é do service
+   */
+  async search(
+    userId: string,
+    filters: { term: string; limit: number }
+  ): Promise<Transaction[]> {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select(`
+        id, description, amount, type, status, due_date,
+        category:categories(id,name)
+      `)
+      .eq('user_id', userId)
+      .ilike('description', `%${filters.term}%`)
+      .order('due_date', { ascending: false })
+      .limit(filters.limit)
+
+    if (error) throw error
+
+    return (data || []).map((t: any) => ({
+      id: t.id,
+      userId,
+      description: t.description,
+      amount: Number(t.amount),
+      type: t.type,
+      status: t.status,
+      dueDate: t.due_date,
+      regime: 'CAIXA' as const,
+      isRecurring: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      category: t.category ? { id: t.category.id, name: t.category.name, type: t.category.type } : undefined,
+    } as Transaction))
+  }
+
+  /**
    * MÉTODO: sumByCategory
    * RESPONSABILIDADE: Somar lançamentos agrupados por categoria
    * NÃO DEVE: Calcular percentuais — isso é do service

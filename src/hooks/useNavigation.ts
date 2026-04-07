@@ -12,22 +12,23 @@ import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 
 const GROUPS_WITH_CHILDREN: Record<string, string[]> = {
-  movimentacoes: ['/movimentacoes', '/cartoes'],
-  gestao: ['/gestao/dre', '/gestao/dfc', '/gestao/balanco'],
+  gestao: [
+    '/gestao/dre', '/gestao/dfc', '/gestao/balanco',
+    '/gestao/indicadores', '/gestao/planejamento',
+  ],
+  movimentacoes: [
+    '/movimentacoes/lancamentos', '/movimentacoes/fluxo',
+    '/movimentacoes/a-pagar', '/movimentacoes/pagas',
+  ],
+  metas: ['/metas/orcamento', '/metas/centros', '/metas/economia'],
   cadastros: [
-    '/cadastros/categorias',
-    '/cadastros/centros',
-    '/cadastros/contas',
-    '/cadastros/formas-pagamento',
-    '/cadastros/projetos',
-    '/cadastros/tags',
+    '/cadastros/categorias', '/cadastros/centros', '/cadastros/contas',
+    '/cadastros/formas-pagamento', '/cadastros/projetos', '/cadastros/tags',
   ],
   ferramentas: [
-    '/ferramentas/documentos',
-    '/ferramentas/propostas',
-    '/ferramentas/regras',
-    '/ferramentas/importacao',
-    '/ferramentas/conexoes',
+    '/ferramentas/documentos', '/ferramentas/propostas',
+    '/ferramentas/regras', '/ferramentas/importacao',
+    '/ferramentas/fechamento', '/ferramentas/configuracoes',
   ],
 }
 

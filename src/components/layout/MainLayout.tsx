@@ -28,10 +28,9 @@ interface MainLayoutProps {
   children: React.ReactNode
   userName: string
   userEmail: string
-  onLogout: () => void
 }
 
-export function MainLayout({ children, userName, userEmail, onLogout }: MainLayoutProps) {
+export function MainLayout({ children, userName, userEmail }: MainLayoutProps) {
   return (
     <QueryClientProvider client={queryClient}>
       <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'grey.50' }}>
@@ -49,7 +48,7 @@ export function MainLayout({ children, userName, userEmail, onLogout }: MainLayo
           }}
         >
           {/* Header fixo no topo */}
-          <Header userName={userName} userEmail={userEmail} onLogout={onLogout} />
+          <Header userName={userName} userEmail={userEmail} />
 
           {/* Espacador para compensar o AppBar fixo */}
           <Toolbar />

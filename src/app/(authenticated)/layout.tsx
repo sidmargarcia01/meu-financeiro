@@ -19,18 +19,13 @@ export default function AuthenticatedLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
-  const { session, loading, signOut } = useSupabaseAuth()
+  const { session, loading } = useSupabaseAuth()
 
   useEffect(() => {
     if (!loading && !session) {
       router.push('/login')
     }
   }, [loading, session, router])
-
-  const handleLogout = async () => {
-    await signOut()
-    router.push('/login')
-  }
 
   if (loading || !session) {
     return (
@@ -43,11 +38,11 @@ export default function AuthenticatedLayout({
   const userName =
     session.user?.user_metadata?.name ??
     session.user?.email?.split('@')[0] ??
-    'Usuario'
+    'Usuário'
   const userEmail = session.user?.email ?? ''
 
   return (
-    <MainLayout userName={userName} userEmail={userEmail} onLogout={handleLogout}>
+    <MainLayout userName={userName} userEmail={userEmail}>
       {children}
     </MainLayout>
   )

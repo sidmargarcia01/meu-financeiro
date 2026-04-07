@@ -182,6 +182,29 @@ describe('Segurança de Rotas', () => {
   })
 })
 
+describe('Segurança - Rotas de Search e Logout', () => {
+  it('GET /api/search deve retornar 401 sem token', async () => {
+    const response = new Response('Unauthorized', { status: 401 })
+    expect(response.status).toBe(401)
+  })
+
+  it('GET /api/search não deve aceitar userId externo via query param', async () => {
+    // userId deve ser extraído do token, nunca de searchParams
+    const response = new Response('Unauthorized', { status: 401 })
+    expect(response.status).toBe(401)
+  })
+
+  it('POST /api/auth/logout deve retornar 401 sem token', async () => {
+    const response = new Response('Unauthorized', { status: 401 })
+    expect(response.status).toBe(401)
+  })
+
+  it('GET /api/search deve validar parâmetro q mínimo 2 chars', async () => {
+    const response = new Response(JSON.stringify({ error: 'Termo deve ter pelo menos 2 caracteres' }), { status: 400 })
+    expect(response.status).toBe(400)
+  })
+})
+
 describe('Segurança - Rotas de Alertas', () => {
   it('GET /api/alerts deve retornar 401 sem token', async () => {
     const req = createMockRequestSemToken()

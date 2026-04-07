@@ -14,12 +14,7 @@ import { useSupabaseAuth } from '@/hooks/useSupabaseAuth'
 
 export default function DashboardClient() {
   const router = useRouter()
-  const { session, loading, signOut } = useSupabaseAuth()
-
-  const handleLogout = async () => {
-    await signOut()
-    router.push('/login')
-  }
+  const { session, loading } = useSupabaseAuth()
 
   if (loading) {
     return (
@@ -44,7 +39,7 @@ export default function DashboardClient() {
   const currentYear = new Date().getFullYear()
 
   return (
-    <MainLayout userName={userName} userEmail={userEmail} onLogout={handleLogout}>
+    <MainLayout userName={userName} userEmail={userEmail}>
       <Box display="flex" flexWrap="wrap" gap={3} mb={3}>
         <Box flex="1" minWidth={300}>
           <SaldoConsolidadoWidget />
