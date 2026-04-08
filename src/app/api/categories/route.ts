@@ -1,69 +1,53 @@
 /**
  * CAMADA: Routes
- * MÓDULO: Categories
- * RESPONSABILIDADE: Endpoints para gestão de categorias
- * NÃO DEVE: Conter lógica de negócio complexa
- * DEPENDE DE: Next.js, middlewares, CategoryService
+ * MÓDULO: Cadastros - Categorias
+ * RESPONSABILIDADE: GET lista e POST nova categoria
+ * NÃO DEVE: Conter lógica de negócio, acessar banco diretamente
+ * DEPENDE DE: categoryService, Zod, withAuth middleware
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/middlewares/auth'
-import { withValidation } from '@/middlewares/validation'
-import { CategoryService } from '@/services/categoryService'
-import { createCategorySchema, updateCategorySchema } from '@/models/category'
+import { createCategorySchema } from '@/schemas/categorySchema'
+import { categoryService } from '@/services/categoryService'
 
-const categoryService = new CategoryService()
-
-// GET /api/categories - Listar categorias do usuário
 export async function GET(request: NextRequest) {
   return withAuth(request, async (req, user) => {
     try {
-      const { searchParams } = new URL(req.url)
-      const includeInactive = searchParams.get('includeInactive') === 'true'
-      const hierarchical = searchParams.get('hierarchical') === 'true'
-      
-      if (hierarchical) {
-        const categories = await categoryService.listHierarchical(user.id, includeInactive)
-        return NextResponse.json(categories)
-      } else {
-        const categories = await categoryService.list(user.id, includeInactive)
-        return NextResponse.json(categories)
-      }
+      const categories = await categoryService.getAll(user.id)
+      return NextResponse.json(categories, { status: 200 })
     } catch (error) {
-      console.error('Erro ao listar categorias:', error)
-      return NextResponse.json(
-        { error: 'Erro ao listar categorias' },
-        { status: 500 }
-      )
+      console.error('[api/categories GET]', error)
+      return NextResponse.json({ error: 'Erro ao buscar categorias' }, { status: 500 })
     }
   })
 }
 
-// POST /api/categories - Criar categoria
 export async function POST(request: NextRequest) {
   return withAuth(request, async (req, user) => {
-    return withValidation(req, createCategorySchema, async (req, data) => {
-      try {
-        const category = await categoryService.create(user.id, {
-          ...data,
-          isActive: data.isActive ?? true
-        })
-        return NextResponse.json(category, { status: 201 })
-      } catch (error) {
-        console.error('Erro ao criar categoria:', error)
-        
-        if (error instanceof Error) {
-          return NextResponse.json(
-            { error: error.message },
-            { status: 400 }
-          )
-        }
-        
+    try {
+      const body = await req.json()
+      const validation = createCategorySchema.safeParse(body)
+      if (!validation.success) {
         return NextResponse.json(
-          { error: 'Erro ao criar categoria' },
-          { status: 500 }
+          { error: validation.error.errors[0].message },
+          { status: 400 }
         )
       }
-    })
+
+      const category = await categoryService.create(user.id, validation.data)
+      return NextResponse.json(category, { status: 201 })
+    } catch (error: any) {
+      const knownErrors = [
+        'Já existe uma categoria',
+        'Nome é obrigatório',
+        'Nome deve ter no máximo'
+      ]
+      if (knownErrors.some(e => error.message?.includes(e))) {
+        return NextResponse.json({ error: error.message }, { status: 422 })
+      }
+      console.error('[api/categories POST]', error)
+      return NextResponse.json({ error: 'Erro ao criar categoria' }, { status: 500 })
+    }
   })
 }

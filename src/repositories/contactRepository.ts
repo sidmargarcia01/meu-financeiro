@@ -1,22 +1,22 @@
 /**
  * CAMADA: Repository
- * MÓDULO: Cadastros - Categorias
- * RESPONSABILIDADE: Acesso ao banco de dados para categorias
- * NÃO DEVE: Conter regras de negócio, calcular hierarquia, validar tipo de pai
+ * MÓDULO: Cadastros - Contatos
+ * RESPONSABILIDADE: Acesso ao banco de dados para contatos
+ * NÃO DEVE: Conter regras de negócio ou validação
  * DEPENDE DE: Supabase client
  */
 
 import { supabaseServer } from '@/lib/serverSupabase'
 
-export const categoryRepository = {
+export const contactRepository = {
   async create(userId: string, data: {
     name: string
-    type: 'RECEITA' | 'DESPESA'
-    parent_id?: string | null
+    email?: string | null
+    phone?: string | null
   }) {
     const supabase = supabaseServer
     const { data: result, error } = await supabase
-      .from('categories')
+      .from('contacts')
       .insert({ ...data, user_id: userId })
       .select()
       .single()
@@ -25,19 +25,14 @@ export const categoryRepository = {
     return result
   },
 
-  async findAllByUser(userId: string, filters?: { type?: string }) {
+  async findAllByUser(userId: string) {
     const supabase = supabaseServer
-    let query = supabase
-      .from('categories')
+    const { data, error } = await supabase
+      .from('contacts')
       .select('*')
       .eq('user_id', userId)
       .order('name')
 
-    if (filters?.type) {
-      query = query.eq('type', filters.type)
-    }
-
-    const { data, error } = await query
     if (error) throw new Error(error.message)
     return data ?? []
   },
@@ -45,7 +40,7 @@ export const categoryRepository = {
   async findById(id: string, userId: string) {
     const supabase = supabaseServer
     const { data, error } = await supabase
-      .from('categories')
+      .from('contacts')
       .select('*')
       .eq('id', id)
       .eq('user_id', userId)
@@ -55,28 +50,26 @@ export const categoryRepository = {
     return data
   },
 
-  async findByNameAndUser(name: string, userId: string, parentId?: string | null) {
+  async findByNameAndUser(name: string, userId: string) {
     const supabase = supabaseServer
-    let query = supabase
-      .from('categories')
+    const { data } = await supabase
+      .from('contacts')
       .select('id, name')
       .eq('user_id', userId)
       .ilike('name', name)
+      .maybeSingle()
 
-    if (parentId !== undefined) {
-      query = parentId
-        ? query.eq('parent_id', parentId)
-        : query.is('parent_id', null)
-    }
-
-    const { data } = await query.maybeSingle()
     return data
   },
 
-  async update(id: string, userId: string, data: { name?: string }) {
+  async update(id: string, userId: string, data: { 
+    name?: string
+    email?: string | null
+    phone?: string | null
+  }) {
     const supabase = supabaseServer
     const { data: result, error } = await supabase
-      .from('categories')
+      .from('contacts')
       .update(data)
       .eq('id', id)
       .eq('user_id', userId)
@@ -90,7 +83,7 @@ export const categoryRepository = {
   async delete(id: string, userId: string) {
     const supabase = supabaseServer
     const { error } = await supabase
-      .from('categories')
+      .from('contacts')
       .delete()
       .eq('id', id)
       .eq('user_id', userId)
@@ -103,18 +96,7 @@ export const categoryRepository = {
     const { count } = await supabase
       .from('transactions')
       .select('id', { count: 'exact', head: true })
-      .eq('category_id', id)
-      .eq('user_id', userId)
-
-    return (count ?? 0) > 0
-  },
-
-  async hasChildren(id: string, userId: string): Promise<boolean> {
-    const supabase = supabaseServer
-    const { count } = await supabase
-      .from('categories')
-      .select('id', { count: 'exact', head: true })
-      .eq('parent_id', id)
+      .eq('contact_id', id)
       .eq('user_id', userId)
 
     return (count ?? 0) > 0

@@ -1,52 +1,40 @@
 /**
  * CAMADA: Routes
- * MÓDULO: Categories
- * RESPONSABILIDADE: Endpoints GET | PUT | DELETE para categoria específica
- * NÃO DEVE: Conter lógica de negócio complexa
- * DEPENDE DE: Next.js, middlewares, CategoryService
+ * MÓDULO: Cadastros - Categorias
+ * RESPONSABILIDADE: PUT e DELETE para categoria específica
+ * NÃO DEVE: Conter lógica de negócio, acessar banco diretamente
+ * DEPENDE DE: categoryService, updateCategorySchema, withAuth
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/middlewares/auth'
-import { withValidation } from '@/middlewares/validation'
-import { CategoryService } from '@/services/categoryService'
-import { updateCategorySchema } from '@/models/category'
-
-const categoryService = new CategoryService()
-
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  return withAuth(request, async (req, user) => {
-    try {
-      const category = await categoryService.findById(user.id, params.id)
-      return NextResponse.json(category)
-    } catch (error) {
-      if (error instanceof Error) {
-        return NextResponse.json({ error: error.message }, { status: 404 })
-      }
-      return NextResponse.json({ error: 'Erro ao obter categoria' }, { status: 500 })
-    }
-  })
-}
+import { updateCategorySchema } from '@/schemas/categorySchema'
+import { categoryService } from '@/services/categoryService'
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   return withAuth(request, async (req, user) => {
-    return withValidation(req, updateCategorySchema, async (req, data) => {
-      try {
-        const category = await categoryService.update(user.id, params.id, data)
-        return NextResponse.json(category)
-      } catch (error: any) {
-        if (error.message?.includes('não encontrada')) {
-          return NextResponse.json({ error: error.message }, { status: 404 })
-        }
-        return NextResponse.json({ error: 'Erro ao atualizar categoria' }, { status: 500 })
+    try {
+      const body = await req.json()
+      const validation = updateCategorySchema.safeParse(body)
+      if (!validation.success) {
+        return NextResponse.json(
+          { error: validation.error.errors[0].message },
+          { status: 400 }
+        )
       }
-    })
+
+      const category = await categoryService.update(params.id, user.id, validation.data)
+      return NextResponse.json(category, { status: 200 })
+    } catch (error: any) {
+      if (error.message?.includes('não encontrada')) {
+        return NextResponse.json({ error: error.message }, { status: 404 })
+      }
+      console.error('[api/categories/[id] PUT]', error)
+      return NextResponse.json({ error: 'Erro ao atualizar categoria' }, { status: 500 })
+    }
   })
 }
 
@@ -56,15 +44,18 @@ export async function DELETE(
 ) {
   return withAuth(request, async (req, user) => {
     try {
-      await categoryService.delete(user.id, params.id)
-      return NextResponse.json({ success: true })
+      await categoryService.delete(params.id, user.id)
+      return NextResponse.json({ success: true }, { status: 200 })
     } catch (error: any) {
-      if (error.message?.includes('não encontrada')) {
-        return NextResponse.json({ error: error.message }, { status: 404 })
-      }
-      if (error.message?.includes('lançamentos') || error.message?.includes('subcategorias')) {
+      const knownErrors = [
+        'não encontrada',
+        'lançamentos vinculados',
+        'subcategorias'
+      ]
+      if (knownErrors.some(e => error.message?.includes(e))) {
         return NextResponse.json({ error: error.message }, { status: 409 })
       }
+      console.error('[api/categories/[id] DELETE]', error)
       return NextResponse.json({ error: 'Erro ao excluir categoria' }, { status: 500 })
     }
   })
