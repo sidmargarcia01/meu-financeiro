@@ -7,6 +7,14 @@
  * ✅ Revisado: Sim
  */
 
+/**
+ * CAMADA: Page
+ * MÓDULO: Metas
+ * RESPONSABILIDADE: Placeholder para hub de metas financeiras
+ */
+
+'use client'
+
 import Link from 'next/link'
 import { Box, Typography, Grid, Card, CardContent, CardActionArea, Stack } from '@mui/material'
 import {
@@ -41,30 +49,23 @@ const METAS_LINKS = [
 
 export default function MetasPage() {
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h5" fontWeight={700} mb={1}>Metas Financeiras</Typography>
-      <Typography variant="body2" color="text.secondary" mb={4}>
-        Defina orçamentos, metas de economia e acompanhe sua evolução financeira.
-      </Typography>
-      <Grid container spacing={3}>
-        {METAS_LINKS.map(m => (
-          <Grid key={m.title} size={{ xs: 12, sm: 6, md: 4 }}>
-            <Card sx={{ height: '100%', border: '1px solid', borderColor: 'grey.200' }}>
-              <CardActionArea component={Link} href={m.href} sx={{ height: '100%', p: 1 }}>
-                <CardContent>
-                  <Stack direction="row" spacing={2} alignItems="flex-start">
-                    <Box color={m.color} mt={0.5}>{m.icon}</Box>
-                    <Box>
-                      <Typography variant="h6" fontWeight={700}>{m.title}</Typography>
-                      <Typography variant="body2" color="text.secondary" mt={0.5}>{m.subtitle}</Typography>
-                    </Box>
-                  </Stack>
-                </CardContent>
-              </CardActionArea>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
-    </Box>
+    <div style={{ padding: '24px' }}>
+      <h1>Metas Financeiras</h1>
+      <p>Defina orçamentos, metas de economia e acompanhe sua evolução financeira.</p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', marginTop: '32px' }}>
+        <div style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '24px' }}>
+          <h3>Orçamento por Categoria</h3>
+          <p>Defina limites de gasto por categoria e acompanhe a execução.</p>
+        </div>
+        <div style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '24px' }}>
+          <h3>Metas de Economia</h3>
+          <p>Crie e gerencie metas de economia e acompanhe o progresso.</p>
+        </div>
+        <div style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '24px' }}>
+          <h3>Metas por Centro de Custo</h3>
+          <p>Aplique orçamentos vinculados a centros de custo específicos.</p>
+        </div>
+      </div>
+    </div>
   )
 }

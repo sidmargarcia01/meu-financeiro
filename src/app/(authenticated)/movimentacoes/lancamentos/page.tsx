@@ -260,15 +260,17 @@ export default function LancamentosPage() {
           onSubmit={handleSubmit}
           onCancel={() => { setFormOpen(false); setEditTarget(null) }}
           accounts={accounts}
-          categories={categories}
+          categories={categories.map(cat => ({ ...cat, children: [], type: cat.type || '' }))}
           settings={DEFAULT_SETTINGS}
           isLoading={isSubmitting}
           initialData={editTarget ? {
+            type: editTarget.type as 'RECEITA' | 'DESPESA' | 'TRANSFERENCIA',
             amount: editTarget.amount,
             description: editTarget.description,
+            due_date: editTarget.due_date,
             account_id: editTarget.account_id,
             category_id: editTarget.category_id,
-            status: editTarget.status,
+            status: (editTarget.status === 'CONCILIADO' || editTarget.status === 'AGENDADO') ? 'PENDENTE' : editTarget.status as 'PENDENTE' | 'CONFIRMADO',
             regime: 'CAIXA',
             repetition_type: 'NONE',
             tags: [],
