@@ -8,6 +8,8 @@
  */
 
 import { supabase } from '@/lib/supabase'
+import { transactionRepository } from '@/repositories/transactionRepository'
+import { accountRepository } from '@/repositories/accountRepository'
 
 export interface OFXTransaction {
   fitid: string
@@ -116,6 +118,55 @@ export class ReconciliationService {
   }
 
   /**
+   * Marcar lançamento individual como CONCILIADO (via repository)
+   * Regra: apenas CONFIRMADO pode ser conciliado
+   */
+  async conciliate(transactionId: string, userId: string) {
+    const transaction = await transactionRepository.findById(transactionId, userId)
+    if (!transaction) throw new Error('Lançamento não encontrado')
+    if (transaction.status !== 'CONFIRMADO') {
+      throw new Error('Apenas lançamentos CONFIRMADOS podem ser conciliados')
+    }
+    return transactionRepository.update(transactionId, userId, { status: 'CONCILIADO' })
+  }
+
+  /**
+   * Retornar extrato de uma conta com saldo projetado e confirmado
+   * Saldo Projetado = initial_balance + PENDENTE + CONFIRMADO + CONCILIADO
+   * Saldo Confirmado = initial_balance + apenas CONFIRMADO + CONCILIADO
+   */
+  async getExtrato(
+    userId: string,
+    accountId: string,
+    filters: { dateFrom?: string; dateTo?: string; status?: string }
+  ) {
+    const account = await accountRepository.findById(accountId, userId)
+    if (!account) throw new Error('Conta não encontrada')
+
+    const transactions = await transactionRepository.list(userId, {
+      accountId,
+      startDate: filters.dateFrom,
+      endDate: filters.dateTo,
+    })
+
+    const initialBalance = (account as any).initialBalance ?? (account as any).initial_balance ?? 0
+
+    const saldo_projetado = transactions.reduce((acc, tx) => {
+      const signal = tx.type === 'RECEITA' ? 1 : -1
+      return acc + tx.amount * signal
+    }, initialBalance)
+
+    const saldo_confirmado = transactions
+      .filter(tx => ['CONFIRMADO', 'CONCILIADO'].includes(tx.status))
+      .reduce((acc, tx) => {
+        const signal = tx.type === 'RECEITA' ? 1 : -1
+        return acc + tx.amount * signal
+      }, initialBalance)
+
+    return { transactions, saldo_projetado, saldo_confirmado, account }
+  }
+
+  /**
    * Confirmar conciliação: marcar transações como CONCILIADO
    */
   async confirmMatches(userId: string, matchIds: string[]): Promise<{ updated: number }> {
@@ -132,3 +183,5 @@ export class ReconciliationService {
     return { updated: data?.length || 0 }
   }
 }
+
+export const reconciliationService = new ReconciliationService()

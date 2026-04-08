@@ -24,8 +24,17 @@ export function middleware(req: NextRequest) {
 
   // Rotas de página protegidas — redirecionar se não tem cookie
   const protectedPages = [
-    '/dashboard', '/transactions', '/registers', '/reports',
-    '/investments', '/business', '/settings', '/tools',
+    '/dashboard',
+    '/movimentacoes',
+    '/cadastros',
+    '/gestao',
+    '/relatorios',
+    '/cartoes',
+    '/extrato',
+    '/ferramentas',
+    '/metas',
+    '/investimentos',
+    '/integracao-contabil',
   ]
   if (protectedPages.some(route => pathname.startsWith(route))) {
     if (!hasSession) {
