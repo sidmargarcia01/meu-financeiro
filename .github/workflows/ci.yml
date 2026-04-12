@@ -100,14 +100,14 @@ jobs:
   notify:
     needs: [quality, deploy-production]
     runs-on: ubuntu-latest
-    if: always()
+    if: always() && secrets.SLACK_WEBHOOK_URL != ''
     steps:
       - name: Notify Slack on Success
         if: needs.deploy-production.result == 'success'
         uses: 8398a7/action-slack@v3
         with:
           status: success
-          text: '🚀 Meu Financeiro deployed successfully to production!'
+          text: 'Meu Financeiro deployed successfully to production!'
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
@@ -116,6 +116,6 @@ jobs:
         uses: 8398a7/action-slack@v3
         with:
           status: failure
-          text: '❌ Meu Financeiro deployment failed!'
+          text: 'Meu Financeiro deployment failed!'
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
