@@ -6,7 +6,7 @@
  * DEPENDE DE: Supabase client
  */
 
-import { supabaseServer } from '@/lib/serverSupabase'
+import { getSupabaseServer } from '@/lib/serverSupabase'
 
 export const categoryRepository = {
   async create(userId: string, data: {
@@ -14,7 +14,7 @@ export const categoryRepository = {
     type: 'RECEITA' | 'DESPESA'
     parent_id?: string | null
   }) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data: result, error } = await supabase
       .from('categories')
       .insert({ ...data, user_id: userId })
@@ -26,7 +26,7 @@ export const categoryRepository = {
   },
 
   async findAllByUser(userId: string, filters?: { type?: string }) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     let query = supabase
       .from('categories')
       .select('*')
@@ -43,7 +43,7 @@ export const categoryRepository = {
   },
 
   async findById(id: string, userId: string) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data, error } = await supabase
       .from('categories')
       .select('*')
@@ -56,7 +56,7 @@ export const categoryRepository = {
   },
 
   async findByNameAndUser(name: string, userId: string, parentId?: string | null) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     let query = supabase
       .from('categories')
       .select('id, name')
@@ -74,7 +74,7 @@ export const categoryRepository = {
   },
 
   async update(id: string, userId: string, data: { name?: string }) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data: result, error } = await supabase
       .from('categories')
       .update(data)
@@ -88,7 +88,7 @@ export const categoryRepository = {
   },
 
   async delete(id: string, userId: string) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { error } = await supabase
       .from('categories')
       .delete()
@@ -99,7 +99,7 @@ export const categoryRepository = {
   },
 
   async hasTransactions(id: string, userId: string): Promise<boolean> {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { count } = await supabase
       .from('transactions')
       .select('id', { count: 'exact', head: true })
@@ -110,7 +110,7 @@ export const categoryRepository = {
   },
 
   async hasChildren(id: string, userId: string): Promise<boolean> {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { count } = await supabase
       .from('categories')
       .select('id', { count: 'exact', head: true })

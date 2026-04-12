@@ -8,13 +8,25 @@
  * ✅ Revisado: Não
  */
 
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-export function createServerSupabaseClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+let supabaseServerInstance: SupabaseClient<any> | null = null
+
+export function getSupabaseServer(): SupabaseClient<any> {
+  if (supabaseServerInstance) {
+    return supabaseServerInstance
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error('NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY são obrigatórios')
+  }
+
+  supabaseServerInstance = createClient(supabaseUrl, serviceRoleKey)
+  return supabaseServerInstance
 }
 
-export const supabaseServer = createServerSupabaseClient()
+// Alias para compatibilidade
+export const supabaseServer = getSupabaseServer()
