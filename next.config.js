@@ -37,6 +37,13 @@ const nextConfig = {
       },
     ]
   },
+  // Forçar renderização dinâmica para evitar problemas de build
+  output: undefined, // Desabilita export estático
+  trailingSlash: true,
+  // Forçar API routes dinâmicas para evitar problemas de build
+  experimental: {
+    serverComponentsExternalPackages: ['@supabase/supabase-js']
+  },
   // Otimizações de performance e bundle
   poweredByHeader: false,
   compress: true,

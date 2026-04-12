@@ -10,6 +10,8 @@
 
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useState, useEffect, useCallback } from 'react'
 import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableHead, TableRow,
@@ -21,11 +23,11 @@ import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Refresh as Refr
 import { formatCurrency } from '@/utils/formatCurrency'
 
 const ACCOUNT_TYPES = [
-  { value: 'CORRENTE',   label: 'Conta Corrente' },
-  { value: 'POUPANCA',   label: 'Poupança' },
-  { value: 'CARTEIRA',   label: 'Carteira' },
+  { value: 'CORRENTE', label: 'Conta Corrente' },
+  { value: 'POUPANCA', label: 'Poupança' },
+  { value: 'CARTEIRA', label: 'Carteira' },
   { value: 'INVESTIMENTO', label: 'Investimento' },
-  { value: 'CARTAO',     label: 'Cartão' },
+  { value: 'CARTAO', label: 'Cartão' },
 ]
 
 interface Account {
@@ -36,13 +38,13 @@ interface Account {
 const EMPTY = { name: '', type: 'CORRENTE', bank: '', currency: 'BRL', balance: 0 }
 
 export default function ContasPage() {
-  const [items, setItems]     = useState<Account[]>([])
+  const [items, setItems] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState<string | null>(null)
-  const [open, setOpen]       = useState(false)
-  const [form, setForm]       = useState(EMPTY)
-  const [editId, setEditId]   = useState<string | null>(null)
-  const [saving, setSaving]   = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [open, setOpen] = useState(false)
+  const [form, setForm] = useState(EMPTY)
+  const [editId, setEditId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true); setError(null)
@@ -55,7 +57,7 @@ export default function ContasPage() {
 
   useEffect(() => { load() }, [load])
 
-  const openNew  = () => { setForm(EMPTY); setEditId(null); setOpen(true) }
+  const openNew = () => { setForm(EMPTY); setEditId(null); setOpen(true) }
   const openEdit = (a: Account) => {
     setForm({ name: a.name, type: a.type, bank: a.bank ?? '', currency: a.currency, balance: a.balance ?? 0 })
     setEditId(a.id); setOpen(true)
@@ -66,7 +68,7 @@ export default function ContasPage() {
     setSaving(true)
     try {
       const method = editId ? 'PUT' : 'POST'
-      const url    = editId ? `/api/accounts/${editId}` : '/api/accounts'
+      const url = editId ? `/api/accounts/${editId}` : '/api/accounts'
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
       if (res.ok) { setOpen(false); load() }
     } finally { setSaving(false) }
