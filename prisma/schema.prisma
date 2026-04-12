@@ -48,6 +48,7 @@ model User {
   projects         Project[]
   contacts         Contact[]
   tags             Tag[]
+  paymentMethods   PaymentMethod[]
   investmentTransactions InvestmentTransaction[]
   portfolios       Portfolio[]
   
@@ -285,6 +286,21 @@ model Contact {
   splitTransactions SplitTransaction[]
   
   @@map("contacts")
+}
+
+// Formas de Pagamento
+
+model PaymentMethod {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name      String
+  type      String    // 'CASH' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_TRANSFER' | 'PIX' | 'OTHER'
+  
+  createdAt DateTime  @default(now()) @map("created_at")
+  
+  @@map("payment_methods")
 }
 
 // Transferências

@@ -46,11 +46,11 @@ export function useCreateCategory() {
   })
 }
 
-export function useUpdateCategory(id: string) {
+export function useUpdateCategory() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: UpdateCategoryInput) => {
+    mutationFn: async ({ id, data }: { id: string; data: UpdateCategoryInput }) => {
       const res = await fetch(`${API_BASE}/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -68,11 +68,11 @@ export function useUpdateCategory(id: string) {
   })
 }
 
-export function useDeleteCategory(id: string) {
+export function useDeleteCategory() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (id: string) => {
       const res = await fetch(`${API_BASE}/${id}`, {
         method: 'DELETE'
       })

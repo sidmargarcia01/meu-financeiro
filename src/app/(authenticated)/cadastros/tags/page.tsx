@@ -43,8 +43,8 @@ interface TagFormData {
 export default function TagsPage() {
   const { data: tags, error, isLoading } = useTags()
   const createMutation = useCreateTag()
-  const updateTagMutation = useUpdateTag
-  const deleteTagMutation = useDeleteTag
+  const updateMutation = useUpdateTag()
+  const deleteMutation = useDeleteTag()
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingTag, setEditingTag] = useState<Tag | null>(null)
@@ -63,8 +63,8 @@ export default function TagsPage() {
     if (!formData.name.trim()) return
 
     if (editingTag) {
-      updateTagMutation(editingTag.id).mutate(
-        formData,
+      updateMutation.mutate(
+        { id: editingTag.id, data: formData },
         {
           onSuccess: () => {
             setDialogOpen(false)
@@ -101,7 +101,7 @@ export default function TagsPage() {
 
   const handleDelete = (id: string, name: string) => {
     if (window.confirm(`Tem certeza que deseja excluir "${name}"?`)) {
-      deleteTagMutation(id).mutate(undefined, {
+      deleteMutation.mutate(id, {
         onSuccess: () => {
           setSnackbar({ open: true, message: 'Tag excluída com sucesso', severity: 'success' })
         },

@@ -61,9 +61,9 @@ export const costCenterRepository = {
     return data
   },
 
-  async update(id: string, userId: string, data: { 
+  async update(id: string, userId: string, data: {
     name?: string
-    description?: string 
+    description?: string
   }) {
     const supabase = supabaseServer
     const { data: result, error } = await supabase
@@ -94,7 +94,7 @@ export const costCenterRepository = {
     const { count } = await supabase
       .from('transactions')
       .select('id', { count: 'exact', head: true })
-      .eq('cost_center_id', id)
+      .eq('center_id', id)
       .eq('user_id', userId)
 
     return (count ?? 0) > 0

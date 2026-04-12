@@ -45,8 +45,8 @@ interface ContactFormData {
 export default function ContatosPage() {
   const { data: contacts, error, isLoading } = useContacts()
   const createMutation = useCreateContact()
-  const updateContactMutation = useUpdateContact
-  const deleteContactMutation = useDeleteContact
+  const updateMutation = useUpdateContact()
+  const deleteMutation = useDeleteContact()
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingContact, setEditingContact] = useState<Contact | null>(null)
@@ -66,8 +66,8 @@ export default function ContatosPage() {
     if (!formData.name.trim()) return
 
     if (editingContact) {
-      updateContactMutation(editingContact.id).mutate(
-        formData,
+      updateMutation.mutate(
+        { id: editingContact.id, data: formData },
         {
           onSuccess: () => {
             setDialogOpen(false)
@@ -105,7 +105,7 @@ export default function ContatosPage() {
 
   const handleDelete = (id: string, name: string) => {
     if (window.confirm(`Tem certeza que deseja excluir "${name}"?`)) {
-      deleteContactMutation(id).mutate(undefined, {
+      deleteMutation.mutate(id, {
         onSuccess: () => {
           setSnackbar({ open: true, message: 'Contato excluído com sucesso', severity: 'success' })
         },

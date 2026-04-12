@@ -54,11 +54,11 @@ export function useCreateContact() {
   })
 }
 
-export function useUpdateContact(id: string) {
+export function useUpdateContact() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: UpdateContactInput) => {
+    mutationFn: async ({ id, data }: { id: string; data: UpdateContactInput }) => {
       const res = await fetch(`${API_BASE}/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -76,11 +76,11 @@ export function useUpdateContact(id: string) {
   })
 }
 
-export function useDeleteContact(id: string) {
+export function useDeleteContact() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (id: string) => {
       const res = await fetch(`${API_BASE}/${id}`, {
         method: 'DELETE'
       })

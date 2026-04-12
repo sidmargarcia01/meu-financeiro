@@ -61,7 +61,7 @@ export const paymentMethodRepository = {
     return data
   },
 
-  async update(id: string, userId: string, data: { 
+  async update(id: string, userId: string, data: {
     name?: string
     type?: string
   }) {
@@ -89,14 +89,8 @@ export const paymentMethodRepository = {
     if (error) throw new Error(error.message)
   },
 
-  async hasTransactions(id: string, userId: string): Promise<boolean> {
-    const supabase = supabaseServer
-    const { count } = await supabase
-      .from('transactions')
-      .select('id', { count: 'exact', head: true })
-      .eq('payment_method_id', id)
-      .eq('user_id', userId)
-
-    return (count ?? 0) > 0
+  async hasTransactions(_id: string, _userId: string): Promise<boolean> {
+    // A tabela transactions não possui FK para payment_methods no schema atual
+    return false
   }
 }

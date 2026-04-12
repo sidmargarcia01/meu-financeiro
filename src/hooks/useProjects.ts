@@ -53,11 +53,11 @@ export function useCreateProject() {
   })
 }
 
-export function useUpdateProject(id: string) {
+export function useUpdateProject() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: UpdateProjectInput) => {
+    mutationFn: async ({ id, data }: { id: string; data: UpdateProjectInput }) => {
       const res = await fetch(`${API_BASE}/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -75,11 +75,11 @@ export function useUpdateProject(id: string) {
   })
 }
 
-export function useDeleteProject(id: string) {
+export function useDeleteProject() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (id: string) => {
       const res = await fetch(`${API_BASE}/${id}`, {
         method: 'DELETE'
       })

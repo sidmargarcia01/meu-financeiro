@@ -50,8 +50,8 @@ interface CategoryFormData {
 export default function CategoriasPage() {
   const { data: categories, error, isLoading } = useCategories()
   const createMutation = useCreateCategory()
-  const updateCategoryMutation = useUpdateCategory
-  const deleteCategoryMutation = useDeleteCategory
+  const updateMutation = useUpdateCategory()
+  const deleteMutation = useDeleteCategory()
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState<CategoryWithChildren | null>(null)
@@ -72,8 +72,8 @@ export default function CategoriasPage() {
     if (!formData.name.trim()) return
 
     if (editingCategory) {
-      updateCategoryMutation(editingCategory.id).mutate(
-        { name: formData.name },
+      updateMutation.mutate(
+        { id: editingCategory.id, data: { name: formData.name } },
         {
           onSuccess: () => {
             setDialogOpen(false)
@@ -111,7 +111,7 @@ export default function CategoriasPage() {
 
   const handleDelete = (id: string, name: string) => {
     if (window.confirm(`Tem certeza que deseja excluir "${name}"?`)) {
-      deleteCategoryMutation(id).mutate(undefined, {
+      deleteMutation.mutate(id, {
         onSuccess: () => {
           setSnackbar({ open: true, message: 'Categoria excluída com sucesso', severity: 'success' })
         },

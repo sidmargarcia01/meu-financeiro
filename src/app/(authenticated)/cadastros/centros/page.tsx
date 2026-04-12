@@ -42,8 +42,8 @@ interface CostCenterFormData {
 export default function CentrosPage() {
   const { data: costCenters, error, isLoading } = useCostCenters()
   const createMutation = useCreateCostCenter()
-  const updateCostCenterMutation = useUpdateCostCenter
-  const deleteCostCenterMutation = useDeleteCostCenter
+  const updateMutation = useUpdateCostCenter()
+  const deleteMutation = useDeleteCostCenter()
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingCostCenter, setEditingCostCenter] = useState<CostCenter | null>(null)
@@ -62,8 +62,8 @@ export default function CentrosPage() {
     if (!formData.name.trim()) return
 
     if (editingCostCenter) {
-      updateCostCenterMutation(editingCostCenter.id).mutate(
-        formData,
+      updateMutation.mutate(
+        { id: editingCostCenter.id, data: formData },
         {
           onSuccess: () => {
             setDialogOpen(false)
@@ -100,7 +100,7 @@ export default function CentrosPage() {
 
   const handleDelete = (id: string, name: string) => {
     if (window.confirm(`Tem certeza que deseja excluir "${name}"?`)) {
-      deleteCostCenterMutation(id).mutate(undefined, {
+      deleteMutation.mutate(id, {
         onSuccess: () => {
           setSnackbar({ open: true, message: 'Centro de custo excluído com sucesso', severity: 'success' })
         },

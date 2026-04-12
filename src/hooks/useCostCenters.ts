@@ -53,11 +53,11 @@ export function useCreateCostCenter() {
   })
 }
 
-export function useUpdateCostCenter(id: string) {
+export function useUpdateCostCenter() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: UpdateCostCenterInput) => {
+    mutationFn: async ({ id, data }: { id: string; data: UpdateCostCenterInput }) => {
       const res = await fetch(`${API_BASE}/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -75,11 +75,11 @@ export function useUpdateCostCenter(id: string) {
   })
 }
 
-export function useDeleteCostCenter(id: string) {
+export function useDeleteCostCenter() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (id: string) => {
       const res = await fetch(`${API_BASE}/${id}`, {
         method: 'DELETE'
       })

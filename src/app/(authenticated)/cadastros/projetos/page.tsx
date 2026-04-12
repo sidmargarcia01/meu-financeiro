@@ -42,8 +42,8 @@ interface ProjectFormData {
 export default function ProjetosPage() {
   const { data: projects, error, isLoading } = useProjects()
   const createMutation = useCreateProject()
-  const updateProjectMutation = useUpdateProject
-  const deleteProjectMutation = useDeleteProject
+  const updateMutation = useUpdateProject()
+  const deleteMutation = useDeleteProject()
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)
@@ -62,8 +62,8 @@ export default function ProjetosPage() {
     if (!formData.name.trim()) return
 
     if (editingProject) {
-      updateProjectMutation(editingProject.id).mutate(
-        formData,
+      updateMutation.mutate(
+        { id: editingProject.id, data: formData },
         {
           onSuccess: () => {
             setDialogOpen(false)
@@ -100,7 +100,7 @@ export default function ProjetosPage() {
 
   const handleDelete = (id: string, name: string) => {
     if (window.confirm(`Tem certeza que deseja excluir "${name}"?`)) {
-      deleteProjectMutation(id).mutate(undefined, {
+      deleteMutation.mutate(id, {
         onSuccess: () => {
           setSnackbar({ open: true, message: 'Projeto excluído com sucesso', severity: 'success' })
         },

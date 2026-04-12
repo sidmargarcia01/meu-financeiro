@@ -53,11 +53,11 @@ export function useCreatePaymentMethod() {
   })
 }
 
-export function useUpdatePaymentMethod(id: string) {
+export function useUpdatePaymentMethod() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: UpdatePaymentMethodInput) => {
+    mutationFn: async ({ id, data }: { id: string; data: UpdatePaymentMethodInput }) => {
       const res = await fetch(`${API_BASE}/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -75,11 +75,11 @@ export function useUpdatePaymentMethod(id: string) {
   })
 }
 
-export function useDeletePaymentMethod(id: string) {
+export function useDeletePaymentMethod() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (id: string) => {
       const res = await fetch(`${API_BASE}/${id}`, {
         method: 'DELETE'
       })

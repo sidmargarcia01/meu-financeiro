@@ -65,8 +65,8 @@ const paymentTypeColors = {
 export default function FormasPagamentoPage() {
   const { data: paymentMethods, error, isLoading } = usePaymentMethods()
   const createMutation = useCreatePaymentMethod()
-  const updatePaymentMethodMutation = useUpdatePaymentMethod
-  const deletePaymentMethodMutation = useDeletePaymentMethod
+  const updateMutation = useUpdatePaymentMethod()
+  const deleteMutation = useDeletePaymentMethod()
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingPaymentMethod, setEditingPaymentMethod] = useState<PaymentMethod | null>(null)
@@ -85,8 +85,8 @@ export default function FormasPagamentoPage() {
     if (!formData.name.trim()) return
 
     if (editingPaymentMethod) {
-      updatePaymentMethodMutation(editingPaymentMethod.id).mutate(
-        formData,
+      updateMutation.mutate(
+        { id: editingPaymentMethod.id, data: formData },
         {
           onSuccess: () => {
             setDialogOpen(false)
@@ -123,7 +123,7 @@ export default function FormasPagamentoPage() {
 
   const handleDelete = (id: string, name: string) => {
     if (window.confirm(`Tem certeza que deseja excluir "${name}"?`)) {
-      deletePaymentMethodMutation(id).mutate(undefined, {
+      deleteMutation.mutate(id, {
         onSuccess: () => {
           setSnackbar({ open: true, message: 'Forma de pagamento excluída com sucesso', severity: 'success' })
         },
@@ -163,9 +163,9 @@ export default function FormasPagamentoPage() {
                   <Chip
                     label={paymentTypeLabels[paymentMethod.type]}
                     size="small"
-                    style={{ 
-                      backgroundColor: paymentTypeColors[paymentMethod.type], 
-                      color: '#fff' 
+                    style={{
+                      backgroundColor: paymentTypeColors[paymentMethod.type],
+                      color: '#fff'
                     }}
                   />
                 </Box>

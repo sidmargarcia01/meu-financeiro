@@ -53,11 +53,11 @@ export function useCreateTag() {
   })
 }
 
-export function useUpdateTag(id: string) {
+export function useUpdateTag() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: UpdateTagInput) => {
+    mutationFn: async ({ id, data }: { id: string; data: UpdateTagInput }) => {
       const res = await fetch(`${API_BASE}/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -75,11 +75,11 @@ export function useUpdateTag(id: string) {
   })
 }
 
-export function useDeleteTag(id: string) {
+export function useDeleteTag() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (id: string) => {
       const res = await fetch(`${API_BASE}/${id}`, {
         method: 'DELETE'
       })
