@@ -6,14 +6,14 @@
  * DEPENDE DE: Supabase client
  */
 
-import { supabaseServer } from '@/lib/serverSupabase'
+import { getSupabaseServer } from '@/lib/serverSupabase'
 
 export const projectRepository = {
   async create(userId: string, data: {
     name: string
     description?: string
   }) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data: result, error } = await supabase
       .from('projects')
       .insert({ ...data, user_id: userId })
@@ -25,7 +25,7 @@ export const projectRepository = {
   },
 
   async findAllByUser(userId: string) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data, error } = await supabase
       .from('projects')
       .select('*')
@@ -37,7 +37,7 @@ export const projectRepository = {
   },
 
   async findById(id: string, userId: string) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data, error } = await supabase
       .from('projects')
       .select('*')
@@ -50,7 +50,7 @@ export const projectRepository = {
   },
 
   async findByNameAndUser(name: string, userId: string) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data } = await supabase
       .from('projects')
       .select('id, name')
@@ -61,11 +61,11 @@ export const projectRepository = {
     return data
   },
 
-  async update(id: string, userId: string, data: { 
+  async update(id: string, userId: string, data: {
     name?: string
-    description?: string 
+    description?: string
   }) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data: result, error } = await supabase
       .from('projects')
       .update(data)
@@ -79,7 +79,7 @@ export const projectRepository = {
   },
 
   async delete(id: string, userId: string) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { error } = await supabase
       .from('projects')
       .delete()
@@ -90,7 +90,7 @@ export const projectRepository = {
   },
 
   async hasTransactions(id: string, userId: string): Promise<boolean> {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { count } = await supabase
       .from('transactions')
       .select('id', { count: 'exact', head: true })

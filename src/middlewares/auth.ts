@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
 import { config } from '@/config'
 import { AuthUser } from '@/models/common'
-import { supabaseAdmin } from '@/lib/supabaseAdmin'
+import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 
 // Interface para payload JWT
 interface JWTPayload {
@@ -23,18 +23,18 @@ interface JWTPayload {
 // Extrair token do header Authorization
 function extractToken(request: NextRequest): string | null {
   const authHeader = request.headers.get('authorization')
-  
+
   if (!authHeader) {
     return null
   }
-  
+
   // Bearer token format: "Bearer <token>"
   const parts = authHeader.split(' ')
-  
+
   if (parts.length !== 2 || parts[0] !== 'Bearer') {
     return null
   }
-  
+
   return parts[1]
 }
 
@@ -56,14 +56,19 @@ export async function withAuth(
   // Prioridade 1: cookie sb-access-token (Supabase JWT do browser)
   const cookieToken = request.cookies.get('sb-access-token')?.value
 
-  if (cookieToken && supabaseAdmin) {
-    const { data: { user: supaUser }, error } = await supabaseAdmin.auth.getUser(cookieToken)
-    if (!error && supaUser) {
-      const user: AuthUser = {
-        id: supaUser.id,
-        email: supaUser.email ?? '',
+  if (cookieToken) {
+    try {
+      const supabaseAdmin = getSupabaseAdmin()
+      const { data: { user: supaUser }, error } = await supabaseAdmin.auth.getUser(cookieToken)
+      if (!error && supaUser) {
+        const user: AuthUser = {
+          id: supaUser.id,
+          email: supaUser.email ?? '',
+        }
+        return handler(request, user)
       }
-      return handler(request, user)
+    } catch (_e) {
+      // Supabase não disponível — cair para JWT fallback
     }
   }
 
@@ -100,22 +105,22 @@ export function withOptionalAuth(
   handler: (request: NextRequest, user?: AuthUser) => Promise<NextResponse>
 ): Promise<NextResponse> {
   const token = extractToken(request)
-  
+
   if (!token) {
     return handler(request)
   }
-  
+
   const payload = verifyToken(token)
-  
+
   if (!payload) {
     return handler(request)
   }
-  
+
   const user: AuthUser = {
     id: payload.userId,
     email: payload.email,
   }
-  
+
   return handler(request, user)
 }
 
@@ -128,7 +133,7 @@ export async function withPlanCheck(
   return withAuth(request, async (request, user) => {
     // TODO: Implementar verificação de plano quando tivermos o repositório
     // Por agora, apenas continua
-    
+
     return handler(request, user)
   })
 }

@@ -6,14 +6,14 @@
  * DEPENDE DE: Supabase client
  */
 
-import { supabaseServer } from '@/lib/serverSupabase'
+import { getSupabaseServer } from '@/lib/serverSupabase'
 
 export const paymentMethodRepository = {
   async create(userId: string, data: {
     name: string
     type: string
   }) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data: result, error } = await supabase
       .from('payment_methods')
       .insert({ ...data, user_id: userId })
@@ -25,7 +25,7 @@ export const paymentMethodRepository = {
   },
 
   async findAllByUser(userId: string) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data, error } = await supabase
       .from('payment_methods')
       .select('*')
@@ -37,7 +37,7 @@ export const paymentMethodRepository = {
   },
 
   async findById(id: string, userId: string) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data, error } = await supabase
       .from('payment_methods')
       .select('*')
@@ -50,7 +50,7 @@ export const paymentMethodRepository = {
   },
 
   async findByNameAndUser(name: string, userId: string) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data } = await supabase
       .from('payment_methods')
       .select('id, name')
@@ -65,7 +65,7 @@ export const paymentMethodRepository = {
     name?: string
     type?: string
   }) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data: result, error } = await supabase
       .from('payment_methods')
       .update(data)
@@ -79,7 +79,7 @@ export const paymentMethodRepository = {
   },
 
   async delete(id: string, userId: string) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { error } = await supabase
       .from('payment_methods')
       .delete()

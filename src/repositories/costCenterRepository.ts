@@ -6,14 +6,14 @@
  * DEPENDE DE: Supabase client
  */
 
-import { supabaseServer } from '@/lib/serverSupabase'
+import { getSupabaseServer } from '@/lib/serverSupabase'
 
 export const costCenterRepository = {
   async create(userId: string, data: {
     name: string
     description?: string
   }) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data: result, error } = await supabase
       .from('cost_centers')
       .insert({ ...data, user_id: userId })
@@ -25,7 +25,7 @@ export const costCenterRepository = {
   },
 
   async findAllByUser(userId: string) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data, error } = await supabase
       .from('cost_centers')
       .select('*')
@@ -37,7 +37,7 @@ export const costCenterRepository = {
   },
 
   async findById(id: string, userId: string) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data, error } = await supabase
       .from('cost_centers')
       .select('*')
@@ -50,7 +50,7 @@ export const costCenterRepository = {
   },
 
   async findByNameAndUser(name: string, userId: string) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data } = await supabase
       .from('cost_centers')
       .select('id, name')
@@ -65,7 +65,7 @@ export const costCenterRepository = {
     name?: string
     description?: string
   }) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data: result, error } = await supabase
       .from('cost_centers')
       .update(data)
@@ -79,7 +79,7 @@ export const costCenterRepository = {
   },
 
   async delete(id: string, userId: string) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { error } = await supabase
       .from('cost_centers')
       .delete()
@@ -90,7 +90,7 @@ export const costCenterRepository = {
   },
 
   async hasTransactions(id: string, userId: string): Promise<boolean> {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { count } = await supabase
       .from('transactions')
       .select('id', { count: 'exact', head: true })

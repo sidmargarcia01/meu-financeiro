@@ -6,14 +6,14 @@
  * DEPENDE DE: Supabase client
  */
 
-import { supabaseServer } from '@/lib/serverSupabase'
+import { getSupabaseServer } from '@/lib/serverSupabase'
 
 export const tagRepository = {
   async create(userId: string, data: {
     name: string
     color?: string | null
   }) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data: result, error } = await supabase
       .from('tags')
       .insert({ ...data, user_id: userId })
@@ -25,7 +25,7 @@ export const tagRepository = {
   },
 
   async findAllByUser(userId: string) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data, error } = await supabase
       .from('tags')
       .select('*')
@@ -37,7 +37,7 @@ export const tagRepository = {
   },
 
   async findById(id: string, userId: string) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data, error } = await supabase
       .from('tags')
       .select('*')
@@ -50,7 +50,7 @@ export const tagRepository = {
   },
 
   async findByNameAndUser(name: string, userId: string) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data } = await supabase
       .from('tags')
       .select('id, name')
@@ -61,11 +61,11 @@ export const tagRepository = {
     return data
   },
 
-  async update(id: string, userId: string, data: { 
+  async update(id: string, userId: string, data: {
     name?: string
     color?: string | null
   }) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data: result, error } = await supabase
       .from('tags')
       .update(data)
@@ -79,7 +79,7 @@ export const tagRepository = {
   },
 
   async delete(id: string, userId: string) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { error } = await supabase
       .from('tags')
       .delete()
@@ -90,7 +90,7 @@ export const tagRepository = {
   },
 
   async hasTransactions(id: string, userId: string): Promise<boolean> {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { count } = await supabase
       .from('transaction_tags')
       .select('id', { count: 'exact', head: true })

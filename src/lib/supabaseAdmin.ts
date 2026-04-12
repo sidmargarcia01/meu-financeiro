@@ -31,5 +31,3 @@ export function getSupabaseAdmin(): SupabaseClient<any> {
   return supabaseAdminInstance
 }
 
-// Alias para compatibilidade
-export const supabaseAdmin = getSupabaseAdmin()

@@ -6,7 +6,7 @@
  * DEPENDE DE: Supabase client
  */
 
-import { supabaseServer } from '@/lib/serverSupabase'
+import { getSupabaseServer } from '@/lib/serverSupabase'
 
 export const contactRepository = {
   async create(userId: string, data: {
@@ -14,7 +14,7 @@ export const contactRepository = {
     email?: string | null
     phone?: string | null
   }) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data: result, error } = await supabase
       .from('contacts')
       .insert({ ...data, user_id: userId })
@@ -26,7 +26,7 @@ export const contactRepository = {
   },
 
   async findAllByUser(userId: string) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data, error } = await supabase
       .from('contacts')
       .select('*')
@@ -38,7 +38,7 @@ export const contactRepository = {
   },
 
   async findById(id: string, userId: string) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data, error } = await supabase
       .from('contacts')
       .select('*')
@@ -51,7 +51,7 @@ export const contactRepository = {
   },
 
   async findByNameAndUser(name: string, userId: string) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data } = await supabase
       .from('contacts')
       .select('id, name')
@@ -62,12 +62,12 @@ export const contactRepository = {
     return data
   },
 
-  async update(id: string, userId: string, data: { 
+  async update(id: string, userId: string, data: {
     name?: string
     email?: string | null
     phone?: string | null
   }) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { data: result, error } = await supabase
       .from('contacts')
       .update(data)
@@ -81,7 +81,7 @@ export const contactRepository = {
   },
 
   async delete(id: string, userId: string) {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { error } = await supabase
       .from('contacts')
       .delete()
@@ -92,7 +92,7 @@ export const contactRepository = {
   },
 
   async hasTransactions(id: string, userId: string): Promise<boolean> {
-    const supabase = supabaseServer
+    const supabase = getSupabaseServer()
     const { count } = await supabase
       .from('transactions')
       .select('id', { count: 'exact', head: true })

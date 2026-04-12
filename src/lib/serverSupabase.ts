@@ -28,5 +28,3 @@ export function getSupabaseServer(): SupabaseClient<any> {
   return supabaseServerInstance
 }
 
-// Alias para compatibilidade
-export const supabaseServer = getSupabaseServer()
