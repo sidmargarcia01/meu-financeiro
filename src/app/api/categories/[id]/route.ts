@@ -6,6 +6,8 @@
  * DEPENDE DE: categoryService, updateCategorySchema, withAuth
  */
 
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/middlewares/auth'
 import { updateCategorySchema } from '@/schemas/categorySchema'

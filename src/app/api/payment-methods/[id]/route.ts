@@ -6,6 +6,8 @@
  * DEPENDE DE: paymentMethodService, updatePaymentMethodSchema, withAuth
  */
 
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/middlewares/auth'
 import { updatePaymentMethodSchema } from '@/schemas/paymentMethodSchema'
