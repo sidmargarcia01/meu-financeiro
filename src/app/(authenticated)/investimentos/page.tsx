@@ -4,6 +4,7 @@
  * RESPONSABILIDADE: Placeholder para o modulo de investimentos (a implementar)
  */
 
+export const dynamic = 'force-dynamic'
 export default function InvestimentosPage() {
   return (
     <div>

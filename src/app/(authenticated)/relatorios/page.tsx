@@ -4,6 +4,7 @@
  * RESPONSABILIDADE: Placeholder para o modulo de relatorios (a implementar)
  */
 
+export const dynamic = 'force-dynamic'
 export default function RelatoriosPage() {
   return (
     <div style={{ padding: '24px' }}>

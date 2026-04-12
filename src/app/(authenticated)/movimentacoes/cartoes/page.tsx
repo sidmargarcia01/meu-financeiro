@@ -4,6 +4,7 @@
  * RESPONSABILIDADE: Placeholder para cartoes de credito (a implementar)
  */
 
+export const dynamic = 'force-dynamic'
 export default function CartoesPage() {
   return (
     <div>
