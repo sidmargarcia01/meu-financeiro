@@ -97,6 +97,8 @@ export function useSupabaseAuth(): UseSupabaseAuthReturn {
     try {
       setError(null)
 
+      console.log('🚀 Starting signup...', { email, name })
+
       // Usar API com fallback para criação de usuário
       const response = await fetch('/api/auth', {
         method: 'POST',
@@ -104,16 +106,22 @@ export function useSupabaseAuth(): UseSupabaseAuthReturn {
         body: JSON.stringify({ email, password, name })
       })
 
+      console.log('📡 Response status:', response.status)
+
       const data = await response.json()
+      console.log('📦 Response data:', data)
 
       if (!response.ok) {
-        const authError = new Error(data.error || 'Erro ao criar conta') as AuthError
+        console.error('❌ Signup failed:', data.error)
+        const authError = new Error(data.error || data.details || 'Erro ao criar conta') as AuthError
         setError(authError)
         return { error: authError }
       }
 
+      console.log('✅ Signup successful')
       return { error: null }
     } catch (err: any) {
+      console.error('💥 Signup exception:', err)
       const authError = new Error(err.message || 'Erro ao criar conta') as AuthError
       setError(authError)
       return { error: authError }
