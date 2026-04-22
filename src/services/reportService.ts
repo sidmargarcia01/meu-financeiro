@@ -1,8 +1,8 @@
 /**
- * 📄 Descrição: Serviço de relatórios financeiros — DRE (caixa e competência), DFC e Extrato
+ * 📄 Descrição: Serviço de relatórios financeiros — DRE, DFC, Extrato, Balanço e Indicadores
  * 🧱 Contexto: Módulo de relatórios do Meu Financeiro
  * 📌 Responsável: Windsurf AI
- * 📅 Data: 2026-04-06
+ * 📅 Data: 2026-04-06 (atualizado 2026-04-22 — Bloco 40)
  * ⚙️ Tecnologias: TypeScript, Supabase
  * 🔍 Dependências: @supabase/supabase-js
  * ✅ Revisado: Sim
@@ -66,6 +66,44 @@ export interface ExtratoLinha {
   categoria?: string
   conta: string
   saldoAcumulado: number
+}
+
+// ─── Balanço Patrimonial (v1 simplificado) ──────────────────────────────────
+export interface BalancoRelatorio {
+  data: string
+  ativoCirculante: number
+  passivoCirculante: number
+  passivoNaoCirculante: number
+  passivoTotal: number
+  patrimonioLiquido: number
+}
+
+// ─── Indicadores Gerenciais ──────────────────────────────────────────────────
+export type IndicatorUnit = 'R$' | '%' | 'ratio'
+
+export interface IndicatorDto {
+  key: string
+  label: string
+  value: number | null
+  unit: IndicatorUnit
+}
+
+export interface IndicatorsSectionDto {
+  title: string
+  indicators: IndicatorDto[]
+}
+
+export interface IndicatorsReportResponse {
+  sections: IndicatorsSectionDto[]
+  period: { startDate: string; endDate: string }
+}
+
+// ─── helpers ─────────────────────────────────────────────────────────────────
+function pct(num: number, den: number): number | null {
+  return den !== 0 ? (num / den) * 100 : null
+}
+function ratio(num: number, den: number): number | null {
+  return den !== 0 ? num / den : null
 }
 
 export class ReportService {
@@ -206,6 +244,169 @@ export class ReportService {
       totalSaidas,
       saldoFinal: saldo,
       saldoInicial: 0,
+    }
+  }
+
+  // ─── Balanço Patrimonial v1 ─────────────────────────────────────────────────
+  // Ativo Circulante = saldo positivo das contas ativas (saldo inicial + movimentações pagas)
+  // Passivo Circulante = total de DESPESAs pendentes com vencimento <= data
+  // PL = AC - PT
+  async gerarBalanco(userId: string, data: string): Promise<BalancoRelatorio> {
+    const { data: accounts, error: errAcc } = await supabase
+      .from('accounts')
+      .select('id, initial_balance')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+
+    if (errAcc) throw errAcc
+
+    const accountIds = (accounts || []).map(a => a.id)
+
+    // Calcular saldo real de cada conta até a data
+    let ativoCirculante = 0
+
+    if (accountIds.length > 0) {
+      const { data: txPagas } = await supabase
+        .from('transactions')
+        .select('account_id, amount, type')
+        .eq('user_id', userId)
+        .eq('status', 'PAGO')
+        .lte('payment_date', data)
+        .in('account_id', accountIds)
+
+      const saldoMap = new Map<string, number>()
+      for (const acc of accounts || []) {
+        saldoMap.set(acc.id, Number(acc.initial_balance ?? 0))
+      }
+      for (const tx of txPagas || []) {
+        const cur = saldoMap.get(tx.account_id) ?? 0
+        saldoMap.set(tx.account_id, cur + (tx.type === 'RECEITA' ? tx.amount : -tx.amount))
+      }
+      for (const v of saldoMap.values()) {
+        if (v > 0) ativoCirculante += v
+      }
+    }
+
+    // Passivo Circulante = DESPESAs pendentes até a data
+    const { data: pendentes } = await supabase
+      .from('transactions')
+      .select('amount')
+      .eq('user_id', userId)
+      .eq('type', 'DESPESA')
+      .eq('status', 'PENDENTE')
+      .lte('due_date', data)
+
+    const passivoCirculante = (pendentes || []).reduce((s, t) => s + Number(t.amount), 0)
+    const passivoNaoCirculante = 0
+    const passivoTotal = passivoCirculante + passivoNaoCirculante
+    const patrimonioLiquido = ativoCirculante - passivoTotal
+
+    return {
+      data,
+      ativoCirculante,
+      passivoCirculante,
+      passivoNaoCirculante,
+      passivoTotal,
+      patrimonioLiquido,
+    }
+  }
+
+  // ─── Indicadores Gerenciais (Bloco 40) ──────────────────────────────────────
+  async gerarIndicadores(
+    userId: string,
+    inicio: string,
+    fim: string
+  ): Promise<IndicatorsReportResponse> {
+    const [dre, dfc, balanco] = await Promise.all([
+      this.gerarDRE(userId, inicio, fim, 'CAIXA'),
+      this.gerarDFC(userId, inicio, fim),
+      this.gerarBalanco(userId, fim),
+    ])
+
+    const rl = dre.totalReceitas
+    const resultadoLiquido = dre.resultado
+    const cfo = dfc.totalEntradas - dfc.totalSaidas
+    const { ativoCirculante, passivoCirculante, passivoTotal, patrimonioLiquido } = balanco
+
+    // ── Seção Resultado ──────────────────────────────────────────────────────
+    const secaoResultado: IndicatorDto[] = [
+      {
+        key: 'receita_operacional_bruta',
+        label: 'Receita Operacional Bruta',
+        value: dre.totalReceitas,
+        unit: 'R$',
+      },
+      {
+        key: 'receita_liquida',
+        label: 'Receita Líquida',
+        value: rl,
+        unit: 'R$',
+      },
+      {
+        key: 'margem_liquida_percent',
+        label: 'Margem Líquida',
+        value: pct(resultadoLiquido, rl),
+        unit: '%',
+      },
+      {
+        key: 'resultado_liquido',
+        label: 'Resultado Líquido',
+        value: resultadoLiquido,
+        unit: 'R$',
+      },
+    ]
+
+    // ── Seção Estrutura e Solvência ──────────────────────────────────────────
+    const secaoEstrutura: IndicatorDto[] = [
+      {
+        key: 'liquidez_corrente',
+        label: 'Liquidez Corrente',
+        value: ratio(ativoCirculante, passivoCirculante),
+        unit: 'ratio',
+      },
+      {
+        key: 'endividamento',
+        label: 'Endividamento',
+        value: ratio(passivoTotal, patrimonioLiquido),
+        unit: 'ratio',
+      },
+      {
+        key: 'participacao_capital_terceiros',
+        label: 'Participação Capital de Terceiros',
+        value: ratio(passivoTotal, patrimonioLiquido),
+        unit: 'ratio',
+      },
+    ]
+
+    // ── Seção Caixa ──────────────────────────────────────────────────────────
+    const secaoCaixa: IndicatorDto[] = [
+      {
+        key: 'gco_valor',
+        label: 'Geração de Caixa Operacional',
+        value: cfo,
+        unit: 'R$',
+      },
+      {
+        key: 'gco_sobre_receita_percent',
+        label: 'GCO / Receita Líquida',
+        value: pct(cfo, rl),
+        unit: '%',
+      },
+      {
+        key: 'variacao_caixa',
+        label: 'Variação de Caixa',
+        value: dfc.saldoFinal - dfc.saldoInicial,
+        unit: 'R$',
+      },
+    ]
+
+    return {
+      sections: [
+        { title: 'Resultado', indicators: secaoResultado },
+        { title: 'Estrutura e Solvência', indicators: secaoEstrutura },
+        { title: 'Caixa', indicators: secaoCaixa },
+      ],
+      period: { startDate: inicio, endDate: fim },
     }
   }
 
