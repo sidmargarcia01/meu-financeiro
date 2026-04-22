@@ -116,7 +116,7 @@ export function TransactionForm({
     resolver: zodResolver(transactionSchema),
     defaultValues: {
       type: 'DESPESA',
-      status: 'PENDENTE',
+      status: 'CONFIRMADO',
       regime: 'CAIXA',
       repetition_type: 'NONE',
       tags: [] as string[],
