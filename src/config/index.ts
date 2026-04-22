@@ -11,45 +11,59 @@ export const config = {
   // App
   appUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
   nodeEnv: process.env.NODE_ENV || 'development',
-  
+
   // Supabase
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
   supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  
+
   // Database
   databaseUrl: process.env.DATABASE_URL!,
   directUrl: process.env.DIRECT_URL!,
-  
+
   // JWT
   jwtSecret: process.env.JWT_SECRET!,
   jwtRefreshSecret: process.env.JWT_REFRESH_SECRET!,
-  
+
   // Rate Limiting
   rateLimitRequests: parseInt(process.env.RATE_LIMIT_REQUESTS || '100'),
   rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutos
-  
+
   // Upload
   maxFileSizeMb: parseInt(process.env.MAX_FILE_SIZE_MB || '10'),
   uploadDir: process.env.UPLOAD_DIR || './uploads',
-  
+
   // Monitoring
   sentryDsn: process.env.SENTRY_DSN,
 }
 
-// Validação de variáveis obrigatórias em desenvolvimento
-if (config.nodeEnv === 'development') {
-  const requiredVars = [
-    'NEXT_PUBLIC_SUPABASE_URL',
-    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-    'DATABASE_URL',
-    'JWT_SECRET',
-  ]
-  
-  const missingVars = requiredVars.filter(varName => !process.env[varName])
-  
-  if (missingVars.length > 0) {
-    console.warn('⚠️ Variáveis de ambiente faltando:', missingVars.join(', '))
+// Validação de variáveis obrigatórias em TODOS os ambientes
+const requiredVars = [
+  { name: 'NEXT_PUBLIC_SUPABASE_URL', value: config.supabaseUrl },
+  { name: 'NEXT_PUBLIC_SUPABASE_ANON_KEY', value: config.supabaseAnonKey },
+]
+
+// Em produção, validar também variáveis server-side
+if (config.isProduction) {
+  requiredVars.push(
+    { name: 'SUPABASE_SERVICE_ROLE_KEY', value: config.supabaseServiceRoleKey },
+    { name: 'JWT_SECRET', value: config.jwtSecret }
+  )
+}
+
+const missingVars = requiredVars.filter(v => !v.value || v.value === 'undefined' || v.value === 'null')
+
+if (missingVars.length > 0) {
+  const errorMessage = `❌ Variáveis de ambiente obrigatórias faltando: ${missingVars.map(v => v.name).join(', ')}`
+  if (config.isDevelopment) {
+    // Em desenvolvimento, apenas avisar
+    if (typeof window === 'undefined') {
+      // eslint-disable-next-line no-console
+      console.warn('⚠️ ' + errorMessage)
+    }
+  } else {
+    // Em produção, lançar erro
+    throw new Error(errorMessage)
   }
 }
 

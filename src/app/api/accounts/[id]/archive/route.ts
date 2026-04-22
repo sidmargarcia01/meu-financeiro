@@ -14,14 +14,15 @@ const accountService = new AccountService()
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   return withAuth(request, async (req, user) => {
     try {
       const body = await req.json().catch(() => ({}))
       const isActive = body.isActive === false ? false : true
+      const { id } = await params
 
-      const account = await accountService.update(user.id, params.id, { isActive })
+      const account = await accountService.update(user.id, id, { isActive })
       return NextResponse.json(account)
     } catch (error: any) {
       if (error.message === 'Conta não encontrada') {

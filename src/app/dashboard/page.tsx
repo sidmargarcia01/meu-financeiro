@@ -1,12 +1,11 @@
+'use client'
+
 import dynamic from 'next/dynamic'
+import { Loading } from '@/components/Loading'
 
 const DashboardClient = dynamic(() => import('./DashboardClient'), {
   ssr: false,
-  loading: () => (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-      <p style={{ fontFamily: 'sans-serif', color: '#666' }}>Carregando dashboard...</p>
-    </div>
-  )
+  loading: () => <Loading message="Carregando dashboard..." fullScreen />
 })
 
 export default function DashboardPage() {
