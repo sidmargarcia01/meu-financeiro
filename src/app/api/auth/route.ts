@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 import { withValidation } from '@/middlewares/validation'
 import { z } from 'zod'
 
@@ -136,25 +137,36 @@ async function register(request: NextRequest, body: any) {
 
   if (userCheckError || !userRecord) {
     console.error('❌ User not found in users table:', userCheckError)
-    // Tentar criar manualmente como fallback
-    const { error: insertError } = await supabase
-      .from('users')
-      .insert({
-        id: authData.user!.id,
-        email: validation.data.email,
-        name: validation.data.name,
-        plan_id: validation.data.planId || null,
-        default_currency: 'BRL',
-      })
+    // Tentar criar manualmente usando admin (ignora RLS)
+    try {
+      const adminClient = getSupabaseAdmin()
+      const { error: insertError } = await adminClient
+        .from('users')
+        .insert({
+          id: authData.user!.id,
+          email: validation.data.email,
+          name: validation.data.name,
+          plan_id: validation.data.planId || null,
+          default_currency: 'BRL',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
 
-    if (insertError) {
-      console.error('❌ Failed to insert user:', insertError)
+      if (insertError) {
+        console.error('❌ Failed to insert user with admin:', insertError)
+        return NextResponse.json(
+          { error: 'Database error saving new user', details: insertError.message },
+          { status: 500 }
+        )
+      }
+      console.log('✅ User inserted manually with admin client')
+    } catch (adminError: any) {
+      console.error('❌ Admin client failed:', adminError)
       return NextResponse.json(
-        { error: 'Database error saving new user', details: insertError.message },
+        { error: 'Database error saving new user', details: adminError.message },
         { status: 500 }
       )
     }
-    console.log('✅ User inserted manually')
   } else {
     console.log('✅ User created by trigger')
     // Atualizar plan_id se necessário
