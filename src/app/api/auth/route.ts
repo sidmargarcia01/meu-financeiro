@@ -154,9 +154,10 @@ async function register(request: NextRequest, body: any) {
         name: validation.data.name
       })
 
+      // Usar upsert para evitar erro se usuário já existe (conflito de email)
       const { error: insertError } = await adminClient
         .from('users')
-        .insert({
+        .upsert({
           id: authData.user!.id,
           email: validation.data.email,
           name: validation.data.name,
@@ -164,6 +165,9 @@ async function register(request: NextRequest, body: any) {
           default_currency: 'BRL',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'id',
+          ignoreDuplicates: false
         })
 
       if (insertError) {
