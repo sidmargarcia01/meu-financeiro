@@ -6,11 +6,20 @@
  * DEPENDE DE: Nenhuma
  */
 
+// Configurações específicas por ambiente (definidas antes do config para uso nele)
+const nodeEnv = process.env.NODE_ENV || 'development'
+const isDevelopment = nodeEnv === 'development'
+const isProduction = nodeEnv === 'production'
+const isTest = nodeEnv === 'test'
+
 // Configurações do ambiente
 export const config = {
   // App
   appUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-  nodeEnv: process.env.NODE_ENV || 'development',
+  nodeEnv,
+  isDevelopment,
+  isProduction,
+  isTest,
 
   // Supabase
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -67,10 +76,8 @@ if (missingVars.length > 0) {
   }
 }
 
-// Configurações específicas por ambiente
-export const isDevelopment = config.nodeEnv === 'development'
-export const isProduction = config.nodeEnv === 'production'
-export const isTest = config.nodeEnv === 'test'
+// Re-export para compatibilidade
+export { isDevelopment, isProduction, isTest }
 
 // Configurações de features (flags)
 export const features = {

@@ -15,10 +15,11 @@ import { costCenterService } from '@/services/costCenterService'
 
 export async function PUT(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     return withAuth(request, async (req, user) => {
         try {
+            const { id } = await params
             const body = await req.json()
             const validation = updateCostCenterSchema.safeParse(body)
             if (!validation.success) {
@@ -28,7 +29,7 @@ export async function PUT(
                 )
             }
 
-            const costCenter = await costCenterService.update(params.id, user.id, validation.data)
+            const costCenter = await costCenterService.update(id, user.id, validation.data)
             return NextResponse.json(costCenter, { status: 200 })
         } catch (error: any) {
             if (error.message?.includes('não encontrado')) {
@@ -42,11 +43,12 @@ export async function PUT(
 
 export async function DELETE(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     return withAuth(request, async (req, user) => {
         try {
-            await costCenterService.delete(params.id, user.id)
+            const { id } = await params
+            await costCenterService.delete(id, user.id)
             return NextResponse.json({ success: true }, { status: 200 })
         } catch (error: any) {
             const knownErrors = [

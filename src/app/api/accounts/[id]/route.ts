@@ -16,11 +16,12 @@ const accountService = new AccountService()
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   return withAuth(request, async (req, user) => {
     try {
-      const account = await accountService.findById(user.id, params.id)
+      const { id } = await params
+      const account = await accountService.findById(user.id, id)
       if (!account) {
         return NextResponse.json({ error: 'Conta não encontrada' }, { status: 404 })
       }
@@ -33,12 +34,13 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   return withAuth(request, async (req, user) => {
     return withValidation(req, updateAccountSchema, async (req, data) => {
       try {
-        const account = await accountService.update(user.id, params.id, data)
+        const { id } = await params
+        const account = await accountService.update(user.id, id, data)
         return NextResponse.json(account)
       } catch (error: any) {
         if (error.message === 'Conta não encontrada') {
@@ -52,11 +54,12 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   return withAuth(request, async (req, user) => {
     try {
-      await accountService.delete(user.id, params.id)
+      const { id } = await params
+      await accountService.delete(user.id, id)
       return NextResponse.json({ success: true })
     } catch (error: any) {
       if (error.message === 'Conta não encontrada') {

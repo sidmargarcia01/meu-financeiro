@@ -15,10 +15,11 @@ import { categoryService } from '@/services/categoryService'
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   return withAuth(request, async (req, user) => {
     try {
+      const { id } = await params
       const body = await req.json()
       const validation = updateCategorySchema.safeParse(body)
       if (!validation.success) {
@@ -28,7 +29,7 @@ export async function PUT(
         )
       }
 
-      const category = await categoryService.update(params.id, user.id, validation.data)
+      const category = await categoryService.update(id, user.id, validation.data)
       return NextResponse.json(category, { status: 200 })
     } catch (error: any) {
       if (error.message?.includes('não encontrada')) {
@@ -42,11 +43,12 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   return withAuth(request, async (req, user) => {
     try {
-      await categoryService.delete(params.id, user.id)
+      const { id } = await params
+      await categoryService.delete(id, user.id)
       return NextResponse.json({ success: true }, { status: 200 })
     } catch (error: any) {
       const knownErrors = [

@@ -16,11 +16,12 @@ const transactionService = new TransactionService()
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   return withAuth(request, async (req, user) => {
     try {
-      const transaction = await transactionService.getTransaction(user.id, params.id)
+      const { id } = await params
+      const transaction = await transactionService.getTransaction(user.id, id)
       if (!transaction) {
         return NextResponse.json({ error: 'Transação não encontrada' }, { status: 404 })
       }
@@ -33,12 +34,13 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   return withAuth(request, async (req, user) => {
     return withValidation(req, updateTransactionSchema, async (req, data) => {
       try {
-        const transaction = await transactionService.updateTransaction(user.id, params.id, data)
+        const { id } = await params
+        const transaction = await transactionService.updateTransaction(user.id, id, data)
         return NextResponse.json(transaction)
       } catch (error: any) {
         if (error.message?.includes('não encontrada')) {
@@ -52,11 +54,12 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   return withAuth(request, async (req, user) => {
     try {
-      await transactionService.deleteTransaction(user.id, params.id)
+      const { id } = await params
+      await transactionService.deleteTransaction(user.id, id)
       return NextResponse.json({ success: true })
     } catch (error: any) {
       if (error.message?.includes('não encontrada')) {
@@ -70,20 +73,21 @@ export async function DELETE(
 // PATCH /api/transactions/[id] — ação semântica via ?action=confirm|reconcile
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   return withAuth(request, async (req, user) => {
     try {
+      const { id } = await params
       const { searchParams } = new URL(req.url)
       const action = searchParams.get('action')
 
       if (action === 'confirm') {
-        const transaction = await transactionService.confirmTransaction(user.id, params.id)
+        const transaction = await transactionService.confirmTransaction(user.id, id)
         return NextResponse.json(transaction)
       }
 
       if (action === 'reconcile') {
-        const transaction = await transactionService.reconcileTransaction(user.id, params.id)
+        const transaction = await transactionService.reconcileTransaction(user.id, id)
         return NextResponse.json(transaction)
       }
 

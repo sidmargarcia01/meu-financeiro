@@ -15,10 +15,11 @@ import { projectService } from '@/services/projectService'
 
 export async function PUT(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     return withAuth(request, async (req, user) => {
         try {
+            const { id } = await params
             const body = await req.json()
             const validation = updateProjectSchema.safeParse(body)
             if (!validation.success) {
@@ -28,7 +29,7 @@ export async function PUT(
                 )
             }
 
-            const project = await projectService.update(params.id, user.id, validation.data)
+            const project = await projectService.update(id, user.id, validation.data)
             return NextResponse.json(project, { status: 200 })
         } catch (error: any) {
             if (error.message?.includes('não encontrado')) {
@@ -42,11 +43,12 @@ export async function PUT(
 
 export async function DELETE(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     return withAuth(request, async (req, user) => {
         try {
-            await projectService.delete(params.id, user.id)
+            const { id } = await params
+            await projectService.delete(id, user.id)
             return NextResponse.json({ success: true }, { status: 200 })
         } catch (error: any) {
             const knownErrors = [
