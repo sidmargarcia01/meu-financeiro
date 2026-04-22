@@ -176,14 +176,15 @@ export default function CategoriasPage() {
     )
   }
 
-  if (isLoading) return <Typography>Carregando...</Typography>
+  if (isLoading) return <div>Carregando...</div>
   if (error) {
     console.error('❌ Categories page error:', error)
     return (
-      <Box p={3}>
-        <Typography color="error" variant="h6">Erro ao carregar categorias</Typography>
-        <Typography color="error" sx={{ mt: 1 }}>{error instanceof Error ? error.message : String(error)}</Typography>
-      </Box>
+      <div style={{ padding: 24 }}>
+        <h3 style={{ color: 'red' }}>Erro ao carregar categorias</h3>
+        <p style={{ color: 'red' }}>{error instanceof Error ? error.message : String(error)}</p>
+        <button onClick={() => window.location.reload()}>Tentar novamente</button>
+      </div>
     )
   }
 
