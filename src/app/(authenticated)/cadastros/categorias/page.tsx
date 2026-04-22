@@ -177,7 +177,15 @@ export default function CategoriasPage() {
   }
 
   if (isLoading) return <Typography>Carregando...</Typography>
-  if (error) return <Typography color="error">Erro ao carregar categorias</Typography>
+  if (error) {
+    console.error('❌ Categories page error:', error)
+    return (
+      <Box p={3}>
+        <Typography color="error" variant="h6">Erro ao carregar categorias</Typography>
+        <Typography color="error" sx={{ mt: 1 }}>{error instanceof Error ? error.message : String(error)}</Typography>
+      </Box>
+    )
+  }
 
   return (
     <Box p={3}>

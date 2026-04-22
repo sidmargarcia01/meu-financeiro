@@ -17,9 +17,17 @@ export function useCategories(type?: string) {
     queryKey: ['categories', type],
     queryFn: async () => {
       const url = type ? `${API_BASE}?type=${type}` : API_BASE
+      console.log('🔄 Fetching categories from:', url)
       const res = await fetch(url)
-      if (!res.ok) throw new Error('Erro ao buscar categorias')
-      return res.json()
+      console.log('📊 Response status:', res.status)
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('❌ Categories fetch error:', errorData)
+        throw new Error(errorData.error || `Erro ${res.status}: ${res.statusText}`)
+      }
+      const data = await res.json()
+      console.log('✅ Categories loaded:', data.length, 'items')
+      return data
     }
   })
 }
