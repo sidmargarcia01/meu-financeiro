@@ -12,6 +12,7 @@
 
 import { categoryRepository } from '@/repositories/categoryRepository'
 import type { CreateCategoryInput, UpdateCategoryInput, DreGroup } from '@/schemas/categorySchema'
+import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 
 export interface CategoryWithChildren {
   id: string
@@ -229,47 +230,101 @@ export const categoryService = {
     return categoryRepository.update(id, userId, input)
   },
 
-  async criarCategoriasPadrao(userId: string) {
-    const existentes = await categoryRepository.findAllByUser(userId, {})
-    const nomesExistentes = new Set(existentes.map(c => c.name.toLowerCase()))
+  // Garante que o usuário existe na tabela users (para FK funcionar)
+  async ensureUserExists(userId: string, email: string = 'user@example.com') {
+    const supabase = getSupabaseAdmin()
 
-    let criadas = 0
-    let ignoradas = 0
+    // Verifica se usuário existe
+    const { data: existing } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', userId)
+      .single()
 
-    for (const pai of CATEGORIAS_PADRAO) {
-      // Verifica se a categoria pai já existe
-      if (nomesExistentes.has(pai.name.toLowerCase())) {
-        ignoradas += 1 + (pai.children?.length ?? 0)
-        continue
-      }
+    if (existing) return // Já existe
 
-      // Cria categoria pai
-      const parentCategory = await categoryRepository.create(userId, {
-        name: pai.name,
-        type: pai.type,
-        dre_group: pai.dre_group,
+    // Cria usuário na tabela users
+    console.log('[SERVICE] Criando usuário na tabela users:', userId)
+    const { error } = await supabase
+      .from('users')
+      .insert({
+        id: userId,
+        email: email,
+        name: 'Usuário',
+        plan_id: null
       })
-      criadas++
 
-      // Cria subcategorias (filhos) herdando o mesmo type e dre_group
-      if (pai.children && pai.children.length > 0) {
-        for (const childName of pai.children) {
-          if (!nomesExistentes.has(childName.toLowerCase())) {
-            await categoryRepository.create(userId, {
-              name: childName,
-              type: pai.type,
-              dre_group: pai.dre_group,
-              parent_id: parentCategory.id,
-            })
-            criadas++
-          } else {
-            ignoradas++
+    if (error) {
+      console.error('[SERVICE] Erro ao criar usuário:', error)
+      throw new Error(`Não foi possível criar usuário: ${error.message}`)
+    }
+  },
+
+  async criarCategoriasPadrao(userId: string, email?: string) {
+    // Garante que usuário existe antes de criar categorias
+    await this.ensureUserExists(userId, email)
+
+    console.log('[SERVICE] Iniciando criarCategoriasPadrao para user:', userId)
+
+    try {
+      const existentes = await categoryRepository.findAllByUser(userId, {})
+      console.log('[SERVICE] Categorias existentes:', existentes.length)
+      const nomesExistentes = new Set(existentes.map(c => c.name.toLowerCase()))
+
+      let criadas = 0
+      let ignoradas = 0
+
+      for (const pai of CATEGORIAS_PADRAO) {
+        console.log('[SERVICE] Processando categoria pai:', pai.name)
+
+        // Verifica se a categoria pai já existe
+        if (nomesExistentes.has(pai.name.toLowerCase())) {
+          console.log('[SERVICE] Categoria já existe, pulando:', pai.name)
+          ignoradas += 1 + (pai.children?.length ?? 0)
+          continue
+        }
+
+        // Cria categoria pai
+        console.log('[SERVICE] Criando categoria pai:', pai.name, { type: pai.type, dre_group: pai.dre_group })
+        try {
+          const parentCategory = await categoryRepository.create(userId, {
+            name: pai.name,
+            type: pai.type,
+            dre_group: pai.dre_group,
+          })
+          console.log('[SERVICE] Categoria pai criada:', parentCategory.id)
+          criadas++
+
+          // Cria subcategorias (filhos) herdando o mesmo type e dre_group
+          if (pai.children && pai.children.length > 0) {
+            for (const childName of pai.children) {
+              if (!nomesExistentes.has(childName.toLowerCase())) {
+                console.log('[SERVICE] Criando subcategoria:', childName)
+                await categoryRepository.create(userId, {
+                  name: childName,
+                  type: pai.type,
+                  dre_group: pai.dre_group,
+                  parent_id: parentCategory.id,
+                })
+                criadas++
+              } else {
+                ignoradas++
+              }
+            }
           }
+        } catch (createError: any) {
+          console.error('[SERVICE] Erro ao criar categoria:', pai.name, createError.message)
+          throw createError
         }
       }
-    }
 
-    return { criadas, ignoradas }
+      console.log('[SERVICE] Resultado final:', { criadas, ignoradas })
+      return { criadas, ignoradas }
+    } catch (error: any) {
+      console.error('[SERVICE] Erro em criarCategoriasPadrao:', error.message)
+      console.error('[SERVICE] Stack:', error.stack)
+      throw error
+    }
   },
 
   async delete(id: string, userId: string) {

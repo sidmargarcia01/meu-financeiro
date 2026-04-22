@@ -15,6 +15,7 @@ export const categoryRepository = {
     parent_id?: string | null
     dre_group?: string | null
   }) {
+    console.log('[REPO] Criando categoria:', { name: data.name, type: data.type, dre_group: data.dre_group, user_id: userId })
     const supabase = getSupabaseServer()
     const { data: result, error } = await supabase
       .from('categories')
@@ -22,7 +23,11 @@ export const categoryRepository = {
       .select()
       .single()
 
-    if (error) throw new Error(error.message)
+    if (error) {
+      console.error('[REPO] Erro Supabase:', error.code, error.message, error.details)
+      throw new Error(`Supabase error: ${error.code} - ${error.message}`)
+    }
+    console.log('[REPO] Categoria criada:', result?.id)
     return result
   },
 

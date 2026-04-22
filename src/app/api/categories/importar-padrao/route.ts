@@ -20,8 +20,8 @@ import { categoryService } from '@/services/categoryService'
 export async function POST(request: NextRequest) {
   return withAuth(request, async (_req, user) => {
     try {
-      console.log('[SEED] Iniciando criarCategoriasPadrao para user:', user.id)
-      const resultado = await categoryService.criarCategoriasPadrao(user.id)
+      console.log('[SEED] Iniciando criarCategoriasPadrao para user:', user.id, user.email)
+      const resultado = await categoryService.criarCategoriasPadrao(user.id, user.email)
       console.log('[SEED] Resultado:', resultado)
       return NextResponse.json(resultado, { status: 201 })
     } catch (error: any) {
