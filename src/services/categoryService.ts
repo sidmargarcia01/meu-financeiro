@@ -11,16 +11,43 @@
  */
 
 import { categoryRepository } from '@/repositories/categoryRepository'
-import type { CreateCategoryInput, UpdateCategoryInput } from '@/schemas/categorySchema'
+import type { CreateCategoryInput, UpdateCategoryInput, DreGroup } from '@/schemas/categorySchema'
 
 export interface CategoryWithChildren {
   id: string
   name: string
   type: 'RECEITA' | 'DESPESA'
   parent_id: string | null
+  dre_group: DreGroup | null
   user_id: string
   children: CategoryWithChildren[]
 }
+
+// Modelo padrão de categorias com dreGroup para DRE gerencial
+const CATEGORIAS_PADRAO: Array<{
+  name: string
+  type: 'RECEITA' | 'DESPESA'
+  dre_group: DreGroup
+}> = [
+    // ── Receitas ─────────────────────────────────────────────────────
+    { name: 'Receita de Vendas', type: 'RECEITA', dre_group: 'RECEITA_BRUTA' },
+    { name: 'Receita de Serviços', type: 'RECEITA', dre_group: 'RECEITA_BRUTA' },
+    { name: 'Devoluções e Abatimentos', type: 'RECEITA', dre_group: 'DEDUCAO_RECEITA' },
+    { name: 'Impostos sobre Receita', type: 'RECEITA', dre_group: 'DEDUCAO_RECEITA' },
+    { name: 'Outras Receitas', type: 'RECEITA', dre_group: 'OUTRAS_RECEITAS' },
+    // ── Despesas ─────────────────────────────────────────────────────
+    { name: 'Custo de Mercadorias (CMV)', type: 'DESPESA', dre_group: 'CPV' },
+    { name: 'Custo de Serviços (CSV)', type: 'DESPESA', dre_group: 'CPV' },
+    { name: 'Salários e Encargos', type: 'DESPESA', dre_group: 'DESPESA_OPERACIONAL' },
+    { name: 'Aluguel e Condomínio', type: 'DESPESA', dre_group: 'DESPESA_OPERACIONAL' },
+    { name: 'Marketing e Publicidade', type: 'DESPESA', dre_group: 'DESPESA_OPERACIONAL' },
+    { name: 'Tecnologia e Software', type: 'DESPESA', dre_group: 'DESPESA_OPERACIONAL' },
+    { name: 'Despesas Administrativas', type: 'DESPESA', dre_group: 'DESPESA_OPERACIONAL' },
+    { name: 'Manutenção e Conservação', type: 'DESPESA', dre_group: 'DESPESA_OPERACIONAL' },
+    { name: 'Juros e Encargos Financeiros', type: 'DESPESA', dre_group: 'DESPESA_FINANCEIRA' },
+    { name: 'Tarifas Bancárias', type: 'DESPESA', dre_group: 'DESPESA_FINANCEIRA' },
+    { name: 'Outras Despesas', type: 'DESPESA', dre_group: 'OUTRAS_DESPESAS' },
+  ]
 
 export const categoryService = {
   async create(userId: string, input: CreateCategoryInput) {
@@ -90,6 +117,23 @@ export const categoryService = {
     }
 
     return categoryRepository.update(id, userId, input)
+  },
+
+  async criarCategoriasPadrao(userId: string) {
+    const existentes = await categoryRepository.findAllByUser(userId, {})
+    const nomesExistentes = new Set(existentes.map(c => c.name.toLowerCase()))
+
+    const para_criar = CATEGORIAS_PADRAO.filter(
+      c => !nomesExistentes.has(c.name.toLowerCase())
+    )
+
+    const criadas = []
+    for (const cat of para_criar) {
+      const nova = await categoryRepository.create(userId, cat)
+      criadas.push(nova)
+    }
+
+    return { criadas: criadas.length, ignoradas: CATEGORIAS_PADRAO.length - criadas.length }
   },
 
   async delete(id: string, userId: string) {

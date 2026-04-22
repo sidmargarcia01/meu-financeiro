@@ -18,6 +18,24 @@ export interface DRELinha {
   nivel: number
 }
 
+// DRE estruturado gerencial — calculado a partir do dre_group das categorias
+export interface DREEstruturado {
+  receitaBruta: number
+  deducoes: number
+  receitaLiquida: number
+  cpv: number
+  margemBruta: number
+  margemBrutaPercent: number | null
+  despesasOperacionais: number
+  ebitda: number
+  ebitdaPercent: number | null
+  despesasFinanceiras: number
+  outrasReceitas: number
+  outrasDespesas: number
+  resultadoLiquido: number
+  margemLiquidaPercent: number | null
+}
+
 export interface DRERelatorio {
   periodo: { inicio: string; fim: string }
   regime: 'CAIXA' | 'COMPETENCIA'
@@ -25,10 +43,12 @@ export interface DRERelatorio {
   totalReceitas: number
   totalDespesas: number
   resultado: number
+  estruturado: DREEstruturado
   categorias: {
     id: string
     nome: string
     tipo: 'RECEITA' | 'DESPESA'
+    dreGroup: string | null
     total: number
     percentual: number
     subcategorias: { id: string; nome: string; total: number }[]
@@ -120,7 +140,7 @@ export class ReportService {
       .select(`
         id, description, amount, type, status,
         due_date, competence_date, payment_date,
-        categories(id, name, type, parent_id)
+        categories(id, name, type, parent_id, dre_group)
       `)
       .eq('user_id', userId)
       .in('type', ['RECEITA', 'DESPESA'])
@@ -132,7 +152,7 @@ export class ReportService {
 
     const categoriaMap = new Map<string, {
       id: string; nome: string; tipo: 'RECEITA' | 'DESPESA'
-      parentId?: string; total: number
+      dreGroup: string | null; parentId?: string; total: number
       subcategorias: Map<string, { id: string; nome: string; total: number }>
     }>()
 
@@ -148,7 +168,8 @@ export class ReportService {
       const tipo: 'RECEITA' | 'DESPESA' = tx.type as any
 
       if (!categoriaMap.has(catId)) {
-        categoriaMap.set(catId, { id: catId, nome: catNome, tipo, total: 0, subcategorias: new Map() })
+        const dreGroup = cat.parent_id ? null : (cat.dre_group ?? null)
+        categoriaMap.set(catId, { id: catId, nome: catNome, tipo, dreGroup, total: 0, subcategorias: new Map() })
       }
 
       const catEntry = categoriaMap.get(catId)!
@@ -169,6 +190,7 @@ export class ReportService {
       id: c.id,
       nome: c.nome,
       tipo: c.tipo,
+      dreGroup: c.dreGroup,
       total: c.total,
       percentual: c.tipo === 'RECEITA'
         ? totalReceitas > 0 ? (c.total / totalReceitas) * 100 : 0
@@ -177,6 +199,33 @@ export class ReportService {
     }))
 
     const resultado = totalReceitas - totalDespesas
+
+    // ── DRE Estruturado (baseado em dreGroup) ─────────────────────────────────
+    const sumGroup = (g: string) =>
+      categorias.filter(c => c.dreGroup === g).reduce((s, c) => s + c.total, 0)
+
+    const receitaBruta = sumGroup('RECEITA_BRUTA')
+    const deducoes = sumGroup('DEDUCAO_RECEITA')
+    const receitaLiquida = receitaBruta - deducoes
+    const cpv = sumGroup('CPV')
+    const margemBruta = receitaLiquida - cpv
+    const margemBrutaPercent = receitaLiquida !== 0 ? (margemBruta / receitaLiquida) * 100 : null
+    const despesasOperacionais = sumGroup('DESPESA_OPERACIONAL')
+    const ebitda = margemBruta - despesasOperacionais
+    const ebitdaPercent = receitaLiquida !== 0 ? (ebitda / receitaLiquida) * 100 : null
+    const despesasFinanceiras = sumGroup('DESPESA_FINANCEIRA')
+    const outrasReceitas = sumGroup('OUTRAS_RECEITAS')
+    const outrasDespesas = sumGroup('OUTRAS_DESPESAS')
+    const resultadoLiquido = ebitda - despesasFinanceiras + outrasReceitas - outrasDespesas
+    const margemLiquidaPercent = receitaLiquida !== 0 ? (resultadoLiquido / receitaLiquida) * 100 : null
+
+    const estruturado: DREEstruturado = {
+      receitaBruta, deducoes, receitaLiquida,
+      cpv, margemBruta, margemBrutaPercent,
+      despesasOperacionais, ebitda, ebitdaPercent,
+      despesasFinanceiras, outrasReceitas, outrasDespesas,
+      resultadoLiquido, margemLiquidaPercent,
+    }
 
     const linhas: DRELinha[] = [
       { descricao: 'RECEITAS', valor: totalReceitas, tipo: 'subtotal', nivel: 0 },
@@ -192,7 +241,7 @@ export class ReportService {
       { descricao: 'RESULTADO (LUCRO/PREJUÍZO)', valor: resultado, tipo: 'total', nivel: 0 },
     ]
 
-    return { periodo: { inicio, fim }, regime, linhas, totalReceitas, totalDespesas, resultado, categorias }
+    return { periodo: { inicio, fim }, regime, linhas, totalReceitas, totalDespesas, resultado, estruturado, categorias }
   }
 
   async gerarDFC(userId: string, inicio: string, fim: string): Promise<DFCRelatorio> {
@@ -323,8 +372,8 @@ export class ReportService {
       this.gerarBalanco(userId, fim),
     ])
 
-    const rl = dre.totalReceitas
-    const resultadoLiquido = dre.resultado
+    const e = dre.estruturado
+    const rl = e.receitaLiquida > 0 ? e.receitaLiquida : dre.totalReceitas
     const cfo = dfc.totalEntradas - dfc.totalSaidas
     const { ativoCirculante, passivoCirculante, passivoTotal, patrimonioLiquido } = balanco
 
@@ -333,7 +382,7 @@ export class ReportService {
       {
         key: 'receita_operacional_bruta',
         label: 'Receita Operacional Bruta',
-        value: dre.totalReceitas,
+        value: e.receitaBruta || dre.totalReceitas,
         unit: 'R$',
       },
       {
@@ -343,15 +392,27 @@ export class ReportService {
         unit: 'R$',
       },
       {
+        key: 'margem_bruta_percent',
+        label: 'Margem Bruta',
+        value: e.margemBrutaPercent,
+        unit: '%',
+      },
+      {
+        key: 'margem_ebitda_percent',
+        label: 'Margem EBITDA',
+        value: e.ebitdaPercent,
+        unit: '%',
+      },
+      {
         key: 'margem_liquida_percent',
         label: 'Margem Líquida',
-        value: pct(resultadoLiquido, rl),
+        value: e.margemLiquidaPercent ?? pct(dre.resultado, rl),
         unit: '%',
       },
       {
         key: 'resultado_liquido',
         label: 'Resultado Líquido',
-        value: resultadoLiquido,
+        value: e.resultadoLiquido || dre.resultado,
         unit: 'R$',
       },
     ]

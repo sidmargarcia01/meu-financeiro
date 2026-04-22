@@ -13,6 +13,7 @@ export const categoryRepository = {
     name: string
     type: 'RECEITA' | 'DESPESA'
     parent_id?: string | null
+    dre_group?: string | null
   }) {
     const supabase = getSupabaseServer()
     const { data: result, error } = await supabase
@@ -73,7 +74,7 @@ export const categoryRepository = {
     return data
   },
 
-  async update(id: string, userId: string, data: { name?: string }) {
+  async update(id: string, userId: string, data: { name?: string; dre_group?: string | null }) {
     const supabase = getSupabaseServer()
     const { data: result, error } = await supabase
       .from('categories')

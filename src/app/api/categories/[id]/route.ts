@@ -41,6 +41,34 @@ export async function PUT(
   })
 }
 
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  return withAuth(request, async (req, user) => {
+    try {
+      const { id } = await params
+      const body = await req.json()
+      const validation = updateCategorySchema.safeParse(body)
+      if (!validation.success) {
+        return NextResponse.json(
+          { error: validation.error.errors[0].message },
+          { status: 400 }
+        )
+      }
+
+      const category = await categoryService.update(id, user.id, validation.data)
+      return NextResponse.json(category, { status: 200 })
+    } catch (error: any) {
+      if (error.message?.includes('não encontrada')) {
+        return NextResponse.json({ error: error.message }, { status: 404 })
+      }
+      console.error('[api/categories/[id] PATCH]', error)
+      return NextResponse.json({ error: 'Erro ao atualizar categoria' }, { status: 500 })
+    }
+  })
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
