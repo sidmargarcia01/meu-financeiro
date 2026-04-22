@@ -39,16 +39,15 @@ export function useNavigation(overridePath?: string) {
   const getInitialCollapsed = (): string[] => {
     // Colapsa todos os grupos exceto o que contém a rota ativa (filho)
     // Em rotas de topo (/dashboard, /metas, etc.), todos os grupos começam expandidos
+    // Cadastros sempre inicia expandido
     const activeGroup = Object.keys(GROUPS_WITH_CHILDREN).find(group =>
       GROUPS_WITH_CHILDREN[group].some(route => activePath.startsWith(route))
     )
     if (!activeGroup) return []
-    return Object.keys(GROUPS_WITH_CHILDREN).filter(g => g !== activeGroup)
+    return Object.keys(GROUPS_WITH_CHILDREN).filter(g => g !== activeGroup && g !== 'cadastros')
   }
 
-  const [collapsedGroups, setCollapsedGroups] = useState<string[]>(
-    getInitialCollapsed
-  )
+  const [collapsedGroups, setCollapsedGroups] = useState<string[]>([])
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false)
 
   useEffect(() => {
