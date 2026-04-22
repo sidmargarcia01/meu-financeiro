@@ -165,8 +165,8 @@ export default function CategoriasPage() {
     const [editTarget, setEditTarget] = useState<Category | null>(null)
     const [editForm, setEditForm] = useState<{ name: string; dre_group: DreGroup | '' }>({ name: '', dre_group: '' })
 
-    // ── Auto-seed silencioso na primeira visita ────────────────────────────────
-    const fetchCategories = useCallback(async (autoSeedIfEmpty = false) => {
+    // ── Auto-seed na primeira visita ─────────────────────────────────────────
+    const fetchCategories = useCallback(async (attemptSeed = false) => {
         setLoading(true); setError(null)
         try {
             const res = await fetch('/api/categories')
@@ -174,13 +174,37 @@ export default function CategoriasPage() {
             const data: Category[] = await res.json()
             setCategories(data)
 
-            if (autoSeedIfEmpty && data.length === 0 && !seeded.current) {
+            // Se vazio e ainda nao tentou seed, tenta criar padroes
+            if (attemptSeed && data.length === 0 && !seeded.current) {
                 seeded.current = true
-                const seed = await fetch('/api/categories/importar-padrao', { method: 'POST' })
-                if (seed.ok) {
-                    const fresh = await fetch('/api/categories')
-                    if (fresh.ok) setCategories(await fresh.json())
+                let retries = 0
+                const maxRetries = 3
+
+                while (retries < maxRetries) {
+                    try {
+                        const seed = await fetch('/api/categories/importar-padrao', { method: 'POST' })
+                        if (seed.ok) {
+                            const fresh = await fetch('/api/categories')
+                            if (fresh.ok) {
+                                setCategories(await fresh.json())
+                                setSuccess('Categorias padrão criadas automaticamente!')
+                                setLoading(false)
+                                return
+                            }
+                        } else {
+                            const errData = await seed.json().catch(() => ({}))
+                            console.error(`[SEED] Tentativa ${retries + 1} falhou:`, errData)
+                        }
+                    } catch (e: any) {
+                        console.error(`[SEED] Tentativa ${retries + 1} erro:`, e.message)
+                    }
+                    retries++
+                    if (retries < maxRetries) {
+                        await new Promise(r => setTimeout(r, 1000)) // Aguarda 1s antes de retry
+                    }
                 }
+
+                setError('Erro ao criar categorias padrão. Verifique os logs do servidor.')
             }
         } catch (err: any) {
             setError(err.message)
@@ -293,8 +317,16 @@ export default function CategoriasPage() {
                         <TableBody>
                             {rootCategories.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={4} align="center" sx={{ py: 6, color: 'text.secondary' }}>
-                                        Nenhuma categoria encontrada.
+                                    <TableCell colSpan={4} align="center" sx={{ py: 6 }}>
+                                        <Stack spacing={2} alignItems="center">
+                                            <CircularProgress size={24} sx={{ mb: 1 }} />
+                                            <Typography color="text.secondary">
+                                                Carregando categorias padrão...
+                                            </Typography>
+                                            <Typography variant="caption" color="text.disabled">
+                                                9 grupos DRE + 46 subcategorias
+                                            </Typography>
+                                        </Stack>
                                     </TableCell>
                                 </TableRow>
                             ) : rootCategories.map(cat => (

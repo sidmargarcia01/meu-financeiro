@@ -20,11 +20,18 @@ import { categoryService } from '@/services/categoryService'
 export async function POST(request: NextRequest) {
   return withAuth(request, async (_req, user) => {
     try {
+      console.log('[SEED] Iniciando criarCategoriasPadrao para user:', user.id)
       const resultado = await categoryService.criarCategoriasPadrao(user.id)
+      console.log('[SEED] Resultado:', resultado)
       return NextResponse.json(resultado, { status: 201 })
-    } catch (error) {
-      console.error('[api/categories/importar-padrao POST]', error)
-      return NextResponse.json({ error: 'Erro ao importar categorias padrão' }, { status: 500 })
+    } catch (error: any) {
+      console.error('[SEED] Erro completo:', error)
+      console.error('[SEED] Message:', error.message)
+      console.error('[SEED] Stack:', error.stack)
+      return NextResponse.json(
+        { error: 'Erro ao importar categorias padrão', details: error.message },
+        { status: 500 }
+      )
     }
   })
 }
