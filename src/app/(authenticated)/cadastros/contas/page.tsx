@@ -32,10 +32,11 @@ const ACCOUNT_TYPES = [
 
 interface Account {
   id: string; name: string; type: string; bank?: string
-  balance?: number; currency: string; isActive: boolean
+  initialBalance: number; confirmedBalance?: number; projectedBalance?: number
+  currency: string; isActive: boolean
 }
 
-const EMPTY = { name: '', type: 'CORRENTE', bank: '', currency: 'BRL', balance: 0 }
+const EMPTY = { name: '', type: 'CORRENTE', bank: '', currency: 'BRL', initialBalance: 0 }
 
 export default function ContasPage() {
   const [items, setItems] = useState<Account[]>([])
@@ -49,7 +50,7 @@ export default function ContasPage() {
   const load = useCallback(async () => {
     setLoading(true); setError(null)
     try {
-      const data = await fetch('/api/accounts').then(r => r.json())
+      const data = await fetch('/api/accounts?balances=true').then(r => r.json())
       setItems(Array.isArray(data) ? data : [])
     } catch { setError('Erro ao carregar contas.') }
     finally { setLoading(false) }
@@ -59,7 +60,7 @@ export default function ContasPage() {
 
   const openNew = () => { setForm(EMPTY); setEditId(null); setOpen(true) }
   const openEdit = (a: Account) => {
-    setForm({ name: a.name, type: a.type, bank: a.bank ?? '', currency: a.currency, balance: a.balance ?? 0 })
+    setForm({ name: a.name, type: a.type, bank: a.bank ?? '', currency: a.currency, initialBalance: a.initialBalance ?? 0 })
     setEditId(a.id); setOpen(true)
   }
 
@@ -69,7 +70,7 @@ export default function ContasPage() {
     try {
       const method = editId ? 'PUT' : 'POST'
       const url = editId ? `/api/accounts/${editId}` : '/api/accounts'
-      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, initialBalance: Number(form.initialBalance) }) })
       if (res.ok) { setOpen(false); load() }
     } finally { setSaving(false) }
   }
@@ -120,7 +121,7 @@ export default function ContasPage() {
                   <TableCell><Typography variant="body2" fontWeight={500}>{a.name}</Typography></TableCell>
                   <TableCell><Chip label={typeLabel(a.type)} size="small" variant="outlined" /></TableCell>
                   <TableCell><Typography variant="body2" color="text.secondary">{a.bank ?? '—'}</Typography></TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600 }}>{formatCurrency(a.balance ?? 0)}</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600, color: (a.confirmedBalance ?? a.initialBalance ?? 0) < 0 ? 'error.main' : 'inherit' }}>{formatCurrency(a.confirmedBalance ?? a.initialBalance ?? 0)}</TableCell>
                   <TableCell><Chip label={a.isActive ? 'Ativa' : 'Inativa'} color={a.isActive ? 'success' : 'default'} size="small" /></TableCell>
                   <TableCell align="right">
                     <Tooltip title="Editar"><IconButton size="small" onClick={() => openEdit(a)}><EditIcon fontSize="small" /></IconButton></Tooltip>
@@ -145,8 +146,9 @@ export default function ContasPage() {
               </Select>
             </FormControl>
             <TextField label="Banco" value={form.bank} onChange={e => setForm(f => ({ ...f, bank: e.target.value }))} fullWidth size="small" />
-            <TextField label="Saldo Inicial" type="number" value={form.balance}
-              onChange={e => setForm(f => ({ ...f, balance: parseFloat(e.target.value) || 0 }))} fullWidth size="small" />
+            <TextField label="Saldo Inicial" type="number" inputProps={{ step: '0.01' }} value={form.initialBalance}
+              onChange={e => setForm(f => ({ ...f, initialBalance: parseFloat(e.target.value) || 0 }))} fullWidth size="small"
+              helperText="Valor de abertura da conta (ex: saldo atual do banco)" />
           </Stack>
         </DialogContent>
         <DialogActions>

@@ -7,11 +7,11 @@
  */
 
 import { supabase } from '@/lib/supabase'
-import { 
-  Account, 
-  AccountWithBalance, 
-  CreditCard, 
-  AccountWithCreditCard 
+import {
+  Account,
+  AccountWithBalance,
+  CreditCard,
+  AccountWithCreditCard
 } from '@/models/account'
 
 export class AccountRepository {
@@ -39,9 +39,9 @@ export class AccountRepository {
       })
       .select()
       .single()
-    
+
     if (error) throw error
-    
+
     return {
       id: account.id,
       userId: account.user_id,
@@ -64,9 +64,9 @@ export class AccountRepository {
       .eq('id', id)
       .eq('user_id', userId)
       .single()
-    
+
     if (error || !account) return null
-    
+
     return {
       id: account.id,
       userId: account.user_id,
@@ -92,11 +92,11 @@ export class AccountRepository {
       .eq('id', id)
       .eq('user_id', userId)
       .single()
-    
+
     if (error || !account) return null
-    
+
     const creditCard = (account.credit_cards as any[])?.[0] || null
-    
+
     return {
       id: account.id,
       userId: account.user_id,
@@ -127,15 +127,15 @@ export class AccountRepository {
       .eq('user_id', userId)
       .order('type', { ascending: true })
       .order('name', { ascending: true })
-    
+
     if (activeOnly) {
       query = query.eq('is_active', true)
     }
-    
+
     const { data: accounts, error } = await query
-    
+
     if (error) throw error
-    
+
     return (accounts || []).map(account => ({
       id: account.id,
       userId: account.user_id,
@@ -165,21 +165,21 @@ export class AccountRepository {
       .eq('is_active', true)
       .order('type', { ascending: true })
       .order('name', { ascending: true })
-    
+
     if (error) throw error
-    
+
     // Calcular saldos
     return (accounts || []).map((account: any) => {
       const transactions = account.transactions || []
       const projectedBalance = transactions.reduce(
-        (sum: number, t: any) => sum + Number(t.amount), 
+        (sum: number, t: any) => sum + Number(t.amount),
         Number(account.initial_balance)
       )
-      
+
       const confirmedBalance = transactions
         .filter((t: any) => ['CONFIRMADO', 'CONCILIADO'].includes(t.status))
         .reduce((sum: number, t: any) => sum + Number(t.amount), Number(account.initial_balance))
-      
+
       return {
         id: account.id,
         userId: account.user_id,
@@ -205,29 +205,34 @@ export class AccountRepository {
     data: Partial<{
       name?: string
       type?: 'CORRENTE' | 'POUPANCA' | 'INVESTIMENTO' | 'CARTAO' | 'CARTEIRA'
+      initialBalance?: number
       currency?: string
       icon?: string
       isActive?: boolean
       bankConnectionId?: string
     }>
   ): Promise<Account> {
+    const updatePayload: Record<string, any> = {
+      name: data.name,
+      type: data.type,
+      currency: data.currency,
+      icon: data.icon,
+      is_active: data.isActive,
+      bank_connection_id: data.bankConnectionId,
+    }
+    if (data.initialBalance !== undefined) {
+      updatePayload.initial_balance = data.initialBalance
+    }
     const { data: account, error } = await supabase
       .from('accounts')
-      .update({
-        name: data.name,
-        type: data.type,
-        currency: data.currency,
-        icon: data.icon,
-        is_active: data.isActive,
-        bank_connection_id: data.bankConnectionId
-      })
+      .update(updatePayload)
       .eq('id', id)
       .eq('user_id', userId)
       .select()
       .single()
-    
+
     if (error) throw error
-    
+
     return {
       id: account.id,
       userId: account.user_id,
@@ -249,7 +254,7 @@ export class AccountRepository {
       .delete()
       .eq('id', id)
       .eq('user_id', userId)
-    
+
     if (error) throw error
   }
 
@@ -270,9 +275,9 @@ export class AccountRepository {
       })
       .select()
       .single()
-    
+
     if (error) throw error
-    
+
     return {
       id: creditCard.id,
       accountId: creditCard.account_id,
@@ -290,9 +295,9 @@ export class AccountRepository {
       .select('*')
       .eq('id', id)
       .single()
-    
+
     if (error || !creditCard) return null
-    
+
     return {
       id: creditCard.id,
       accountId: creditCard.account_id,
@@ -322,9 +327,9 @@ export class AccountRepository {
       .eq('id', id)
       .select()
       .single()
-    
+
     if (error) throw error
-    
+
     return {
       id: creditCard.id,
       accountId: creditCard.account_id,
@@ -341,7 +346,7 @@ export class AccountRepository {
       .from('credit_cards')
       .delete()
       .eq('id', id)
-    
+
     if (error) throw error
   }
 
@@ -352,9 +357,9 @@ export class AccountRepository {
       .select('*')
       .eq('account_id', accountId)
       .single()
-    
+
     if (error || !creditCard) return null
-    
+
     return {
       id: creditCard.id,
       accountId: creditCard.account_id,
@@ -373,7 +378,7 @@ export class AccountRepository {
       .eq('id', id)
       .eq('user_id', userId)
       .single()
-    
+
     return !error && !!account
   }
 
@@ -389,9 +394,9 @@ export class AccountRepository {
       .eq('type', type)
       .eq('is_active', true)
       .order('name', { ascending: true })
-    
+
     if (error) throw error
-    
+
     return (accounts || []).map((account: any) => ({
       id: account.id,
       userId: account.user_id,
@@ -412,15 +417,15 @@ export class AccountRepository {
       .from('accounts')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId)
-    
+
     if (activeOnly) {
       query = query.eq('is_active', true)
     }
-    
+
     const { count, error } = await query
-    
+
     if (error) throw error
-    
+
     return count || 0
   }
 
@@ -430,9 +435,9 @@ export class AccountRepository {
       .from('transactions')
       .select('*', { count: 'exact', head: true })
       .eq('account_id', accountId)
-    
+
     if (error) throw error
-    
+
     return (count || 0) > 0
   }
 
@@ -444,15 +449,15 @@ export class AccountRepository {
       .eq('user_id', userId)
       .order('type', { ascending: true })
       .order('name', { ascending: true })
-    
+
     if (!includeArchived) {
       query = query.eq('is_active', true)
     }
-    
+
     const { data: accounts, error } = await query
-    
+
     if (error) throw error
-    
+
     return (accounts || []).map((account: any) => ({
       id: account.id,
       userId: account.user_id,
