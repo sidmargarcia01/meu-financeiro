@@ -9,11 +9,11 @@
 'use client'
 
 import { useState } from 'react'
-import { 
-  Card, 
-  CardContent, 
-  Typography, 
-  Box, 
+import {
+  Card,
+  CardContent,
+  Typography,
+  Box,
   CircularProgress,
   List,
   ListItem,
@@ -27,8 +27,8 @@ import {
   Alert,
   Button
 } from '@mui/material'
-import { 
-  Event, 
+import {
+  Event,
   MoreVert,
   ArrowUpward,
   ArrowDownward,
@@ -90,28 +90,6 @@ export function LancamentosProximosWidget({ className }: LancamentosProximosWidg
     )
   }
 
-  const getDaysFromToday = (date: string) => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const target = new Date(date)
-    target.setHours(0, 0, 0, 0)
-    return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-  }
-
-  const formatDate = (date: string | Date) => {
-    return new Intl.DateTimeFormat('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    }).format(new Date(date))
-  }
-
-  const formatRelativeDayLabel = (date: string) => {
-    const days = getDaysFromToday(date)
-    if (days === 0) return 'Vence hoje'
-    if (days > 0) return `Vence em ${days} ${days === 1 ? 'dia' : 'dias'}` 
-    return `Vencido há ${Math.abs(days)} ${Math.abs(days) === 1 ? 'dia' : 'dias'}` 
-  }
 
   if (!data || data.length === 0) {
     return (
@@ -175,15 +153,15 @@ export function LancamentosProximosWidget({ className }: LancamentosProximosWidg
                     <ArrowDownward color="error" />
                   )}
                 </ListItemIcon>
-                
+
                 <ListItemText
                   primary={
                     <Box display="flex" justifyContent="space-between" alignItems="center">
                       <Typography variant="body1" fontWeight="medium">
                         {lancamento.description}
                       </Typography>
-                      <Typography 
-                        variant="body1" 
+                      <Typography
+                        variant="body1"
                         fontWeight="bold"
                         color={lancamento.type === 'RECEITA' ? 'success.main' : 'error.main'}
                       >
