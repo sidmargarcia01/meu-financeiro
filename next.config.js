@@ -24,7 +24,9 @@ const securityHeaders = [
 
 const nextConfig = {
   images: {
-    domains: ['localhost'],
+    remotePatterns: [
+      { protocol: 'http', hostname: 'localhost' },
+    ],
   },
   env: {
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
@@ -37,10 +39,8 @@ const nextConfig = {
       },
     ]
   },
-  // Forçar renderização dinâmica para evitar problemas de build
-  experimental: {
-    serverComponentsExternalPackages: ['@supabase/supabase-js']
-  },
+  // Packages que devem rodar no servidor (Next.js 15+)
+  serverExternalPackages: ['@supabase/supabase-js'],
   // Otimizações de performance e bundle
   poweredByHeader: false,
   compress: true,

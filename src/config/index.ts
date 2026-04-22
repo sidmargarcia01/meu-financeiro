@@ -46,34 +46,20 @@ export const config = {
   sentryDsn: process.env.SENTRY_DSN,
 }
 
-// Validação de variáveis obrigatórias em TODOS os ambientes
+// Validação de variáveis — apenas WARN no console, nunca lançar em module-level
+// Isso evita quebrar o build estático do Next.js quando as vars não estão disponíveis
+// O erro real ocorre em runtime nas funções que tentam usar os valores
 const requiredVars = [
   { name: 'NEXT_PUBLIC_SUPABASE_URL', value: config.supabaseUrl },
   { name: 'NEXT_PUBLIC_SUPABASE_ANON_KEY', value: config.supabaseAnonKey },
 ]
 
-// Em produção, validar também variáveis server-side
-if (config.isProduction) {
-  requiredVars.push(
-    { name: 'SUPABASE_SERVICE_ROLE_KEY', value: config.supabaseServiceRoleKey },
-    { name: 'JWT_SECRET', value: config.jwtSecret }
-  )
-}
-
 const missingVars = requiredVars.filter(v => !v.value || v.value === 'undefined' || v.value === 'null')
 
-if (missingVars.length > 0) {
-  const errorMessage = `❌ Variáveis de ambiente obrigatórias faltando: ${missingVars.map(v => v.name).join(', ')}`
-  if (config.isDevelopment) {
-    // Em desenvolvimento, apenas avisar
-    if (typeof window === 'undefined') {
-      // eslint-disable-next-line no-console
-      console.warn('⚠️ ' + errorMessage)
-    }
-  } else {
-    // Em produção, lançar erro
-    throw new Error(errorMessage)
-  }
+if (missingVars.length > 0 && typeof window === 'undefined') {
+  const errorMessage = `⚠️ Variáveis de ambiente faltando: ${missingVars.map(v => v.name).join(', ')}`
+  // eslint-disable-next-line no-console
+  console.warn(errorMessage)
 }
 
 // Re-export para compatibilidade
