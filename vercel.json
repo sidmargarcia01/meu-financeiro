@@ -6,7 +6,7 @@
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
-          "value": "https://meu-financeiro.vercel.app"
+          "value": "https://meu-financeiro-rouge.vercel.app"
         },
         {
           "key": "Access-Control-Allow-Methods",
