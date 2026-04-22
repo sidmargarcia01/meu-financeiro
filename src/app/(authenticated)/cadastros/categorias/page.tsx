@@ -50,6 +50,7 @@ interface CategoryFormData {
 }
 
 export default function CategoriasPage() {
+  console.log('🚀 CategoriasPage rendering...')
   const { data: categories, error, isLoading } = useCategories()
   const createMutation = useCreateCategory()
   const updateMutation = useUpdateCategory()
@@ -176,6 +177,7 @@ export default function CategoriasPage() {
     )
   }
 
+  console.log('🔄 isLoading:', isLoading, 'error:', error, 'categories:', categories?.length || 0)
   if (isLoading) return <div>Carregando...</div>
   if (error) {
     console.error('❌ Categories page error:', error)
@@ -187,6 +189,7 @@ export default function CategoriasPage() {
       </div>
     )
   }
+  console.log('✅ Categories loaded:', categories?.length || 0, 'items')
 
   return (
     <Box p={3}>
