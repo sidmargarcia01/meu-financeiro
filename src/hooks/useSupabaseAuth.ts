@@ -36,7 +36,7 @@ export function useSupabaseAuth(): UseSupabaseAuthReturn {
     const getInitialSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession()
-        
+
         if (error) {
           setError(error)
         } else {
@@ -96,23 +96,25 @@ export function useSupabaseAuth(): UseSupabaseAuthReturn {
   const signUp = async (email: string, password: string, name: string) => {
     try {
       setError(null)
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name
-          }
-        }
+
+      // Usar API com fallback para criação de usuário
+      const response = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, name })
       })
-      
-      if (error) {
-        setError(error)
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        const authError = new Error(data.error || 'Erro ao criar conta') as AuthError
+        setError(authError)
+        return { error: authError }
       }
-      
-      return { error }
-    } catch (err) {
-      const authError = new Error('Erro ao criar conta') as AuthError
+
+      return { error: null }
+    } catch (err: any) {
+      const authError = new Error(err.message || 'Erro ao criar conta') as AuthError
       setError(authError)
       return { error: authError }
     }
@@ -131,11 +133,11 @@ export function useSupabaseAuth(): UseSupabaseAuthReturn {
     try {
       setError(null)
       const { error } = await supabase.auth.resetPasswordForEmail(email)
-      
+
       if (error) {
         setError(error)
       }
-      
+
       return { error }
     } catch (err) {
       const authError = new Error('Erro ao redefinir senha') as AuthError
