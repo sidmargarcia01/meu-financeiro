@@ -23,40 +23,140 @@ export interface CategoryWithChildren {
   children: CategoryWithChildren[]
 }
 
-// Modelo padrão de categorias com dreGroup — 9 grupos gerenciais (alinhado com personal-website)
+// Modelo padrão de categorias — 9 pais + 46 subcategorias (alinhado com personal-website)
+// Estrutura hierárquica: pai com dreGroup, filhos herdam o mesmo grupo
 const CATEGORIAS_PADRAO: Array<{
   name: string
   type: 'RECEITA' | 'DESPESA'
   dre_group: DreGroup
+  children?: string[]
 }> = [
-    // ── Receitas Operacionais (ROB) ───────────────────────────────────
-    { name: 'Receita de Vendas', type: 'RECEITA', dre_group: 'RECEITAS_OPERACIONAIS' },
-    { name: 'Receita de Serviços', type: 'RECEITA', dre_group: 'RECEITAS_OPERACIONAIS' },
-    // ── Impostos sobre Faturamento → Receita Líquida ─────────────────
-    { name: 'Impostos sobre Faturamento', type: 'RECEITA', dre_group: 'IMPOSTOS_FATURAMENTO' },
-    // ── Custos Operacionais → Margem Bruta ───────────────────────────
-    { name: 'Custo de Mercadorias (CMV)', type: 'DESPESA', dre_group: 'CUSTOS_OPERACIONAIS' },
-    { name: 'Custo de Serviços Prestados', type: 'DESPESA', dre_group: 'CUSTOS_OPERACIONAIS' },
-    // ── Despesas Variáveis → Margem de Contribuição ───────────────────
-    { name: 'Comissões de Vendas', type: 'DESPESA', dre_group: 'DESPESAS_VARIAVEIS' },
-    { name: 'Fretes e Entregas', type: 'DESPESA', dre_group: 'DESPESAS_VARIAVEIS' },
-    { name: 'Marketing e Publicidade', type: 'DESPESA', dre_group: 'DESPESAS_VARIAVEIS' },
-    // ── Despesas Fixas → EBITDA ───────────────────────────────────────
-    { name: 'Salários e Encargos', type: 'DESPESA', dre_group: 'DESPESAS_FIXAS' },
-    { name: 'Aluguel e Condomínio', type: 'DESPESA', dre_group: 'DESPESAS_FIXAS' },
-    { name: 'Tecnologia e Software', type: 'DESPESA', dre_group: 'DESPESAS_FIXAS' },
-    { name: 'Despesas Administrativas', type: 'DESPESA', dre_group: 'DESPESAS_FIXAS' },
-    { name: 'Manutenção e Conservação', type: 'DESPESA', dre_group: 'DESPESAS_FIXAS' },
-    // ── Receitas Não Operacionais ─────────────────────────────────────
-    { name: 'Receitas Financeiras', type: 'RECEITA', dre_group: 'RECEITAS_NAO_OPERACIONAIS' },
-    { name: 'Outras Receitas', type: 'RECEITA', dre_group: 'RECEITAS_NAO_OPERACIONAIS' },
-    // ── Despesas Não Operacionais → EBT ──────────────────────────────
-    { name: 'Juros e Encargos Financeiros', type: 'DESPESA', dre_group: 'DESPESAS_NAO_OPERACIONAIS' },
-    { name: 'Tarifas Bancárias', type: 'DESPESA', dre_group: 'DESPESAS_NAO_OPERACIONAIS' },
-    // ── Impostos sobre Lucros → Resultado antes Participações ─────────
-    { name: 'Imposto de Renda (IR/CSLL)', type: 'DESPESA', dre_group: 'IMPOSTOS_LUCRO' },
-    // ── Distribuição de Lucros → Resultado Líquido ───────────────────
-    { name: 'Distribuição de Lucros', type: 'DESPESA', dre_group: 'DISTRIBUICAO_LUCROS' },
+    // ── 1. RECEITAS OPERACIONAIS (ROB) ─────────────────────────────────
+    {
+      name: 'Receitas Operacionais',
+      type: 'RECEITA',
+      dre_group: 'RECEITAS_OPERACIONAIS',
+      children: [
+        'Vendas de produtos',
+        'Vendas de serviços',
+        'Outras receitas operacionais',
+      ],
+    },
+
+    // ── 2. RECEITAS NÃO OPERACIONAIS ───────────────────────────────────
+    {
+      name: 'Receitas não Operacionais',
+      type: 'RECEITA',
+      dre_group: 'RECEITAS_NAO_OPERACIONAIS',
+      children: [
+        'Juros recebidos',
+        'Rendimentos de aplicações',
+        'Outras receitas não operacionais',
+      ],
+    },
+
+    // ── 3. CUSTOS OPERACIONAIS (CPV/CSP/CMV) ───────────────────────────
+    {
+      name: 'Custos Operacionais',
+      type: 'DESPESA',
+      dre_group: 'CUSTOS_OPERACIONAIS',
+      children: [
+        'Custo dos produtos vendidos (CPV)',
+        'Custo dos serviços prestados (CSP)',
+        'Custo de mercadorias vendidas (CMV)',
+      ],
+    },
+
+    // ── 4. DESPESAS VARIÁVEIS → Margem de Contribuição ─────────────────
+    {
+      name: 'Despesas Variáveis',
+      type: 'DESPESA',
+      dre_group: 'DESPESAS_VARIAVEIS',
+      children: [
+        'Comissões sobre vendas',
+        'Taxas de cartão de crédito',
+        'Fretes sobre vendas',
+        'Embalagens',
+        'Outras despesas variáveis',
+      ],
+    },
+
+    // ── 5. DESPESAS FIXAS → EBITDA ─────────────────────────────────────
+    {
+      name: 'Despesas Fixas',
+      type: 'DESPESA',
+      dre_group: 'DESPESAS_FIXAS',
+      children: [
+        'Aluguel',
+        'Condomínio',
+        'Folha de pagamento',
+        'Encargos trabalhistas',
+        'Contabilidade',
+        'Energia elétrica',
+        'Água e esgoto',
+        'Telefone e internet',
+        'Material de escritório',
+        'Material de limpeza',
+        'Manutenção e reparos',
+        'Seguros',
+        'Assinaturas e mensalidades',
+        'Marketing e publicidade',
+        'Outras despesas fixas',
+      ],
+    },
+
+    // ── 6. DESPESAS NÃO OPERACIONAIS → EBT ─────────────────────────────
+    {
+      name: 'Despesas não Operacionais',
+      type: 'DESPESA',
+      dre_group: 'DESPESAS_NAO_OPERACIONAIS',
+      children: [
+        'Juros pagos',
+        'Multas e encargos bancários',
+        'Taxas bancárias',
+        'Outras despesas não operacionais',
+      ],
+    },
+
+    // ── 7. IMPOSTOS SOBRE FATURAMENTO → Receita Líquida ────────────────
+    // IMPORTANTE: type = DESPESA (dedução da receita, não receita negativa)
+    {
+      name: 'Impostos sobre Faturamento',
+      type: 'DESPESA',
+      dre_group: 'IMPOSTOS_FATURAMENTO',
+      children: [
+        'Simples Nacional',
+        'ISS',
+        'ICMS',
+        'PIS',
+        'COFINS',
+        'Outros impostos sobre faturamento',
+      ],
+    },
+
+    // ── 8. IMPOSTOS SOBRE LUCRO ────────────────────────────────────────
+    {
+      name: 'Impostos sobre Lucro',
+      type: 'DESPESA',
+      dre_group: 'IMPOSTOS_LUCRO',
+      children: [
+        'IRPJ',
+        'CSLL',
+        'Outros impostos sobre lucro',
+      ],
+    },
+
+    // ── 9. DISTRIBUIÇÃO DE LUCROS → Resultado Líquido ─────────────────
+    {
+      name: 'Distribuição de Lucros',
+      type: 'DESPESA',
+      dre_group: 'DISTRIBUICAO_LUCROS',
+      children: [
+        'Pró-labore',
+        'Distribuição de lucros',
+        'Dividendos',
+      ],
+    },
   ]
 
 export const categoryService = {
@@ -133,17 +233,43 @@ export const categoryService = {
     const existentes = await categoryRepository.findAllByUser(userId, {})
     const nomesExistentes = new Set(existentes.map(c => c.name.toLowerCase()))
 
-    const para_criar = CATEGORIAS_PADRAO.filter(
-      c => !nomesExistentes.has(c.name.toLowerCase())
-    )
+    let criadas = 0
+    let ignoradas = 0
 
-    const criadas = []
-    for (const cat of para_criar) {
-      const nova = await categoryRepository.create(userId, cat)
-      criadas.push(nova)
+    for (const pai of CATEGORIAS_PADRAO) {
+      // Verifica se a categoria pai já existe
+      if (nomesExistentes.has(pai.name.toLowerCase())) {
+        ignoradas += 1 + (pai.children?.length ?? 0)
+        continue
+      }
+
+      // Cria categoria pai
+      const parentCategory = await categoryRepository.create(userId, {
+        name: pai.name,
+        type: pai.type,
+        dre_group: pai.dre_group,
+      })
+      criadas++
+
+      // Cria subcategorias (filhos) herdando o mesmo type e dre_group
+      if (pai.children && pai.children.length > 0) {
+        for (const childName of pai.children) {
+          if (!nomesExistentes.has(childName.toLowerCase())) {
+            await categoryRepository.create(userId, {
+              name: childName,
+              type: pai.type,
+              dre_group: pai.dre_group,
+              parent_id: parentCategory.id,
+            })
+            criadas++
+          } else {
+            ignoradas++
+          }
+        }
+      }
     }
 
-    return { criadas: criadas.length, ignoradas: CATEGORIAS_PADRAO.length - criadas.length }
+    return { criadas, ignoradas }
   },
 
   async delete(id: string, userId: string) {
