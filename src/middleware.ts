@@ -16,8 +16,13 @@ export function middleware(req: NextRequest) {
   const hasSession = !!req.cookies.get('sb-access-token')?.value
 
   // Rotas de autenticação — redirecionar se já tem cookie de sessão
+  // IMPORTANTE: usar match preciso (exato ou subrota com /) para evitar que
+  // /cadastro corresponda erroneamente a /cadastros/categorias etc.
   const authRoutes = ['/login', '/register', '/cadastro', '/recuperar-senha']
-  if (authRoutes.some(route => pathname.startsWith(route))) {
+  const isAuthRoute = authRoutes.some(
+    route => pathname === route || pathname.startsWith(route + '/')
+  )
+  if (isAuthRoute) {
     if (hasSession) return NextResponse.redirect(new URL('/dashboard', req.url))
     return NextResponse.next()
   }
