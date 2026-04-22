@@ -115,25 +115,58 @@ async function register(request: NextRequest, body: any) {
   })
 
   if (authError) {
+    console.error('❌ Auth Error:', authError)
     return NextResponse.json(
       { error: 'Erro ao criar conta', details: authError.message },
       { status: 400 }
     )
   }
 
-  // O trigger handle_new_user já criou o usuário automaticamente
-  // Apenas atualizar dados adicionais (plan_id) se necessário
-  if (validation.data.planId) {
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({
-        plan_id: validation.data.planId,
-      })
-      .eq('id', authData.user!.id)
+  console.log('✅ Auth user created:', authData.user?.id)
 
-    if (updateError) {
-      console.error('Erro ao atualizar plano:', updateError)
-      // Não falhar o registro por causa do plano
+  // Aguardar trigger executar (pequeno delay)
+  await new Promise(resolve => setTimeout(resolve, 500))
+
+  // Verificar se usuário foi criado na tabela users pelo trigger
+  const { data: userRecord, error: userCheckError } = await supabase
+    .from('users')
+    .select('id')
+    .eq('id', authData.user!.id)
+    .single()
+
+  if (userCheckError || !userRecord) {
+    console.error('❌ User not found in users table:', userCheckError)
+    // Tentar criar manualmente como fallback
+    const { error: insertError } = await supabase
+      .from('users')
+      .insert({
+        id: authData.user!.id,
+        email: validation.data.email,
+        name: validation.data.name,
+        plan_id: validation.data.planId || null,
+        default_currency: 'BRL',
+      })
+
+    if (insertError) {
+      console.error('❌ Failed to insert user:', insertError)
+      return NextResponse.json(
+        { error: 'Database error saving new user', details: insertError.message },
+        { status: 500 }
+      )
+    }
+    console.log('✅ User inserted manually')
+  } else {
+    console.log('✅ User created by trigger')
+    // Atualizar plan_id se necessário
+    if (validation.data.planId) {
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ plan_id: validation.data.planId })
+        .eq('id', authData.user!.id)
+
+      if (updateError) {
+        console.error('Erro ao atualizar plano:', updateError)
+      }
     }
   }
 
