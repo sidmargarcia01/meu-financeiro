@@ -13,9 +13,12 @@ import { z } from 'zod'
 
 // Schema de validação para query params
 const resumoMensalSchema = z.object({
-  mes: z.coerce.number().min(1).max(12).optional(),
-  ano: z.coerce.number().min(2020).max(2100).optional()
-})
+  mes: z.coerce.number().min(1).max(12).optional().nullable(),
+  ano: z.coerce.number().min(2020).max(2100).optional().nullable()
+}).transform(data => ({
+  mes: data.mes ?? undefined,
+  ano: data.ano ?? undefined
+}))
 
 export async function GET(request: NextRequest) {
   return withAuth(request, async (request, user) => {
