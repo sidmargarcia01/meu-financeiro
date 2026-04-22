@@ -39,8 +39,8 @@ import { formatCurrency } from '@/utils/formatCurrency'
 import { formatDate } from '@/utils/formatDate'
 
 const STATUS_CONFIG = {
-  PENDENTE:   { label: 'Pendente',   color: 'warning' as const, icon: <PendingIcon fontSize="small" /> },
-  AGENDADO:   { label: 'Agendado',   color: 'info'    as const, icon: <PendingIcon fontSize="small" /> },
+  PENDENTE: { label: 'Pendente', color: 'warning' as const, icon: <PendingIcon fontSize="small" /> },
+  AGENDADO: { label: 'Agendado', color: 'info' as const, icon: <PendingIcon fontSize="small" /> },
   CONFIRMADO: { label: 'Confirmado', color: 'success' as const, icon: <ConfirmedIcon fontSize="small" /> },
   CONCILIADO: { label: 'Conciliado', color: 'primary' as const, icon: <ConciliatedIcon fontSize="small" /> },
 }
@@ -62,28 +62,29 @@ interface Transaction {
   type: 'RECEITA' | 'DESPESA' | 'TRANSFERENCIA'
   status: 'PENDENTE' | 'AGENDADO' | 'CONFIRMADO' | 'CONCILIADO'
   due_date: string
-  account_id: string
-  account_name?: string
+  account_id?: string
   category_id?: string
+  account_name?: string
   category_name?: string
 }
 
 interface Account { id: string; name: string; type: string }
-interface Category { id: string; name: string; type?: string }
+interface Category { id: string; name: string; type?: string; children?: Category[] }
 
 export default function LancamentosPage() {
-  const [formOpen, setFormOpen]         = useState(false)
-  const [editTarget, setEditTarget]     = useState<Transaction | null>(null)
+  const [formOpen, setFormOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState<Transaction | null>(null)
   const [filterStatus, setFilterStatus] = useState('')
-  const [filterType, setFilterType]     = useState('')
-  const [searchTerm, setSearchTerm]     = useState('')
+  const [filterType, setFilterType] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [accounts, setAccounts]         = useState<Account[]>([])
-  const [categories, setCategories]     = useState<Category[]>([])
-  const [loading, setLoading]           = useState(true)
-  const [error, setError]               = useState<string | null>(null)
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // Carregar accounts e categories uma vez
   useEffect(() => {
@@ -103,8 +104,8 @@ export default function LancamentosPage() {
     try {
       const params = new URLSearchParams()
       if (filterStatus) params.set('status', filterStatus)
-      if (filterType)   params.set('type', filterType)
-      if (searchTerm)   params.set('search', searchTerm)
+      if (filterType) params.set('type', filterType)
+      if (searchTerm) params.set('search', searchTerm)
       params.set('limit', '50')
       const res = await fetch(`/api/transactions?${params}`)
       if (!res.ok) throw new Error()
@@ -119,21 +120,45 @@ export default function LancamentosPage() {
 
   useEffect(() => { fetchTransactions() }, [fetchTransactions])
 
+  const toISODate = (d: string) => d ? new Date(d + 'T12:00:00.000Z').toISOString() : undefined
+
   const handleSubmit = async (data: TransactionFormData) => {
     setIsSubmitting(true)
+    setSubmitError(null)
     try {
       const method = editTarget ? 'PUT' : 'POST'
       const url = editTarget ? `/api/transactions/${editTarget.id}` : '/api/transactions'
+      const payload = {
+        description: data.description,
+        amount: data.amount,
+        type: data.type,
+        dueDate: toISODate(data.due_date),
+        accountId: data.account_id || undefined,
+        categoryId: data.category_id || undefined,
+        status: data.status || 'PENDENTE',
+        regime: data.regime || 'CAIXA',
+        notes: data.notes || undefined,
+        centerId: data.center_id || undefined,
+        projectId: data.project_id || undefined,
+        contactId: data.contact_id || undefined,
+        tags: data.tags || [],
+        isRecurring: data.repetition_type !== 'NONE',
+      }
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       })
       if (res.ok) {
         setFormOpen(false)
         setEditTarget(null)
         fetchTransactions()
+      } else {
+        const err = await res.json().catch(() => ({}))
+        setSubmitError(err.error || `Erro ${res.status} ao salvar lançamento`)
       }
+    } catch {
+      setSubmitError('Falha de conexão ao salvar o lançamento.')
     } finally {
       setIsSubmitting(false)
     }
@@ -145,8 +170,8 @@ export default function LancamentosPage() {
     fetchTransactions()
   }
 
-  const openNew   = () => { setEditTarget(null); setFormOpen(true) }
-  const openEdit  = (tx: Transaction) => { setEditTarget(tx); setFormOpen(true) }
+  const openNew = () => { setEditTarget(null); setFormOpen(true) }
+  const openEdit = (tx: Transaction) => { setEditTarget(tx); setFormOpen(true) }
 
   return (
     <Box sx={{ p: 3 }}>
@@ -257,20 +282,25 @@ export default function LancamentosPage() {
           <Typography variant="h6">{editTarget ? 'Editar Lançamento' : 'Novo Lançamento'}</Typography>
           <IconButton onClick={() => { setFormOpen(false); setEditTarget(null) }}>✕</IconButton>
         </Box>
+        {submitError && (
+          <Box px={2} pb={1}>
+            <Alert severity="error" onClose={() => setSubmitError(null)}>{submitError}</Alert>
+          </Box>
+        )}
         <TransactionForm
           onSubmit={handleSubmit}
-          onCancel={() => { setFormOpen(false); setEditTarget(null) }}
+          onCancel={() => { setFormOpen(false); setEditTarget(null); setSubmitError(null) }}
           accounts={accounts}
-          categories={categories.map(cat => ({ ...cat, children: [], type: cat.type || '' }))}
+          categories={categories.map(cat => ({ ...cat, type: cat.type || '', children: (cat.children ?? []).map(c => ({ ...c, type: c.type || '', children: [] })) }))}
           settings={DEFAULT_SETTINGS}
           isLoading={isSubmitting}
           initialData={editTarget ? {
             type: editTarget.type as 'RECEITA' | 'DESPESA' | 'TRANSFERENCIA',
             amount: editTarget.amount,
             description: editTarget.description,
-            due_date: editTarget.due_date,
-            account_id: editTarget.account_id,
-            category_id: editTarget.category_id,
+            due_date: editTarget.due_date ?? '',
+            account_id: editTarget.account_id ?? '',
+            category_id: editTarget.category_id ?? '',
             status: (editTarget.status === 'CONCILIADO' || editTarget.status === 'AGENDADO') ? 'PENDENTE' : editTarget.status as 'PENDENTE' | 'CONFIRMADO',
             regime: 'CAIXA',
             repetition_type: 'NONE',

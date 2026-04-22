@@ -7,12 +7,12 @@
  */
 
 import { supabase } from '@/lib/supabase'
-import { 
-  Transaction, 
-  TransactionWithRelations, 
-  AccountBalance, 
+import {
+  Transaction,
+  TransactionWithRelations,
+  AccountBalance,
   MonthlySummary,
-  TransactionFilters 
+  TransactionFilters
 } from '@/models/transaction'
 
 export class TransactionRepository {
@@ -61,9 +61,9 @@ export class TransactionRepository {
       })
       .select()
       .single()
-    
+
     if (error) throw error
-    
+
     return {
       id: transaction.id,
       userId: transaction.user_id,
@@ -135,9 +135,9 @@ export class TransactionRepository {
       .from('transactions')
       .insert(transactionsToInsert)
       .select()
-    
+
     if (error) throw error
-    
+
     return (data || []).map((transaction: any) => ({
       id: transaction.id,
       userId: transaction.user_id,
@@ -171,7 +171,7 @@ export class TransactionRepository {
       .eq('id', id)
       .eq('user_id', userId)
       .single()
-    
+
     if (error && error.code !== 'PGRST116') throw error
     return !!data
   }
@@ -181,13 +181,20 @@ export class TransactionRepository {
     startDate?: string
     endDate?: string
     accountId?: string
+    categoryId?: string
     type?: string
     status?: string
+    search?: string
     limit?: number
+    page?: number
   }): Promise<any[]> {
     let query = supabase
       .from('transactions')
-      .select('*')
+      .select(`
+        *,
+        account:accounts(name),
+        category:categories(name)
+      `)
       .eq('user_id', userId)
       .order('due_date', { ascending: false })
 
@@ -200,11 +207,17 @@ export class TransactionRepository {
     if (filters?.accountId) {
       query = query.eq('account_id', filters.accountId)
     }
+    if (filters?.categoryId) {
+      query = query.eq('category_id', filters.categoryId)
+    }
     if (filters?.type) {
       query = query.eq('type', filters.type)
     }
     if (filters?.status) {
       query = query.eq('status', filters.status)
+    }
+    if (filters?.search) {
+      query = query.ilike('description', `%${filters.search}%`)
     }
     if (filters?.limit) {
       query = query.limit(filters.limit)
@@ -212,7 +225,12 @@ export class TransactionRepository {
 
     const { data, error } = await query
     if (error) throw error
-    return data || []
+
+    return (data || []).map((t: any) => ({
+      ...t,
+      account_name: (t.account as any)?.name ?? null,
+      category_name: (t.category as any)?.name ?? null,
+    }))
   }
 
   // Buscar saldos por conta
@@ -228,15 +246,15 @@ export class TransactionRepository {
       `)
       .eq('user_id', userId)
       .in('status', ['CONFIRMADO', 'CONCILIADO'])
-    
+
     if (error) throw error
-    
+
     const balances: { [key: string]: AccountBalance } = {}
-    
+
     data.forEach(transaction => {
       const accountId = transaction.account_id
       const accountName = (transaction.accounts as any).name
-      
+
       if (!balances[accountId]) {
         balances[accountId] = {
           accountId,
@@ -245,7 +263,7 @@ export class TransactionRepository {
           projectedBalance: 0,
         }
       }
-      
+
       const amount = Number(transaction.amount)
       if (transaction.type === 'RECEITA') {
         balances[accountId].confirmedBalance += amount
@@ -255,7 +273,7 @@ export class TransactionRepository {
         balances[accountId].projectedBalance -= amount
       }
     })
-    
+
     return Object.values(balances)
   }
 
@@ -301,9 +319,9 @@ export class TransactionRepository {
       .eq('user_id', userId)
       .select()
       .single()
-    
+
     if (error) throw error
-    
+
     return transaction
   }
 
@@ -314,7 +332,7 @@ export class TransactionRepository {
       .delete()
       .eq('id', id)
       .eq('user_id', userId)
-    
+
     if (error) throw error
   }
 
@@ -333,10 +351,10 @@ export class TransactionRepository {
       .eq('id', id)
       .eq('user_id', userId)
       .single()
-    
+
     if (error && error.code !== 'PGRST116') throw error
     if (!data) return null
-    
+
     return {
       id: data.id,
       userId: data.user_id,
@@ -394,17 +412,17 @@ export class TransactionRepository {
       .from('transactions')
       .select('amount, type')
       .eq('account_id', accountId)
-    
+
     if (statusFilter && statusFilter.length > 0) {
       query = query.in('status', statusFilter)
     }
-    
+
     const { data, error } = await query
-    
+
     if (error) throw error
-    
+
     if (!data || data.length === 0) return 0
-    
+
     return data.reduce((sum, transaction) => {
       const amount = Number(transaction.amount)
       return transaction.type === 'RECEITA' ? sum + amount : sum - amount
@@ -415,16 +433,16 @@ export class TransactionRepository {
   async countByUserMonth(userId: string, month: number, year: number): Promise<number> {
     const startDate = new Date(year, month - 1, 1)
     const endDate = new Date(year, month, 0)
-    
+
     const { count, error } = await supabase
       .from('transactions')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId)
       .gte('due_date', startDate.toISOString().split('T')[0])
       .lte('due_date', endDate.toISOString().split('T')[0])
-    
+
     if (error) throw error
-    
+
     return count || 0
   }
 
@@ -574,22 +592,22 @@ export class TransactionRepository {
     // Agrupar por categoria e somar valores
     const categoryMap = new Map<string, { category_id: string; category_name: string; total: number }>()
 
-    ;(data || []).forEach((item: any) => {
-      const categoryId = item.categories.id
-      const categoryName = item.categories.name
-      const amount = Number(item.amount)
+      ; (data || []).forEach((item: any) => {
+        const categoryId = item.categories.id
+        const categoryName = item.categories.name
+        const amount = Number(item.amount)
 
-      if (categoryMap.has(categoryId)) {
-        const existing = categoryMap.get(categoryId)!
-        existing.total += amount
-      } else {
-        categoryMap.set(categoryId, {
-          category_id: categoryId,
-          category_name: categoryName,
-          total: amount
-        })
-      }
-    })
+        if (categoryMap.has(categoryId)) {
+          const existing = categoryMap.get(categoryId)!
+          existing.total += amount
+        } else {
+          categoryMap.set(categoryId, {
+            category_id: categoryId,
+            category_name: categoryName,
+            total: amount
+          })
+        }
+      })
 
     return Array.from(categoryMap.values())
   }
