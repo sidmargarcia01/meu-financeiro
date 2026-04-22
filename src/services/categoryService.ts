@@ -230,34 +230,46 @@ export const categoryService = {
     return categoryRepository.update(id, userId, input)
   },
 
-  // Garante que o usuário existe na tabela users (para FK funcionar)
+  // Garante que o usuário existe na tabela users com o auth UUID correto
   async ensureUserExists(userId: string, email: string = 'user@example.com') {
     const supabase = getSupabaseAdmin()
 
-    // Verifica se usuário existe
-    const { data: existing } = await supabase
+    // 1. Verifica se já existe com o id correto (auth UUID)
+    const { data: existingById } = await supabase
       .from('users')
       .select('id')
       .eq('id', userId)
-      .single()
+      .maybeSingle()
 
-    if (existing) return // Já existe
+    if (existingById) {
+      console.log('[SERVICE] Usuário já existe pelo id:', userId)
+      return
+    }
 
-    // Cria usuário na tabela users
-    console.log('[SERVICE] Criando usuário na tabela users:', userId)
+    // 2. Verifica se existe com mesmo email mas id diferente
+    const { data: existingByEmail } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle()
+
+    if (existingByEmail) {
+      // Deleta o row com id errado e recria com auth UUID correto
+      console.log('[SERVICE] Usuário encontrado por email com id diferente. Recriando com auth UUID:', userId)
+      await supabase.from('users').delete().eq('id', existingByEmail.id)
+    }
+
+    // 3. Insere com o auth UUID correto
+    console.log('[SERVICE] Inserindo usuário com auth UUID:', userId, email)
     const { error } = await supabase
       .from('users')
-      .insert({
-        id: userId,
-        email: email,
-        name: 'Usuário',
-        plan_id: null
-      })
+      .insert({ id: userId, email, name: 'Usuário', plan_id: null })
 
     if (error) {
-      console.error('[SERVICE] Erro ao criar usuário:', error)
+      console.error('[SERVICE] Erro ao inserir usuário:', error)
       throw new Error(`Não foi possível criar usuário: ${error.message}`)
     }
+    console.log('[SERVICE] Usuário criado com sucesso:', userId)
   },
 
   async criarCategoriasPadrao(userId: string, email?: string) {
