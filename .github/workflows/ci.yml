@@ -55,7 +55,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Deploy to Vercel Preview
-        if: secrets.VERCEL_TOKEN != ''
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
@@ -67,12 +66,11 @@ jobs:
   deploy-production:
     needs: quality
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') && github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
 
       - name: Deploy to Vercel Production
-        if: secrets.VERCEL_TOKEN != ''
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
@@ -107,7 +105,7 @@ jobs:
     if: always()
     steps:
       - name: Notify Slack on Success
-        if: needs.deploy-production.result == 'success' && secrets.SLACK_WEBHOOK_URL != ''
+        if: needs.deploy-production.result == 'success'
         uses: 8398a7/action-slack@v3
         with:
           status: success
@@ -116,7 +114,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Notify Slack on Failure
-        if: (needs.deploy-production.result == 'failure' || needs.quality.result == 'failure') && secrets.SLACK_WEBHOOK_URL != ''
+        if: needs.deploy-production.result == 'failure' || needs.quality.result == 'failure'
         uses: 8398a7/action-slack@v3
         with:
           status: failure
