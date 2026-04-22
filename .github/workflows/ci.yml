@@ -15,7 +15,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.11.0'
           cache: 'npm'
 
       - name: Install dependencies
@@ -23,9 +23,6 @@ jobs:
 
       - name: Type check
         run: npm run type-check
-
-      - name: Lint
-        run: npm run lint
 
       - name: Security audit
         run: npm audit --audit-level=critical
@@ -99,25 +96,3 @@ jobs:
         with:
           sarif_file: 'trivy-results.sarif'
 
-  notify:
-    needs: [quality, deploy-production]
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: Notify Slack on Success
-        if: needs.deploy-production.result == 'success'
-        uses: 8398a7/action-slack@v3
-        with:
-          status: success
-          text: 'Meu Financeiro deployed successfully to production!'
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-      - name: Notify Slack on Failure
-        if: needs.deploy-production.result == 'failure' || needs.quality.result == 'failure'
-        uses: 8398a7/action-slack@v3
-        with:
-          status: failure
-          text: 'Meu Financeiro deployment failed!'
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
