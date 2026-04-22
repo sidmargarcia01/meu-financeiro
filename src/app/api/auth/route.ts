@@ -29,7 +29,7 @@ const registerSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    
+
     // Verificar se é login ou registro
     if (body.name) {
       return await register(request, body)
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
 async function login(request: NextRequest, body: any) {
   const { email, password } = body
-  
+
   // Validar entrada
   const validation = loginSchema.safeParse({ email, password })
   if (!validation.success) {
@@ -56,20 +56,20 @@ async function login(request: NextRequest, body: any) {
       { status: 400 }
     )
   }
-  
+
   // Autenticar com Supabase
   const { data, error } = await supabase.auth.signInWithPassword({
     email: validation.data.email,
     password: validation.data.password,
   })
-  
+
   if (error) {
     return NextResponse.json(
       { error: 'Email ou senha inválidos' },
       { status: 401 }
     )
   }
-  
+
   // Buscar dados completos do usuário
   const { data: userData } = await supabase
     .from('users')
@@ -80,7 +80,7 @@ async function login(request: NextRequest, body: any) {
     `)
     .eq('id', data.user.id)
     .single()
-  
+
   return NextResponse.json({
     user: {
       id: data.user.id,
@@ -93,7 +93,7 @@ async function login(request: NextRequest, body: any) {
 
 async function register(request: NextRequest, body: any) {
   const { email, password, name, planId } = body
-  
+
   // Validar entrada
   const validation = registerSchema.safeParse({ email, password, name, planId })
   if (!validation.success) {
@@ -102,7 +102,7 @@ async function register(request: NextRequest, body: any) {
       { status: 400 }
     )
   }
-  
+
   // Criar usuário no Supabase Auth
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email: validation.data.email,
@@ -113,31 +113,30 @@ async function register(request: NextRequest, body: any) {
       },
     },
   })
-  
+
   if (authError) {
     return NextResponse.json(
       { error: 'Erro ao criar conta', details: authError.message },
       { status: 400 }
     )
   }
-  
-  // Criar registro na tabela users
-  const { error: userError } = await supabase
-    .from('users')
-    .insert({
-      id: authData.user!.id,
-      name: validation.data.name,
-      planId: validation.data.planId || null,
-      defaultCurrency: 'BRL',
-    })
-  
-  if (userError) {
-    return NextResponse.json(
-      { error: 'Erro ao criar perfil', details: userError.message },
-      { status: 500 }
-    )
+
+  // O trigger handle_new_user já criou o usuário automaticamente
+  // Apenas atualizar dados adicionais (plan_id) se necessário
+  if (validation.data.planId) {
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({
+        plan_id: validation.data.planId,
+      })
+      .eq('id', authData.user!.id)
+
+    if (updateError) {
+      console.error('Erro ao atualizar plano:', updateError)
+      // Não falhar o registro por causa do plano
+    }
   }
-  
+
   return NextResponse.json({
     user: authData.user,
     message: 'Conta criada com sucesso. Verifique seu email para confirmar.',
@@ -148,26 +147,26 @@ async function register(request: NextRequest, body: any) {
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization')
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json(
         { error: 'Token não fornecido' },
         { status: 401 }
       )
     }
-    
+
     const token = authHeader.substring(7)
-    
+
     // Verificar token com Supabase
     const { data: { user }, error } = await supabase.auth.getUser(token)
-    
+
     if (error || !user) {
       return NextResponse.json(
         { error: 'Token inválido' },
         { status: 401 }
       )
     }
-    
+
     // Buscar dados completos do usuário
     const { data: userData } = await supabase
       .from('users')
@@ -178,7 +177,7 @@ export async function GET(request: NextRequest) {
       `)
       .eq('id', user.id)
       .single()
-    
+
     return NextResponse.json({
       user: {
         id: user.id,
@@ -199,26 +198,26 @@ export async function GET(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization')
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json(
         { error: 'Token não fornecido' },
         { status: 401 }
       )
     }
-    
+
     const token = authHeader.substring(7)
-    
+
     // Fazer logout no Supabase
     const { error } = await supabase.auth.signOut()
-    
+
     if (error) {
       return NextResponse.json(
         { error: 'Erro ao fazer logout' },
         { status: 500 }
       )
     }
-    
+
     return NextResponse.json({ message: 'Logout realizado com sucesso' })
   } catch (error) {
     console.error('Erro no logout:', error)
