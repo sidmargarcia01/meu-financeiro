@@ -42,6 +42,15 @@ export function useSupabaseAuth(): UseSupabaseAuthReturn {
         } else {
           setSession(session)
           setUser(session?.user ?? null)
+          // Setar cookie para autenticar chamadas de API server-side (withAuth middleware)
+          if (typeof document !== 'undefined') {
+            if (session?.access_token) {
+              const maxAge = session.expires_in ?? 3600
+              document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=${maxAge}; SameSite=Lax`
+            } else {
+              document.cookie = 'sb-access-token=; path=/; max-age=0'
+            }
+          }
         }
       } catch (err) {
         console.error('Erro ao obter sessão inicial:', err)
