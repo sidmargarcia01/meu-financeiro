@@ -39,10 +39,14 @@ const fetchLancamentos = async (): Promise<Lancamento[]> => {
     hoje.setHours(0, 0, 0, 0)
 
     const mapItem = (item: Record<string, unknown>, isOverdue: boolean): Lancamento => {
-      const dueDate = String(item.dueDate || item.due_date || '')
+      const rawDate = (item.dueDate || item.due_date || '') as string
+      const dueDate = String(rawDate)
       const target = new Date(dueDate)
-      target.setHours(0, 0, 0, 0)
-      const diffDays = Math.round((target.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24))
+      const targetValid = !isNaN(target.getTime())
+      if (targetValid) target.setHours(0, 0, 0, 0)
+      const diffDays = targetValid
+        ? Math.round((target.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24))
+        : 0
 
       return {
         id: String(item.id || ''),
