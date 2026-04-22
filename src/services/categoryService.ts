@@ -23,30 +23,40 @@ export interface CategoryWithChildren {
   children: CategoryWithChildren[]
 }
 
-// Modelo padrão de categorias com dreGroup para DRE gerencial
+// Modelo padrão de categorias com dreGroup — 9 grupos gerenciais (alinhado com personal-website)
 const CATEGORIAS_PADRAO: Array<{
   name: string
   type: 'RECEITA' | 'DESPESA'
   dre_group: DreGroup
 }> = [
-    // ── Receitas ─────────────────────────────────────────────────────
-    { name: 'Receita de Vendas', type: 'RECEITA', dre_group: 'RECEITA_BRUTA' },
-    { name: 'Receita de Serviços', type: 'RECEITA', dre_group: 'RECEITA_BRUTA' },
-    { name: 'Devoluções e Abatimentos', type: 'RECEITA', dre_group: 'DEDUCAO_RECEITA' },
-    { name: 'Impostos sobre Receita', type: 'RECEITA', dre_group: 'DEDUCAO_RECEITA' },
-    { name: 'Outras Receitas', type: 'RECEITA', dre_group: 'OUTRAS_RECEITAS' },
-    // ── Despesas ─────────────────────────────────────────────────────
-    { name: 'Custo de Mercadorias (CMV)', type: 'DESPESA', dre_group: 'CPV' },
-    { name: 'Custo de Serviços (CSV)', type: 'DESPESA', dre_group: 'CPV' },
-    { name: 'Salários e Encargos', type: 'DESPESA', dre_group: 'DESPESA_OPERACIONAL' },
-    { name: 'Aluguel e Condomínio', type: 'DESPESA', dre_group: 'DESPESA_OPERACIONAL' },
-    { name: 'Marketing e Publicidade', type: 'DESPESA', dre_group: 'DESPESA_OPERACIONAL' },
-    { name: 'Tecnologia e Software', type: 'DESPESA', dre_group: 'DESPESA_OPERACIONAL' },
-    { name: 'Despesas Administrativas', type: 'DESPESA', dre_group: 'DESPESA_OPERACIONAL' },
-    { name: 'Manutenção e Conservação', type: 'DESPESA', dre_group: 'DESPESA_OPERACIONAL' },
-    { name: 'Juros e Encargos Financeiros', type: 'DESPESA', dre_group: 'DESPESA_FINANCEIRA' },
-    { name: 'Tarifas Bancárias', type: 'DESPESA', dre_group: 'DESPESA_FINANCEIRA' },
-    { name: 'Outras Despesas', type: 'DESPESA', dre_group: 'OUTRAS_DESPESAS' },
+    // ── Receitas Operacionais (ROB) ───────────────────────────────────
+    { name: 'Receita de Vendas', type: 'RECEITA', dre_group: 'RECEITAS_OPERACIONAIS' },
+    { name: 'Receita de Serviços', type: 'RECEITA', dre_group: 'RECEITAS_OPERACIONAIS' },
+    // ── Impostos sobre Faturamento → Receita Líquida ─────────────────
+    { name: 'Impostos sobre Faturamento', type: 'RECEITA', dre_group: 'IMPOSTOS_FATURAMENTO' },
+    // ── Custos Operacionais → Margem Bruta ───────────────────────────
+    { name: 'Custo de Mercadorias (CMV)', type: 'DESPESA', dre_group: 'CUSTOS_OPERACIONAIS' },
+    { name: 'Custo de Serviços Prestados', type: 'DESPESA', dre_group: 'CUSTOS_OPERACIONAIS' },
+    // ── Despesas Variáveis → Margem de Contribuição ───────────────────
+    { name: 'Comissões de Vendas', type: 'DESPESA', dre_group: 'DESPESAS_VARIAVEIS' },
+    { name: 'Fretes e Entregas', type: 'DESPESA', dre_group: 'DESPESAS_VARIAVEIS' },
+    { name: 'Marketing e Publicidade', type: 'DESPESA', dre_group: 'DESPESAS_VARIAVEIS' },
+    // ── Despesas Fixas → EBITDA ───────────────────────────────────────
+    { name: 'Salários e Encargos', type: 'DESPESA', dre_group: 'DESPESAS_FIXAS' },
+    { name: 'Aluguel e Condomínio', type: 'DESPESA', dre_group: 'DESPESAS_FIXAS' },
+    { name: 'Tecnologia e Software', type: 'DESPESA', dre_group: 'DESPESAS_FIXAS' },
+    { name: 'Despesas Administrativas', type: 'DESPESA', dre_group: 'DESPESAS_FIXAS' },
+    { name: 'Manutenção e Conservação', type: 'DESPESA', dre_group: 'DESPESAS_FIXAS' },
+    // ── Receitas Não Operacionais ─────────────────────────────────────
+    { name: 'Receitas Financeiras', type: 'RECEITA', dre_group: 'RECEITAS_NAO_OPERACIONAIS' },
+    { name: 'Outras Receitas', type: 'RECEITA', dre_group: 'RECEITAS_NAO_OPERACIONAIS' },
+    // ── Despesas Não Operacionais → EBT ──────────────────────────────
+    { name: 'Juros e Encargos Financeiros', type: 'DESPESA', dre_group: 'DESPESAS_NAO_OPERACIONAIS' },
+    { name: 'Tarifas Bancárias', type: 'DESPESA', dre_group: 'DESPESAS_NAO_OPERACIONAIS' },
+    // ── Impostos sobre Lucros → Resultado antes Participações ─────────
+    { name: 'Imposto de Renda (IR/CSLL)', type: 'DESPESA', dre_group: 'IMPOSTOS_LUCRO' },
+    // ── Distribuição de Lucros → Resultado Líquido ───────────────────
+    { name: 'Distribuição de Lucros', type: 'DESPESA', dre_group: 'DISTRIBUICAO_LUCROS' },
   ]
 
 export const categoryService = {

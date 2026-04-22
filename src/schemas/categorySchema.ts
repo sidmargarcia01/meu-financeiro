@@ -7,26 +7,31 @@
 
 import { z } from 'zod'
 
+// 9 grupos DRE gerencial — alinhado com personal-website (indicators-report.service)
 export const DRE_GROUPS = [
-  'RECEITA_BRUTA',
-  'DEDUCAO_RECEITA',
-  'CPV',
-  'DESPESA_OPERACIONAL',
-  'DESPESA_FINANCEIRA',
-  'OUTRAS_RECEITAS',
-  'OUTRAS_DESPESAS',
+  'RECEITAS_OPERACIONAIS',     // ROB → Receita Líquida
+  'IMPOSTOS_FATURAMENTO',      // (-) Impostos sobre faturamento
+  'CUSTOS_OPERACIONAIS',       // (-) CPV / CSV → Margem Bruta
+  'DESPESAS_VARIAVEIS',        // (-) Variáveis → Margem de Contribuição
+  'DESPESAS_FIXAS',            // (-) Fixas → EBITDA
+  'RECEITAS_NAO_OPERACIONAIS', // (+) Outras receitas
+  'DESPESAS_NAO_OPERACIONAIS', // (-) Outras despesas → EBT
+  'IMPOSTOS_LUCRO',            // (-) IR / CSLL
+  'DISTRIBUICAO_LUCROS',       // (-) Dividendos → Resultado Líquido
 ] as const
 
 export type DreGroup = typeof DRE_GROUPS[number]
 
 export const DRE_GROUP_LABELS: Record<DreGroup, string> = {
-  RECEITA_BRUTA: 'Receita Bruta',
-  DEDUCAO_RECEITA: 'Deduções de Receita',
-  CPV: 'CPV / CSV',
-  DESPESA_OPERACIONAL: 'Despesa Operacional',
-  DESPESA_FINANCEIRA: 'Despesa Financeira',
-  OUTRAS_RECEITAS: 'Outras Receitas',
-  OUTRAS_DESPESAS: 'Outras Despesas',
+  RECEITAS_OPERACIONAIS: 'Receitas Operacionais',
+  IMPOSTOS_FATURAMENTO: 'Impostos sobre Faturamento',
+  CUSTOS_OPERACIONAIS: 'Custos Operacionais (CPV/CSV)',
+  DESPESAS_VARIAVEIS: 'Despesas Variáveis',
+  DESPESAS_FIXAS: 'Despesas Fixas',
+  RECEITAS_NAO_OPERACIONAIS: 'Receitas Não Operacionais',
+  DESPESAS_NAO_OPERACIONAIS: 'Despesas Não Operacionais',
+  IMPOSTOS_LUCRO: 'Impostos sobre Lucros (IR/CSLL)',
+  DISTRIBUICAO_LUCROS: 'Distribuição de Lucros',
 }
 
 export const createCategorySchema = z.object({

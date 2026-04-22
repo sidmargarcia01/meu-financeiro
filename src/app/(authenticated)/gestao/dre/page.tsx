@@ -23,8 +23,29 @@ import { formatCurrency } from '@/utils/formatCurrency'
 
 interface DRECategoria {
   id: string; nome: string; tipo: 'RECEITA' | 'DESPESA'
-  total: number; percentual: number
+  dreGroup: string | null; total: number; percentual: number
   subcategorias: { id: string; nome: string; total: number }[]
+}
+interface DREEstruturado {
+  receitasOperacionais: number
+  impostosFaturamento: number
+  receitaLiquida: number
+  custosOperacionais: number
+  margemBruta: number
+  margemBrutaPercent: number | null
+  despesasVariaveis: number
+  margemContribuicao: number
+  margemContribuicaoPercent: number | null
+  despesasFixas: number
+  ebitda: number
+  ebitdaPercent: number | null
+  receitasNaoOperacionais: number
+  despesasNaoOperacionais: number
+  resultadoAntesIR: number
+  impostosLucro: number
+  distribuicaoLucros: number
+  resultadoLiquido: number
+  margemLiquidaPercent: number | null
 }
 interface DREData {
   periodo: { inicio: string; fim: string }
@@ -32,6 +53,7 @@ interface DREData {
   totalReceitas: number
   totalDespesas: number
   resultado: number
+  estruturado: DREEstruturado
   categorias: DRECategoria[]
 }
 
@@ -39,17 +61,17 @@ function getDefaultDates() {
   const now = new Date()
   return {
     inicio: new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10),
-    fim:    now.toISOString().slice(0, 10),
+    fim: now.toISOString().slice(0, 10),
   }
 }
 
 export default function DrePage() {
   const { inicio: defI, fim: defF } = getDefaultDates()
-  const [data, setData]     = useState<DREData | null>(null)
+  const [data, setData] = useState<DREData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError]   = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [inicio, setInicio] = useState(defI)
-  const [fim, setFim]       = useState(defF)
+  const [fim, setFim] = useState(defF)
   const [regime, setRegime] = useState('CAIXA')
 
   const fetchDRE = useCallback(async () => {
@@ -65,13 +87,37 @@ export default function DrePage() {
 
   useEffect(() => { fetchDRE() }, [fetchDRE])
 
-  const receitas = data?.categorias.filter(c => c.tipo === 'RECEITA') ?? []
-  const despesas = data?.categorias.filter(c => c.tipo === 'DESPESA') ?? []
+  const fmtPct = (v: number | null) => v === null ? '–' : `${v.toFixed(1)}%`
+  const e = data?.estruturado
+
+  // Linhas do DRE gerencial em ordem
+  const dreLinhas = e ? [
+    { label: 'Receitas Operacionais (ROB)', valor: e.receitasOperacionais, pct: '100%', destaque: false, tipo: 'receita' },
+    { label: '(-) Impostos sobre Faturamento', valor: -e.impostosFaturamento, pct: fmtPct(e.impostosFaturamento > 0 ? -(e.impostosFaturamento / e.receitasOperacionais) * 100 : null), destaque: false, tipo: 'deducao' },
+    { label: 'Receita Líquida', valor: e.receitaLiquida, pct: fmtPct(e.receitasOperacionais > 0 ? (e.receitaLiquida / e.receitasOperacionais) * 100 : null), destaque: true, tipo: 'subtotal' },
+    { label: '(-) Custos Operacionais (CPV/CSV)', valor: -e.custosOperacionais, pct: fmtPct(e.receitaLiquida > 0 ? -(e.custosOperacionais / e.receitaLiquida) * 100 : null), destaque: false, tipo: 'deducao' },
+    { label: 'Margem Bruta', valor: e.margemBruta, pct: fmtPct(e.margemBrutaPercent), destaque: true, tipo: 'subtotal' },
+    { label: '(-) Despesas Variáveis', valor: -e.despesasVariaveis, pct: fmtPct(e.receitaLiquida > 0 ? -(e.despesasVariaveis / e.receitaLiquida) * 100 : null), destaque: false, tipo: 'deducao' },
+    { label: 'Margem de Contribuição', valor: e.margemContribuicao, pct: fmtPct(e.margemContribuicaoPercent), destaque: true, tipo: 'subtotal' },
+    { label: '(-) Despesas Fixas', valor: -e.despesasFixas, pct: fmtPct(e.receitaLiquida > 0 ? -(e.despesasFixas / e.receitaLiquida) * 100 : null), destaque: false, tipo: 'deducao' },
+    { label: 'EBITDA (Resultado Operacional)', valor: e.ebitda, pct: fmtPct(e.ebitdaPercent), destaque: true, tipo: 'subtotal' },
+    { label: '(+) Receitas Não Operacionais', valor: e.receitasNaoOperacionais, pct: '', destaque: false, tipo: 'receita' },
+    { label: '(-) Despesas Não Operacionais', valor: -e.despesasNaoOperacionais, pct: '', destaque: false, tipo: 'deducao' },
+    { label: 'Resultado antes do IR (EBT)', valor: e.resultadoAntesIR, pct: '', destaque: true, tipo: 'subtotal' },
+    { label: '(-) Impostos sobre Lucros', valor: -e.impostosLucro, pct: '', destaque: false, tipo: 'deducao' },
+    { label: '(-) Distribuição de Lucros', valor: -e.distribuicaoLucros, pct: '', destaque: false, tipo: 'deducao' },
+    { label: 'RESULTADO LÍQUIDO', valor: e.resultadoLiquido, pct: fmtPct(e.margemLiquidaPercent), destaque: true, tipo: 'total' },
+  ] : []
 
   return (
     <Box sx={{ p: 3 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h5" fontWeight={700}>DRE — Demonstrativo de Resultado</Typography>
+        <Box>
+          <Typography variant="h5" fontWeight={700}>DRE — Demonstrativo de Resultado</Typography>
+          <Typography variant="caption" color="text.secondary">
+            Estrutura gerencial com Margem Bruta, Margem de Contribuição e EBITDA
+          </Typography>
+        </Box>
         <Tooltip title="Atualizar"><IconButton onClick={fetchDRE} disabled={loading}><RefreshIcon /></IconButton></Tooltip>
       </Stack>
 
@@ -91,17 +137,19 @@ export default function DrePage() {
       </Stack>
 
       {/* Cards resumo */}
-      {data && (
+      {e && (
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mb={3}>
           {[
-            { label: 'Receitas Totais',  value: data.totalReceitas, color: 'success.main' },
-            { label: 'Despesas Totais',  value: data.totalDespesas, color: 'error.main' },
-            { label: 'Resultado Líquido', value: data.resultado,    color: data.resultado >= 0 ? 'primary.main' : 'warning.main' },
+            { label: 'Receita Operacional Bruta', value: e.receitasOperacionais, color: 'success.main' },
+            { label: 'Margem Bruta', value: e.margemBruta, color: e.margemBruta >= 0 ? 'primary.main' : 'error.main', extra: fmtPct(e.margemBrutaPercent) },
+            { label: 'EBITDA', value: e.ebitda, color: e.ebitda >= 0 ? 'primary.main' : 'error.main', extra: fmtPct(e.ebitdaPercent) },
+            { label: 'Resultado Líquido', value: e.resultadoLiquido, color: e.resultadoLiquido >= 0 ? 'primary.main' : 'warning.main', extra: fmtPct(e.margemLiquidaPercent) },
           ].map(c => (
             <Card key={c.label} sx={{ flex: 1 }}>
-              <CardContent>
+              <CardContent sx={{ pb: '12px !important' }}>
                 <Typography variant="caption" color="text.secondary">{c.label}</Typography>
                 <Typography variant="h6" fontWeight={700} color={c.color}>{formatCurrency(c.value)}</Typography>
+                {'extra' in c && c.extra && <Chip label={c.extra} size="small" variant="outlined" sx={{ mt: 0.5 }} />}
               </CardContent>
             </Card>
           ))}
@@ -119,70 +167,40 @@ export default function DrePage() {
               <TableRow sx={{ bgcolor: 'grey.50' }}>
                 <TableCell sx={{ fontWeight: 700 }}>Descrição</TableCell>
                 <TableCell sx={{ fontWeight: 700 }} align="right">Valor</TableCell>
-                <TableCell sx={{ fontWeight: 700 }} align="right">% Total</TableCell>
+                <TableCell sx={{ fontWeight: 700 }} align="right">% RL</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {/* RECEITAS */}
-              <TableRow sx={{ bgcolor: 'success.50' }}>
-                <TableCell colSpan={3} sx={{ fontWeight: 700, color: 'success.dark' }}>RECEITAS</TableCell>
-              </TableRow>
-              {receitas.map(cat => (
-                <>
-                  <TableRow key={cat.id} hover>
-                    <TableCell sx={{ pl: 3 }}>{cat.nome}</TableCell>
-                    <TableCell align="right" sx={{ color: 'success.main', fontWeight: 600 }}>{formatCurrency(cat.total)}</TableCell>
-                    <TableCell align="right">{cat.percentual.toFixed(1)}%</TableCell>
-                  </TableRow>
-                  {cat.subcategorias.map(s => (
-                    <TableRow key={s.id}>
-                      <TableCell sx={{ pl: 6, color: 'text.secondary' }}>{s.nome}</TableCell>
-                      <TableCell align="right" sx={{ color: 'text.secondary' }}>{formatCurrency(s.total)}</TableCell>
-                      <TableCell />
-                    </TableRow>
-                  ))}
-                </>
+              {dreLinhas.map((linha, i) => (
+                <TableRow
+                  key={i}
+                  sx={{
+                    bgcolor: linha.tipo === 'total'
+                      ? (linha.valor >= 0 ? '#e3f2fd' : '#fff3e0')
+                      : linha.destaque ? 'grey.100' : 'white',
+                  }}
+                >
+                  <TableCell sx={{ fontWeight: linha.destaque ? 700 : 400, pl: linha.destaque ? 2 : 4 }}>
+                    {linha.label}
+                  </TableCell>
+                  <TableCell
+                    align="right"
+                    sx={{
+                      fontWeight: linha.destaque ? 700 : 400,
+                      color: linha.tipo === 'total'
+                        ? (linha.valor >= 0 ? 'primary.main' : 'warning.main')
+                        : linha.tipo === 'receita' ? 'success.main'
+                          : linha.tipo === 'deducao' ? 'error.main'
+                            : 'text.primary',
+                    }}
+                  >
+                    {formatCurrency(linha.valor)}
+                  </TableCell>
+                  <TableCell align="right" sx={{ color: 'text.secondary', fontSize: '0.8rem' }}>
+                    {linha.pct}
+                  </TableCell>
+                </TableRow>
               ))}
-              <TableRow sx={{ bgcolor: 'success.50' }}>
-                <TableCell sx={{ fontWeight: 700 }}>Total Receitas</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 700, color: 'success.main' }}>{formatCurrency(data.totalReceitas)}</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 700 }}>100%</TableCell>
-              </TableRow>
-
-              {/* DESPESAS */}
-              <TableRow sx={{ bgcolor: 'error.50' }}>
-                <TableCell colSpan={3} sx={{ fontWeight: 700, color: 'error.dark' }}>DESPESAS</TableCell>
-              </TableRow>
-              {despesas.map(cat => (
-                <>
-                  <TableRow key={cat.id} hover>
-                    <TableCell sx={{ pl: 3 }}>{cat.nome}</TableCell>
-                    <TableCell align="right" sx={{ color: 'error.main', fontWeight: 600 }}>{formatCurrency(cat.total)}</TableCell>
-                    <TableCell align="right">{cat.percentual.toFixed(1)}%</TableCell>
-                  </TableRow>
-                  {cat.subcategorias.map(s => (
-                    <TableRow key={s.id}>
-                      <TableCell sx={{ pl: 6, color: 'text.secondary' }}>{s.nome}</TableCell>
-                      <TableCell align="right" sx={{ color: 'text.secondary' }}>{formatCurrency(s.total)}</TableCell>
-                      <TableCell />
-                    </TableRow>
-                  ))}
-                </>
-              ))}
-              <TableRow sx={{ bgcolor: 'error.50' }}>
-                <TableCell sx={{ fontWeight: 700 }}>Total Despesas</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 700, color: 'error.main' }}>{formatCurrency(data.totalDespesas)}</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 700 }}>100%</TableCell>
-              </TableRow>
-
-              {/* RESULTADO */}
-              <TableRow sx={{ bgcolor: data.resultado >= 0 ? 'primary.50' : 'warning.50' }}>
-                <TableCell sx={{ fontWeight: 700, fontSize: '1rem' }}>RESULTADO LÍQUIDO</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 700, fontSize: '1rem', color: data.resultado >= 0 ? 'primary.main' : 'warning.main' }}>
-                  {formatCurrency(data.resultado)}
-                </TableCell>
-                <TableCell />
-              </TableRow>
             </TableBody>
           </Table>
           <Divider />

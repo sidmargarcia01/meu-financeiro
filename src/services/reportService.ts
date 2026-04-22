@@ -18,20 +18,25 @@ export interface DRELinha {
   nivel: number
 }
 
-// DRE estruturado gerencial — calculado a partir do dre_group das categorias
+// DRE estruturado gerencial (9 grupos) — alinhado com personal-website dre-report.service
 export interface DREEstruturado {
-  receitaBruta: number
-  deducoes: number
-  receitaLiquida: number
-  cpv: number
-  margemBruta: number
+  receitasOperacionais: number         // RECEITAS_OPERACIONAIS (ROB)
+  impostosFaturamento: number          // IMPOSTOS_FATURAMENTO
+  receitaLiquida: number               // ROB - impostos
+  custosOperacionais: number           // CUSTOS_OPERACIONAIS (CPV/CSV)
+  margemBruta: number                  // RL - custos
   margemBrutaPercent: number | null
-  despesasOperacionais: number
-  ebitda: number
+  despesasVariaveis: number            // DESPESAS_VARIAVEIS
+  margemContribuicao: number           // MB - variáveis
+  margemContribuicaoPercent: number | null
+  despesasFixas: number                // DESPESAS_FIXAS
+  ebitda: number                       // MC - fixas (Resultado Operacional)
   ebitdaPercent: number | null
-  despesasFinanceiras: number
-  outrasReceitas: number
-  outrasDespesas: number
+  receitasNaoOperacionais: number      // RECEITAS_NAO_OPERACIONAIS
+  despesasNaoOperacionais: number      // DESPESAS_NAO_OPERACIONAIS
+  resultadoAntesIR: number             // EBT
+  impostosLucro: number                // IMPOSTOS_LUCRO
+  distribuicaoLucros: number           // DISTRIBUICAO_LUCROS
   resultadoLiquido: number
   margemLiquidaPercent: number | null
 }
@@ -200,31 +205,38 @@ export class ReportService {
 
     const resultado = totalReceitas - totalDespesas
 
-    // ── DRE Estruturado (baseado em dreGroup) ─────────────────────────────────
+    // ── DRE Estruturado (9 grupos gerenciais) ────────────────────────────────
     const sumGroup = (g: string) =>
       categorias.filter(c => c.dreGroup === g).reduce((s, c) => s + c.total, 0)
+    const pctRL = (v: number, rl: number) => rl !== 0 ? (v / rl) * 100 : null
 
-    const receitaBruta = sumGroup('RECEITA_BRUTA')
-    const deducoes = sumGroup('DEDUCAO_RECEITA')
-    const receitaLiquida = receitaBruta - deducoes
-    const cpv = sumGroup('CPV')
-    const margemBruta = receitaLiquida - cpv
-    const margemBrutaPercent = receitaLiquida !== 0 ? (margemBruta / receitaLiquida) * 100 : null
-    const despesasOperacionais = sumGroup('DESPESA_OPERACIONAL')
-    const ebitda = margemBruta - despesasOperacionais
-    const ebitdaPercent = receitaLiquida !== 0 ? (ebitda / receitaLiquida) * 100 : null
-    const despesasFinanceiras = sumGroup('DESPESA_FINANCEIRA')
-    const outrasReceitas = sumGroup('OUTRAS_RECEITAS')
-    const outrasDespesas = sumGroup('OUTRAS_DESPESAS')
-    const resultadoLiquido = ebitda - despesasFinanceiras + outrasReceitas - outrasDespesas
-    const margemLiquidaPercent = receitaLiquida !== 0 ? (resultadoLiquido / receitaLiquida) * 100 : null
+    const receitasOperacionais = sumGroup('RECEITAS_OPERACIONAIS')
+    const impostosFaturamento = sumGroup('IMPOSTOS_FATURAMENTO')
+    const receitaLiquida = receitasOperacionais - impostosFaturamento
+    const custosOperacionais = sumGroup('CUSTOS_OPERACIONAIS')
+    const margemBruta = receitaLiquida - custosOperacionais
+    const margemBrutaPercent = pctRL(margemBruta, receitaLiquida)
+    const despesasVariaveis = sumGroup('DESPESAS_VARIAVEIS')
+    const margemContribuicao = margemBruta - despesasVariaveis
+    const margemContribuicaoPercent = pctRL(margemContribuicao, receitaLiquida)
+    const despesasFixas = sumGroup('DESPESAS_FIXAS')
+    const ebitda = margemContribuicao - despesasFixas
+    const ebitdaPercent = pctRL(ebitda, receitaLiquida)
+    const receitasNaoOperacionais = sumGroup('RECEITAS_NAO_OPERACIONAIS')
+    const despesasNaoOperacionais = sumGroup('DESPESAS_NAO_OPERACIONAIS')
+    const resultadoAntesIR = ebitda + receitasNaoOperacionais - despesasNaoOperacionais
+    const impostosLucro = sumGroup('IMPOSTOS_LUCRO')
+    const distribuicaoLucros = sumGroup('DISTRIBUICAO_LUCROS')
+    const resultadoLiquido = resultadoAntesIR - impostosLucro - distribuicaoLucros
+    const margemLiquidaPercent = pctRL(resultadoLiquido, receitaLiquida)
 
     const estruturado: DREEstruturado = {
-      receitaBruta, deducoes, receitaLiquida,
-      cpv, margemBruta, margemBrutaPercent,
-      despesasOperacionais, ebitda, ebitdaPercent,
-      despesasFinanceiras, outrasReceitas, outrasDespesas,
-      resultadoLiquido, margemLiquidaPercent,
+      receitasOperacionais, impostosFaturamento, receitaLiquida,
+      custosOperacionais, margemBruta, margemBrutaPercent,
+      despesasVariaveis, margemContribuicao, margemContribuicaoPercent,
+      despesasFixas, ebitda, ebitdaPercent,
+      receitasNaoOperacionais, despesasNaoOperacionais, resultadoAntesIR,
+      impostosLucro, distribuicaoLucros, resultadoLiquido, margemLiquidaPercent,
     }
 
     const linhas: DRELinha[] = [
@@ -377,12 +389,12 @@ export class ReportService {
     const cfo = dfc.totalEntradas - dfc.totalSaidas
     const { ativoCirculante, passivoCirculante, passivoTotal, patrimonioLiquido } = balanco
 
-    // ── Seção Resultado ──────────────────────────────────────────────────────
+    // ── Seção Resultado (A — DRE) ────────────────────────────────────────────
     const secaoResultado: IndicatorDto[] = [
       {
         key: 'receita_operacional_bruta',
         label: 'Receita Operacional Bruta',
-        value: e.receitaBruta || dre.totalReceitas,
+        value: e.receitasOperacionais || dre.totalReceitas,
         unit: 'R$',
       },
       {
@@ -395,6 +407,12 @@ export class ReportService {
         key: 'margem_bruta_percent',
         label: 'Margem Bruta',
         value: e.margemBrutaPercent,
+        unit: '%',
+      },
+      {
+        key: 'margem_contribuicao_percent',
+        label: 'Margem de Contribuição',
+        value: e.margemContribuicaoPercent,
         unit: '%',
       },
       {

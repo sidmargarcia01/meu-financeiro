@@ -36,13 +36,15 @@ interface Category {
 
 // ─── Cores por dreGroup ───────────────────────────────────────────────────────
 const DRE_GROUP_COLOR: Record<DreGroup, 'default' | 'success' | 'warning' | 'error' | 'info' | 'primary' | 'secondary'> = {
-    RECEITA_BRUTA: 'success',
-    DEDUCAO_RECEITA: 'warning',
-    CPV: 'error',
-    DESPESA_OPERACIONAL: 'info',
-    DESPESA_FINANCEIRA: 'secondary',
-    OUTRAS_RECEITAS: 'primary',
-    OUTRAS_DESPESAS: 'default',
+    RECEITAS_OPERACIONAIS: 'success',
+    IMPOSTOS_FATURAMENTO: 'warning',
+    CUSTOS_OPERACIONAIS: 'error',
+    DESPESAS_VARIAVEIS: 'info',
+    DESPESAS_FIXAS: 'secondary',
+    RECEITAS_NAO_OPERACIONAIS: 'primary',
+    DESPESAS_NAO_OPERACIONAIS: 'default',
+    IMPOSTOS_LUCRO: 'error',
+    DISTRIBUICAO_LUCROS: 'default',
 }
 
 const EMPTY_FORM = { name: '', type: 'DESPESA' as 'RECEITA' | 'DESPESA', dre_group: '' as DreGroup | '' }
