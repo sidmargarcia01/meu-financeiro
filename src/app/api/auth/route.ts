@@ -137,9 +137,23 @@ async function register(request: NextRequest, body: any) {
 
   if (userCheckError || !userRecord) {
     console.error('❌ User not found in users table:', userCheckError)
+    console.log('🔑 ENV check:', {
+      hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      serviceKeyLength: process.env.SUPABASE_SERVICE_ROLE_KEY?.length || 0
+    })
     // Tentar criar manualmente usando admin (ignora RLS)
     try {
+      console.log('🚀 Initializing admin client...')
       const adminClient = getSupabaseAdmin()
+      console.log('✅ Admin client initialized')
+
+      console.log('📝 Inserting user data:', {
+        id: authData.user!.id,
+        email: validation.data.email,
+        name: validation.data.name
+      })
+
       const { error: insertError } = await adminClient
         .from('users')
         .insert({
@@ -155,7 +169,7 @@ async function register(request: NextRequest, body: any) {
       if (insertError) {
         console.error('❌ Failed to insert user with admin:', insertError)
         return NextResponse.json(
-          { error: 'Database error saving new user', details: insertError.message },
+          { error: 'Database error saving new user', details: insertError.message, hint: 'Insert failed' },
           { status: 500 }
         )
       }
@@ -163,7 +177,7 @@ async function register(request: NextRequest, body: any) {
     } catch (adminError: any) {
       console.error('❌ Admin client failed:', adminError)
       return NextResponse.json(
-        { error: 'Database error saving new user', details: adminError.message },
+        { error: 'Database error saving new user', details: adminError.message, hint: 'Admin init failed' },
         { status: 500 }
       )
     }
