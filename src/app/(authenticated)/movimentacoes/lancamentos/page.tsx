@@ -17,7 +17,8 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   Box, Button, Typography, Drawer, IconButton, Chip, Paper,
   CircularProgress, Alert, Tooltip, Stack, Divider, Checkbox,
-  FormControlLabel, ToggleButton, ToggleButtonGroup, Fab, TextField
+  FormControlLabel, ToggleButton, ToggleButtonGroup, Fab, TextField,
+  Menu, MenuItem
 } from '@mui/material'
 import {
   Add as AddIcon,
@@ -39,7 +40,12 @@ import {
   ArrowUpward as ArrowUpIcon,
   ArrowDownward as ArrowDownIcon,
   SwapHoriz as SwapIcon,
-  MoreVert as MoreIcon
+  MoreVert as MoreIcon,
+  Done as DoneIcon,
+  DoneAll as DoneAllIcon,
+  TrendingFlat as PartialIcon,
+  ContentCopy as CopyIcon,
+  Info as InfoIcon
 } from '@mui/icons-material'
 import { TransactionForm } from '@/components/transactions/TransactionForm'
 import type { TransactionFormData } from '@/components/transactions/TransactionForm'
@@ -130,6 +136,10 @@ export default function LancamentosCaixaPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Estado do menu de ações
+  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null)
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
 
   // Carregar dados
   useEffect(() => {
@@ -311,6 +321,84 @@ export default function LancamentosCaixaPage() {
 
   const openNew = () => { setEditTarget(null); setFormOpen(true) }
   const openEdit = (tx: Transaction) => { setEditTarget(tx); setFormOpen(true) }
+
+  // Handlers do menu de ações
+  const openMenu = (e: React.MouseEvent<HTMLElement>, tx: Transaction) => {
+    e.stopPropagation()
+    setMenuAnchor(e.currentTarget)
+    setSelectedTransaction(tx)
+  }
+  const closeMenu = () => { setMenuAnchor(null); setSelectedTransaction(null) }
+
+  const handleConfirm = async () => {
+    if (!selectedTransaction) return
+    await fetch(`/api/transactions/${selectedTransaction.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'CONFIRMADO' })
+    })
+    fetchTransactions()
+    closeMenu()
+  }
+
+  const handleConfirmToday = async () => {
+    if (!selectedTransaction) return
+    const today = new Date().toISOString().split('T')[0]
+    await fetch(`/api/transactions/${selectedTransaction.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'CONFIRMADO', due_date: today })
+    })
+    fetchTransactions()
+    closeMenu()
+  }
+
+  const handleConfirmPartial = async () => {
+    // TODO: Implementar confirmação parcial com valor
+    alert('Confirmação parcial - implementar modal com valor parcial')
+    closeMenu()
+  }
+
+  const handleConciliar = async () => {
+    if (!selectedTransaction) return
+    await fetch(`/api/transactions/${selectedTransaction.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'CONCILIADO' })
+    })
+    fetchTransactions()
+    closeMenu()
+  }
+
+  const handleClone = async () => {
+    if (!selectedTransaction) return
+    const { id, ...data } = selectedTransaction
+    await fetch('/api/transactions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...data,
+        description: `${data.description} (cópia)`,
+        status: 'PENDENTE'
+      })
+    })
+    fetchTransactions()
+    closeMenu()
+  }
+
+  const handleDetail = () => {
+    if (selectedTransaction) {
+      openEdit(selectedTransaction)
+      closeMenu()
+    }
+  }
+
+  const handleDeleteFromMenu = () => {
+    if (selectedTransaction) {
+      handleDelete(selectedTransaction.id)
+      closeMenu()
+    }
+  }
 
   const monthNames = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
   const currentDateStr = useMemo(() => {
@@ -621,15 +709,14 @@ export default function LancamentosCaixaPage() {
                               {isReceita ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
                             </Typography>
 
-                            {/* Ações */}
-                            <Stack direction="row" spacing={0} sx={{ ml: 1 }}>
-                              <IconButton size="small" sx={{ p: 0.5 }} onClick={(e) => { e.stopPropagation(); openEdit(tx) }}>
-                                <EditIcon fontSize="small" sx={{ fontSize: 16 }} />
-                              </IconButton>
-                              <IconButton size="small" color="error" sx={{ p: 0.5 }} onClick={(e) => { e.stopPropagation(); handleDelete(tx.id) }}>
-                                <DeleteIcon fontSize="small" sx={{ fontSize: 16 }} />
-                              </IconButton>
-                            </Stack>
+                            {/* Ações - Menu de 3 pontinhos */}
+                            <IconButton
+                              size="small"
+                              sx={{ p: 0.5, ml: 0.5 }}
+                              onClick={(e) => openMenu(e, tx)}
+                            >
+                              <MoreIcon fontSize="small" sx={{ fontSize: 18, color: '#6b7280' }} />
+                            </IconButton>
                           </Paper>
                         )
                       })}
@@ -691,6 +778,55 @@ export default function LancamentosCaixaPage() {
           } : undefined}
         />
       </Drawer>
+
+      {/* Menu de Ações - 3 pontinhos */}
+      <Menu
+        anchorEl={menuAnchor}
+        open={Boolean(menuAnchor)}
+        onClose={closeMenu}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        PaperProps={{ sx: { minWidth: 200, mt: 0.5 } }}
+      >
+        <MenuItem onClick={handleConfirm} sx={{ gap: 1.5 }}>
+          <DoneIcon fontSize="small" sx={{ color: '#22c55e' }} />
+          <Typography variant="body2">Confirmar</Typography>
+        </MenuItem>
+        <MenuItem onClick={handleConfirmToday} sx={{ gap: 1.5 }}>
+          <DoneAllIcon fontSize="small" sx={{ color: '#22c55e' }} />
+          <Typography variant="body2">Confirmar hoje</Typography>
+        </MenuItem>
+        <MenuItem onClick={handleConfirmPartial} sx={{ gap: 1.5 }}>
+          <PartialIcon fontSize="small" sx={{ color: '#3b82f6' }} />
+          <Typography variant="body2">Confirmar parcialmente</Typography>
+        </MenuItem>
+        <MenuItem onClick={handleConciliar} sx={{ gap: 1.5 }}>
+          <ConciliatedIcon fontSize="small" sx={{ color: '#8b5cf6' }} />
+          <Typography variant="body2">Conciliar</Typography>
+        </MenuItem>
+
+        <Divider />
+
+        <MenuItem onClick={handleDetail} sx={{ gap: 1.5 }}>
+          <EditIcon fontSize="small" sx={{ color: '#6b7280' }} />
+          <Typography variant="body2">Editar</Typography>
+        </MenuItem>
+        <MenuItem onClick={handleDeleteFromMenu} sx={{ gap: 1.5, color: '#ef4444' }}>
+          <DeleteIcon fontSize="small" />
+          <Typography variant="body2">Excluir</Typography>
+        </MenuItem>
+
+        <Divider />
+
+        <MenuItem onClick={handleClone} sx={{ gap: 1.5 }}>
+          <CopyIcon fontSize="small" sx={{ color: '#6b7280' }} />
+          <Typography variant="body2">Clonar</Typography>
+        </MenuItem>
+        <MenuItem onClick={handleDetail} sx={{ gap: 1.5 }}>
+          <InfoIcon fontSize="small" sx={{ color: '#6b7280' }} />
+          <Typography variant="body2">Detalhar</Typography>
+        </MenuItem>
+      </Menu>
     </Box>
   )
 }
