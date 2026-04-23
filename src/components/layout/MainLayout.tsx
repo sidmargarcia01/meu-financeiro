@@ -9,6 +9,7 @@
 
 'use client'
 
+import { useState } from 'react'
 import { Box, Toolbar } from '@mui/material'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Sidebar } from './Sidebar'
@@ -31,11 +32,13 @@ interface MainLayoutProps {
 }
 
 export function MainLayout({ children, userName, userEmail }: MainLayoutProps) {
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
   return (
     <QueryClientProvider client={queryClient}>
       <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'grey.50' }}>
-        {/* Sidebar fixa a esquerda */}
-        <Sidebar />
+        {/* Sidebar como Drawer temporário - oculto por padrão */}
+        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
         {/* Area de conteudo dinamica a direita */}
         <Box
@@ -48,7 +51,11 @@ export function MainLayout({ children, userName, userEmail }: MainLayoutProps) {
           }}
         >
           {/* Header fixo no topo */}
-          <Header userName={userName} userEmail={userEmail} />
+          <Header
+            userName={userName}
+            userEmail={userEmail}
+            onMenuClick={() => setSidebarOpen(true)}
+          />
 
           {/* Espacador para compensar o AppBar fixo */}
           <Toolbar />

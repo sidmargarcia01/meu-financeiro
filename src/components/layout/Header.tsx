@@ -32,6 +32,7 @@ import {
   Logout as LogoutIcon,
   Settings as SettingsIcon,
   Warning as WarningIcon,
+  Menu as MenuIcon,
 } from '@mui/icons-material'
 import { useAlerts } from '@/hooks/useAlerts'
 import { useSearch } from '@/hooks/useSearch'
@@ -41,9 +42,10 @@ import { formatCurrency } from '@/utils/formatCurrency'
 interface HeaderProps {
   userName: string
   userEmail: string
+  onMenuClick?: () => void
 }
 
-export function Header({ userName, userEmail }: HeaderProps) {
+export function Header({ userName, userEmail, onMenuClick }: HeaderProps) {
   const router = useRouter()
   const { data: alertsData } = useAlerts()
   const { setIsOpen: openSearch } = useSearch()
@@ -77,6 +79,13 @@ export function Header({ userName, userEmail }: HeaderProps) {
         }}
       >
         <Toolbar sx={{ gap: 1.5, minHeight: '64px !important' }}>
+
+          {/* Botão de menu hambúrguer para abrir o Drawer lateral */}
+          <Tooltip title="Abrir menu">
+            <IconButton size="small" onClick={onMenuClick} sx={{ color: 'text.secondary' }}>
+              <MenuIcon />
+            </IconButton>
+          </Tooltip>
 
           {/* ELEMENTO 1: Busca Global — "atalho CTRL+K" documentado */}
           <Box

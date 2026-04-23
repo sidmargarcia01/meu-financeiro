@@ -39,8 +39,7 @@ import {
   ArrowUpward as ArrowUpIcon,
   ArrowDownward as ArrowDownIcon,
   SwapHoriz as SwapIcon,
-  MoreVert as MoreIcon,
-  Menu as MenuIcon
+  MoreVert as MoreIcon
 } from '@mui/icons-material'
 import { TransactionForm } from '@/components/transactions/TransactionForm'
 import type { TransactionFormData } from '@/components/transactions/TransactionForm'
@@ -125,7 +124,6 @@ export default function LancamentosCaixaPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const [menuOpen, setMenuOpen] = useState(false)
 
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [accounts, setAccounts] = useState<AccountWithBalance[]>([])
@@ -334,37 +332,29 @@ export default function LancamentosCaixaPage() {
       {/* Header */}
       <Paper sx={{ p: 1.5, borderRadius: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e5e7eb' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <IconButton size="small" onClick={() => setMenuOpen(true)}>
-            <MenuIcon fontSize="small" />
+          <IconButton size="small" onClick={goToPrevDay}>
+            <PrevIcon fontSize="small" />
           </IconButton>
-          <Typography variant="body1" fontWeight={500} sx={{ fontSize: '0.95rem' }}>
-            Lançamentos de caixa
+          <Typography
+            variant="body1"
+            sx={{ fontWeight: 500, fontSize: '0.95rem', cursor: 'pointer', minWidth: 90, textAlign: 'center' }}
+            onClick={() => dateInputRef.current?.showPicker?.()}
+          >
+            {currentDateStr}
           </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 2 }}>
-            <IconButton size="small" onClick={goToPrevDay}>
-              <PrevIcon fontSize="small" />
-            </IconButton>
-            <Typography
-              variant="body1"
-              sx={{ fontWeight: 500, fontSize: '0.95rem', cursor: 'pointer', minWidth: 90, textAlign: 'center' }}
-              onClick={() => dateInputRef.current?.showPicker?.()}
-            >
-              {currentDateStr}
-            </Typography>
-            <IconButton size="small" onClick={goToNextDay}>
-              <NextIcon fontSize="small" />
-            </IconButton>
-            <IconButton size="small" onClick={() => dateInputRef.current?.showPicker?.()}>
-              <CalendarIcon fontSize="small" />
-            </IconButton>
-            <input
-              ref={dateInputRef}
-              type="date"
-              value={currentDate.toISOString().split('T')[0]}
-              onChange={(e) => e.target.value && setCurrentDate(new Date(e.target.value))}
-              style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
-            />
-          </Box>
+          <IconButton size="small" onClick={goToNextDay}>
+            <NextIcon fontSize="small" />
+          </IconButton>
+          <IconButton size="small" onClick={() => dateInputRef.current?.showPicker?.()}>
+            <CalendarIcon fontSize="small" />
+          </IconButton>
+          <input
+            ref={dateInputRef}
+            type="date"
+            value={currentDate.toISOString().split('T')[0]}
+            onChange={(e) => e.target.value && setCurrentDate(new Date(e.target.value))}
+            style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
+          />
         </Box>
 
         <Stack direction="row" spacing={1}>
@@ -411,145 +401,138 @@ export default function LancamentosCaixaPage() {
 
       {/* Conteúdo principal */}
       <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* Drawer - Menu de Contas */}
-        <Drawer
-          anchor="left"
-          open={menuOpen}
-          onClose={() => setMenuOpen(false)}
-          PaperProps={{ sx: { width: 320 } }}
-        >
-          <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            {/* Header Contas com colunas */}
-            <Box sx={{ p: 1.5, borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center' }}>
-              <Box sx={{ width: 36 }} /> {/* Espaço checkbox */}
-              <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ flex: 1, fontSize: '0.75rem', letterSpacing: '0.5px' }}>CONTAS</Typography>
-              <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ width: 85, textAlign: 'right', fontSize: '0.7rem', letterSpacing: '0.3px' }}>Confirmado</Typography>
-              <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ width: 85, textAlign: 'right', fontSize: '0.7rem', ml: 1.5, letterSpacing: '0.3px' }}>Projetado</Typography>
-            </Box>
-
-            <Box sx={{ flex: 1, overflow: 'auto' }}>
-              {accounts.map(acc => (
-                <Box
-                  key={acc.id}
-                  sx={{
-                    p: 1.25,
-                    borderBottom: '1px solid #f3f4f6',
-                    bgcolor: selectedAccounts.includes(acc.id) ? '#fafafa' : 'transparent',
-                    '&:hover': { bgcolor: '#f9fafb' }
-                  }}
-                >
-                  <Stack direction="row" alignItems="center" spacing={0.75}>
-                    <Checkbox
-                      size="small"
-                      checked={selectedAccounts.includes(acc.id)}
-                      onChange={() => toggleAccount(acc.id)}
-                      sx={{ p: 0.5 }}
-                    />
-                    <Box sx={{ flex: 1, minWidth: 0, mr: 1 }}>
-                      <Typography variant="caption" fontWeight={600} noWrap display="block" sx={{ fontSize: '0.8rem', letterSpacing: '0.2px' }}>{acc.name}</Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.68rem', letterSpacing: '0.3px', textTransform: 'uppercase' }}>{acc.type}</Typography>
-                    </Box>
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        width: 85,
-                        textAlign: 'right',
-                        fontSize: '0.78rem',
-                        color: acc.confirmedBalance >= 0 ? '#22c55e' : '#ef4444',
-                        fontWeight: 500,
-                        letterSpacing: '0.3px'
-                      }}
-                    >
-                      {formatCurrency(acc.confirmedBalance)}
-                    </Typography>
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        width: 85,
-                        textAlign: 'right',
-                        fontSize: '0.78rem',
-                        color: acc.projectedBalance >= 0 ? '#22c55e' : '#ef4444',
-                        ml: 1.5,
-                        fontWeight: 500,
-                        letterSpacing: '0.3px'
-                      }}
-                    >
-                      {formatCurrency(acc.projectedBalance)}
-                    </Typography>
-                  </Stack>
-                </Box>
-              ))}
-            </Box>
-
-            {/* Total */}
-            <Box sx={{ p: 1.5, borderTop: '2px solid #e5e7eb', bgcolor: '#f9fafb' }}>
-              <Stack direction="row" alignItems="center">
-                <Box sx={{ width: 36 }} />
-                <Typography variant="body2" fontWeight={700} sx={{ flex: 1, fontSize: '0.85rem' }}>Total</Typography>
-                <Typography variant="body2" fontWeight={700} sx={{ width: 85, textAlign: 'right', color: '#22c55e', fontSize: '0.85rem', letterSpacing: '0.3px' }}>
-                  {formatCurrency(accounts.filter(a => selectedAccounts.includes(a.id)).reduce((sum, a) => sum + a.confirmedBalance, 0))}
-                </Typography>
-                <Typography variant="body2" fontWeight={700} sx={{ width: 85, textAlign: 'right', ml: 1.5, color: '#ef4444', fontSize: '0.85rem', letterSpacing: '0.3px' }}>
-                  {formatCurrency(accounts.filter(a => selectedAccounts.includes(a.id)).reduce((sum, a) => sum + a.projectedBalance, 0))}
-                </Typography>
-              </Stack>
-            </Box>
-
-            {/* Resumo - Resultados */}
-            <Box sx={{ p: 1.5, borderTop: '1px solid #e5e7eb', bgcolor: '#f9fafb' }}>
-              <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ display: 'block', mb: 1, textAlign: 'center', fontSize: '0.7rem' }}>
-                Resultados (R$)
-              </Typography>
-
-              <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
-                <Typography variant="caption" fontSize="0.75rem">Entradas</Typography>
-                <Typography variant="caption" fontWeight={600} sx={{ color: '#22c55e', fontSize: '0.75rem' }}>
-                  {formatCurrency(totals.entradas)}
-                </Typography>
-              </Stack>
-              <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5, pl: 1 }}>
-                <Typography variant="caption" fontSize="0.7rem" color="text.secondary">Receitas</Typography>
-                <Typography variant="caption" fontSize="0.7rem" sx={{ color: '#22c55e' }}>
-                  {formatCurrency(totals.receitas)}
-                </Typography>
-              </Stack>
-              <Stack direction="row" justifyContent="space-between" sx={{ mb: 1, pl: 1 }}>
-                <Typography variant="caption" fontSize="0.7rem" color="text.secondary">Transferências</Typography>
-                <Typography variant="caption" fontSize="0.7rem" sx={{ color: '#6b7280' }}>
-                  0,00
-                </Typography>
-              </Stack>
-
-              <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
-                <Typography variant="caption" fontSize="0.75rem">Saídas</Typography>
-                <Typography variant="caption" fontWeight={600} sx={{ color: '#ef4444', fontSize: '0.75rem' }}>
-                  {formatCurrency(totals.saidas)}
-                </Typography>
-              </Stack>
-              <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5, pl: 1 }}>
-                <Typography variant="caption" fontSize="0.7rem" color="text.secondary">Despesas</Typography>
-                <Typography variant="caption" fontSize="0.7rem" sx={{ color: '#ef4444' }}>
-                  {formatCurrency(totals.despesas)}
-                </Typography>
-              </Stack>
-              <Stack direction="row" justifyContent="space-between" sx={{ mb: 1, pl: 1 }}>
-                <Typography variant="caption" fontSize="0.7rem" color="text.secondary">Transferências</Typography>
-                <Typography variant="caption" fontSize="0.7rem" sx={{ color: '#6b7280' }}>
-                  0,00
-                </Typography>
-              </Stack>
-
-              <Divider sx={{ my: 1 }} />
-
-              <Stack direction="row" justifyContent="space-between">
-                <Typography variant="caption" fontWeight={600} fontSize="0.75rem">Resultado</Typography>
-                <Typography variant="caption" fontWeight={700} sx={{ color: totals.resultado >= 0 ? '#22c55e' : '#ef4444', fontSize: '0.75rem' }}>
-                  {formatCurrency(totals.resultado)}
-                </Typography>
-              </Stack>
-            </Box>
+        {/* Sidebar - Contas */}
+        <Paper sx={{ width: 320, borderRadius: 0, borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' }}>
+          {/* Header Contas com colunas */}
+          <Box sx={{ p: 1.5, borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center' }}>
+            <Box sx={{ width: 36 }} /> {/* Espaço checkbox */}
+            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ flex: 1, fontSize: '0.75rem', letterSpacing: '0.5px' }}>CONTAS</Typography>
+            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ width: 85, textAlign: 'right', fontSize: '0.7rem', letterSpacing: '0.3px' }}>Confirmado</Typography>
+            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ width: 85, textAlign: 'right', fontSize: '0.7rem', ml: 1.5, letterSpacing: '0.3px' }}>Projetado</Typography>
           </Box>
-        </Drawer>
+
+          <Box sx={{ flex: 1, overflow: 'auto' }}>
+            {accounts.map(acc => (
+              <Box
+                key={acc.id}
+                sx={{
+                  p: 1.25,
+                  borderBottom: '1px solid #f3f4f6',
+                  bgcolor: selectedAccounts.includes(acc.id) ? '#fafafa' : 'transparent',
+                  '&:hover': { bgcolor: '#f9fafb' }
+                }}
+              >
+                <Stack direction="row" alignItems="center" spacing={0.75}>
+                  <Checkbox
+                    size="small"
+                    checked={selectedAccounts.includes(acc.id)}
+                    onChange={() => toggleAccount(acc.id)}
+                    sx={{ p: 0.5 }}
+                  />
+                  <Box sx={{ flex: 1, minWidth: 0, mr: 1 }}>
+                    <Typography variant="caption" fontWeight={600} noWrap display="block" sx={{ fontSize: '0.8rem', letterSpacing: '0.2px' }}>{acc.name}</Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.68rem', letterSpacing: '0.3px', textTransform: 'uppercase' }}>{acc.type}</Typography>
+                  </Box>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      width: 85,
+                      textAlign: 'right',
+                      fontSize: '0.78rem',
+                      color: acc.confirmedBalance >= 0 ? '#22c55e' : '#ef4444',
+                      fontWeight: 500,
+                      letterSpacing: '0.3px'
+                    }}
+                  >
+                    {formatCurrency(acc.confirmedBalance)}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      width: 85,
+                      textAlign: 'right',
+                      fontSize: '0.78rem',
+                      color: acc.projectedBalance >= 0 ? '#22c55e' : '#ef4444',
+                      ml: 1.5,
+                      fontWeight: 500,
+                      letterSpacing: '0.3px'
+                    }}
+                  >
+                    {formatCurrency(acc.projectedBalance)}
+                  </Typography>
+                </Stack>
+              </Box>
+            ))}
+          </Box>
+
+          {/* Total */}
+          <Box sx={{ p: 1.5, borderTop: '2px solid #e5e7eb', bgcolor: '#f9fafb' }}>
+            <Stack direction="row" alignItems="center">
+              <Box sx={{ width: 36 }} />
+              <Typography variant="body2" fontWeight={700} sx={{ flex: 1, fontSize: '0.85rem' }}>Total</Typography>
+              <Typography variant="body2" fontWeight={700} sx={{ width: 85, textAlign: 'right', color: '#22c55e', fontSize: '0.85rem', letterSpacing: '0.3px' }}>
+                {formatCurrency(accounts.filter(a => selectedAccounts.includes(a.id)).reduce((sum, a) => sum + a.confirmedBalance, 0))}
+              </Typography>
+              <Typography variant="body2" fontWeight={700} sx={{ width: 85, textAlign: 'right', ml: 1.5, color: '#ef4444', fontSize: '0.85rem', letterSpacing: '0.3px' }}>
+                {formatCurrency(accounts.filter(a => selectedAccounts.includes(a.id)).reduce((sum, a) => sum + a.projectedBalance, 0))}
+              </Typography>
+            </Stack>
+          </Box>
+
+          {/* Resumo - Resultados */}
+          <Box sx={{ p: 1.5, borderTop: '1px solid #e5e7eb', bgcolor: '#f9fafb' }}>
+            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ display: 'block', mb: 1, textAlign: 'center', fontSize: '0.7rem' }}>
+              Resultados (R$)
+            </Typography>
+
+            <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+              <Typography variant="caption" fontSize="0.75rem">Entradas</Typography>
+              <Typography variant="caption" fontWeight={600} sx={{ color: '#22c55e', fontSize: '0.75rem' }}>
+                {formatCurrency(totals.entradas)}
+              </Typography>
+            </Stack>
+            <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5, pl: 1 }}>
+              <Typography variant="caption" fontSize="0.7rem" color="text.secondary">Receitas</Typography>
+              <Typography variant="caption" fontSize="0.7rem" sx={{ color: '#22c55e' }}>
+                {formatCurrency(totals.receitas)}
+              </Typography>
+            </Stack>
+            <Stack direction="row" justifyContent="space-between" sx={{ mb: 1, pl: 1 }}>
+              <Typography variant="caption" fontSize="0.7rem" color="text.secondary">Transferências</Typography>
+              <Typography variant="caption" fontSize="0.7rem" sx={{ color: '#6b7280' }}>
+                0,00
+              </Typography>
+            </Stack>
+
+            <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+              <Typography variant="caption" fontSize="0.75rem">Saídas</Typography>
+              <Typography variant="caption" fontWeight={600} sx={{ color: '#ef4444', fontSize: '0.75rem' }}>
+                {formatCurrency(totals.saidas)}
+              </Typography>
+            </Stack>
+            <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5, pl: 1 }}>
+              <Typography variant="caption" fontSize="0.7rem" color="text.secondary">Despesas</Typography>
+              <Typography variant="caption" fontSize="0.7rem" sx={{ color: '#ef4444' }}>
+                {formatCurrency(totals.despesas)}
+              </Typography>
+            </Stack>
+            <Stack direction="row" justifyContent="space-between" sx={{ mb: 1, pl: 1 }}>
+              <Typography variant="caption" fontSize="0.7rem" color="text.secondary">Transferências</Typography>
+              <Typography variant="caption" fontSize="0.7rem" sx={{ color: '#6b7280' }}>
+                0,00
+              </Typography>
+            </Stack>
+
+            <Divider sx={{ my: 1 }} />
+
+            <Stack direction="row" justifyContent="space-between">
+              <Typography variant="caption" fontWeight={600} fontSize="0.75rem">Resultado</Typography>
+              <Typography variant="caption" fontWeight={700} sx={{ color: totals.resultado >= 0 ? '#22c55e' : '#ef4444', fontSize: '0.75rem' }}>
+                {formatCurrency(totals.resultado)}
+              </Typography>
+            </Stack>
+          </Box>
+        </Paper>
 
         {/* Timeline - Lançamentos */}
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

@@ -18,7 +18,7 @@
 
 import { Box, Drawer, List, Divider, IconButton, Tooltip } from '@mui/material'
 import {
-  ChevronLeft, ChevronRight,
+  ChevronLeft,
   Dashboard as DashboardIcon,
   Business as GestaoIcon,
   BarChart as DREIcon,
@@ -62,15 +62,17 @@ import { SidebarFavorites } from './SidebarFavorites'
 import { SidebarFooter } from './SidebarFooter'
 
 const SIDEBAR_WIDTH = 260
-const SIDEBAR_MINIMIZED_WIDTH = 64
 
-export function Sidebar() {
+interface SidebarProps {
+  open: boolean
+  onClose: () => void
+}
+
+export function Sidebar({ open, onClose }: SidebarProps) {
   const {
     isRouteActive, isGroupCollapsed,
-    isSidebarMinimized, toggleGroup, setSidebarMinimized,
+    toggleGroup,
   } = useNavigation()
-
-  const mini = isSidebarMinimized
 
   const item = (
     key: string, label: string, href: string,
@@ -79,7 +81,7 @@ export function Sidebar() {
     <SidebarItem
       key={key} itemKey={key} label={label} href={href}
       icon={icon} isActive={isRouteActive(href)}
-      isMinimized={mini} isChild={isChild}
+      isMinimized={false} isChild={isChild}
       showFavorite={!isChild}
     />
   )
@@ -91,7 +93,7 @@ export function Sidebar() {
     <SidebarGroup
       key={key} label={label} icon={icon}
       isCollapsed={isGroupCollapsed(key)}
-      isMinimized={mini}
+      isMinimized={false}
       onToggle={() => toggleGroup(key)}
     >
       {children}
@@ -100,14 +102,15 @@ export function Sidebar() {
 
   return (
     <Drawer
-      variant="permanent"
+      variant="temporary"
+      open={open}
+      onClose={onClose}
       sx={{
-        width: mini ? SIDEBAR_MINIMIZED_WIDTH : SIDEBAR_WIDTH,
+        width: SIDEBAR_WIDTH,
         flexShrink: 0,
         '& .MuiDrawer-paper': {
-          width: mini ? SIDEBAR_MINIMIZED_WIDTH : SIDEBAR_WIDTH,
+          width: SIDEBAR_WIDTH,
           boxSizing: 'border-box',
-          transition: 'width 0.2s ease',
           overflowX: 'hidden',
           borderRight: '1px solid',
           borderColor: 'divider',
@@ -117,29 +120,27 @@ export function Sidebar() {
         },
       }}
     >
-      {/* Cabeçalho — logo e botão retrátil documentado */}
+      {/* Cabeçalho — logo e botão fechar */}
       <Box
         display="flex"
         alignItems="center"
-        justifyContent={mini ? 'center' : 'space-between'}
-        px={mini ? 0 : 2}
+        justifyContent="space-between"
+        px={2}
         py={1.5}
         sx={{ minHeight: 64, borderBottom: '1px solid', borderColor: 'divider' }}
       >
-        {!mini && (
-          <Box component="span" fontWeight={700} fontSize={17} color="primary.main">
-            Meu Financeiro
-          </Box>
-        )}
-        <Tooltip title={mini ? 'Expandir menu' : 'Recolher menu'} placement="right">
-          <IconButton size="small" onClick={() => setSidebarMinimized(!mini)}>
-            {mini ? <ChevronRight /> : <ChevronLeft />}
+        <Box component="span" fontWeight={700} fontSize={17} color="primary.main">
+          Meu Financeiro
+        </Box>
+        <Tooltip title="Fechar menu" placement="right">
+          <IconButton size="small" onClick={onClose}>
+            <ChevronLeft />
           </IconButton>
         </Tooltip>
       </Box>
 
       {/* Favoritos no topo — "pinar itens para acesso rápido no topo" */}
-      <SidebarFavorites isMinimized={mini} />
+      <SidebarFavorites isMinimized={false} />
 
       {/* Navegação principal — 11 módulos na ordem exata dos documentos */}
       <List sx={{ flex: 1, overflowY: 'auto', pt: 1, pb: 1, px: 0 }}>
@@ -215,7 +216,7 @@ export function Sidebar() {
       </List>
 
       {/* Rodapé com modo escuro — "alternância de tema no rodapé do menu" */}
-      <SidebarFooter isMinimized={mini} />
+      <SidebarFooter isMinimized={false} />
 
     </Drawer>
   )
