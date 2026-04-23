@@ -151,6 +151,15 @@ export default function LancamentosCaixaPage() {
       const params = new URLSearchParams()
       params.set('limit', '100')
       if (searchTerm) params.set('search', searchTerm)
+
+      // Filtro por mês/ano selecionado
+      const year = currentDate.getFullYear()
+      const month = currentDate.getMonth()
+      const startDate = new Date(year, month, 1).toISOString().split('T')[0]
+      const endDate = new Date(year, month + 1, 0).toISOString().split('T')[0]
+      params.set('startDate', startDate)
+      params.set('endDate', endDate)
+
       const res = await fetch(`/api/transactions?${params}`)
       if (!res.ok) throw new Error()
       const data = await res.json()
@@ -160,7 +169,7 @@ export default function LancamentosCaixaPage() {
     } finally {
       setLoading(false)
     }
-  }, [searchTerm])
+  }, [searchTerm, currentDate])
 
   useEffect(() => { fetchTransactions() }, [fetchTransactions])
 
@@ -288,7 +297,26 @@ export default function LancamentosCaixaPage() {
   const openEdit = (tx: Transaction) => { setEditTarget(tx); setFormOpen(true) }
 
   const monthNames = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
-  const currentMonthStr = `${currentDate.getDate()} ${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`
+  const currentMonthStr = useMemo(() => {
+    return `${currentDate.getDate()} ${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`
+  }, [currentDate])
+
+  // Navegação de data segura
+  const goToPrevMonth = () => {
+    setCurrentDate(prev => {
+      const newDate = new Date(prev)
+      newDate.setMonth(newDate.getMonth() - 1)
+      return newDate
+    })
+  }
+
+  const goToNextMonth = () => {
+    setCurrentDate(prev => {
+      const newDate = new Date(prev)
+      newDate.setMonth(newDate.getMonth() + 1)
+      return newDate
+    })
+  }
 
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', bgcolor: '#f5f5f5' }}>
@@ -297,13 +325,13 @@ export default function LancamentosCaixaPage() {
         <Stack direction="row" alignItems="center" spacing={2}>
           <Typography variant="h6" fontWeight={600}>Lançamentos de caixa</Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: '#f3f4f6', borderRadius: 1, px: 1 }}>
-            <IconButton size="small" onClick={() => setCurrentDate(d => new Date(d.setMonth(d.getMonth() - 1)))}>
+            <IconButton size="small" onClick={goToPrevMonth}>
               <PrevIcon fontSize="small" />
             </IconButton>
-            <Typography sx={{ mx: 1, fontWeight: 500, minWidth: 80, textAlign: 'center' }}>
+            <Typography sx={{ mx: 1, fontWeight: 500, minWidth: 100, textAlign: 'center' }}>
               {currentMonthStr}
             </Typography>
-            <IconButton size="small" onClick={() => setCurrentDate(d => new Date(d.setMonth(d.getMonth() + 1)))}>
+            <IconButton size="small" onClick={goToNextMonth}>
               <NextIcon fontSize="small" />
             </IconButton>
             <IconButton size="small" sx={{ ml: 1 }}><CalendarIcon fontSize="small" /></IconButton>
