@@ -143,19 +143,22 @@ export default function LancamentosCaixaPage() {
     }).catch(() => setError('Erro ao carregar dados.'))
   }, [])
 
-  // Buscar transações
+  // Buscar transações (desde o início do mês até a data selecionada)
   const fetchTransactions = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       const params = new URLSearchParams()
-      params.set('limit', '100')
+      params.set('limit', '500')
       if (searchTerm) params.set('search', searchTerm)
 
-      // Filtro por data selecionada (apenas um dia)
-      const selectedDate = currentDate.toISOString().split('T')[0]
-      params.set('startDate', selectedDate)
-      params.set('endDate', selectedDate)
+      // Buscar desde o início do mês até a data selecionada
+      const year = currentDate.getFullYear()
+      const month = currentDate.getMonth()
+      const startDate = new Date(year, month, 1).toISOString().split('T')[0]
+      const endDate = currentDate.toISOString().split('T')[0]
+      params.set('startDate', startDate)
+      params.set('endDate', endDate)
 
       const res = await fetch(`/api/transactions?${params}`)
       if (!res.ok) throw new Error()
@@ -179,30 +182,36 @@ export default function LancamentosCaixaPage() {
     })
   }, [transactions, selectedStatuses, selectedAccounts])
 
-  // Agrupar por data
+  // Separar transações do dia vs acumuladas
+  const selectedDateStr = currentDate.toISOString().split('T')[0]
+  const currentDayTransactions = useMemo(() => {
+    return filteredTransactions.filter(tx => tx.due_date === selectedDateStr)
+  }, [filteredTransactions, selectedDateStr])
+
+  // Agrupar por data (apenas para timeline - mostrar apenas dia atual)
   const groupedByDate = useMemo(() => {
     const groups: { [key: string]: Transaction[] } = {}
-    filteredTransactions.forEach(tx => {
+    currentDayTransactions.forEach(tx => {
       const date = tx.due_date
       if (!groups[date]) groups[date] = []
       groups[date].push(tx)
     })
     return Object.entries(groups)
       .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
-  }, [filteredTransactions])
+  }, [currentDayTransactions])
 
-  // Calcular totais
+  // Calcular totais (apenas do dia selecionado)
   const totals = useMemo(() => {
-    const entradas = filteredTransactions
+    const entradas = currentDayTransactions
       .filter(t => t.type === 'RECEITA' && ['CONFIRMADO', 'CONCILIADO'].includes(t.status))
       .reduce((sum, t) => sum + Math.abs(t.amount), 0)
-    const saidas = filteredTransactions
+    const saidas = currentDayTransactions
       .filter(t => t.type === 'DESPESA' && ['CONFIRMADO', 'CONCILIADO'].includes(t.status))
       .reduce((sum, t) => sum + Math.abs(t.amount), 0)
-    const receitasProj = filteredTransactions
+    const receitasProj = currentDayTransactions
       .filter(t => t.type === 'RECEITA')
       .reduce((sum, t) => sum + Math.abs(t.amount), 0)
-    const despesasProj = filteredTransactions
+    const despesasProj = currentDayTransactions
       .filter(t => t.type === 'DESPESA')
       .reduce((sum, t) => sum + Math.abs(t.amount), 0)
     return {
@@ -211,20 +220,30 @@ export default function LancamentosCaixaPage() {
       resultado: entradas - saidas,
       receitas: receitasProj,
       despesas: despesasProj,
-      saldoInicial: accounts.reduce((sum, a) => sum + (a.initialBalance || 0), 0)
+      saldoInicial: accounts.filter(a => selectedAccounts.includes(a.id)).reduce((sum, a) => sum + (a.initialBalance || 0), 0)
     }
-  }, [filteredTransactions, accounts])
+  }, [currentDayTransactions, accounts, selectedAccounts])
 
-  // Calcular saldo anterior
+  // Calcular saldo anterior (baseado na data selecionada)
   const saldoAnterior = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0]
-    const pastTx = transactions.filter(t => t.due_date < today && selectedAccounts.includes(t.account_id || ''))
+    const selectedDate = currentDate.toISOString().split('T')[0]
+    const initialBalanceSum = accounts
+      .filter(a => selectedAccounts.includes(a.id))
+      .reduce((sum, a) => sum + (a.initialBalance || 0), 0)
+
+    // Buscar todas as transações anteriores à data selecionada
+    const pastTx = transactions.filter(t =>
+      t.due_date < selectedDate &&
+      selectedAccounts.includes(t.account_id || '') &&
+      ['CONFIRMADO', 'CONCILIADO'].includes(t.status)
+    )
+
     return pastTx.reduce((sum, t) => {
-      if (t.type === 'RECEITA') return sum + t.amount
-      if (t.type === 'DESPESA') return sum + t.amount
+      if (t.type === 'RECEITA') return sum + Math.abs(t.amount)
+      if (t.type === 'DESPESA') return sum - Math.abs(t.amount)
       return sum
-    }, 0) + accounts.reduce((sum, a) => sum + (a.initialBalance || 0), 0)
-  }, [transactions, selectedAccounts, accounts])
+    }, initialBalanceSum)
+  }, [transactions, selectedAccounts, accounts, currentDate])
 
   // Handlers
   const toISODate = (d: string) => d ? new Date(d + 'T12:00:00.000Z').toISOString() : undefined
@@ -383,13 +402,13 @@ export default function LancamentosCaixaPage() {
       {/* Conteúdo principal */}
       <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* Sidebar - Contas */}
-        <Paper sx={{ width: 280, borderRadius: 0, borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' }}>
+        <Paper sx={{ width: 320, borderRadius: 0, borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' }}>
           {/* Header Contas com colunas */}
           <Box sx={{ p: 1.5, borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center' }}>
-            <Box sx={{ width: 28 }} /> {/* Espaço checkbox */}
-            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ flex: 1 }}>CONTAS</Typography>
-            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ width: 70, textAlign: 'right', fontSize: '0.7rem' }}>Confirmado</Typography>
-            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ width: 70, textAlign: 'right', fontSize: '0.7rem', ml: 1 }}>Projetado</Typography>
+            <Box sx={{ width: 36 }} /> {/* Espaço checkbox */}
+            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ flex: 1, fontSize: '0.75rem', letterSpacing: '0.5px' }}>CONTAS</Typography>
+            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ width: 85, textAlign: 'right', fontSize: '0.7rem', letterSpacing: '0.3px' }}>Confirmado</Typography>
+            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ width: 85, textAlign: 'right', fontSize: '0.7rem', ml: 1.5, letterSpacing: '0.3px' }}>Projetado</Typography>
           </Box>
 
           <Box sx={{ flex: 1, overflow: 'auto' }}>
@@ -397,31 +416,32 @@ export default function LancamentosCaixaPage() {
               <Box
                 key={acc.id}
                 sx={{
-                  p: 1,
+                  p: 1.25,
                   borderBottom: '1px solid #f3f4f6',
                   bgcolor: selectedAccounts.includes(acc.id) ? '#fafafa' : 'transparent',
                   '&:hover': { bgcolor: '#f9fafb' }
                 }}
               >
-                <Stack direction="row" alignItems="center" spacing={0.5}>
+                <Stack direction="row" alignItems="center" spacing={0.75}>
                   <Checkbox
                     size="small"
                     checked={selectedAccounts.includes(acc.id)}
                     onChange={() => toggleAccount(acc.id)}
                     sx={{ p: 0.5 }}
                   />
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="caption" fontWeight={600} noWrap display="block">{acc.name}</Typography>
-                    <Typography variant="caption" color="text.secondary" fontSize="0.65rem">{acc.type}</Typography>
+                  <Box sx={{ flex: 1, minWidth: 0, mr: 1 }}>
+                    <Typography variant="caption" fontWeight={600} noWrap display="block" sx={{ fontSize: '0.8rem', letterSpacing: '0.2px' }}>{acc.name}</Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.68rem', letterSpacing: '0.3px', textTransform: 'uppercase' }}>{acc.type}</Typography>
                   </Box>
                   <Typography
                     variant="caption"
                     sx={{
-                      width: 70,
+                      width: 85,
                       textAlign: 'right',
-                      fontSize: '0.75rem',
+                      fontSize: '0.78rem',
                       color: acc.confirmedBalance >= 0 ? '#22c55e' : '#ef4444',
-                      fontWeight: 500
+                      fontWeight: 500,
+                      letterSpacing: '0.3px'
                     }}
                   >
                     {formatCurrency(acc.confirmedBalance)}
@@ -429,12 +449,13 @@ export default function LancamentosCaixaPage() {
                   <Typography
                     variant="caption"
                     sx={{
-                      width: 70,
+                      width: 85,
                       textAlign: 'right',
-                      fontSize: '0.75rem',
+                      fontSize: '0.78rem',
                       color: acc.projectedBalance >= 0 ? '#22c55e' : '#ef4444',
-                      ml: 1,
-                      fontWeight: 500
+                      ml: 1.5,
+                      fontWeight: 500,
+                      letterSpacing: '0.3px'
                     }}
                   >
                     {formatCurrency(acc.projectedBalance)}
@@ -447,13 +468,13 @@ export default function LancamentosCaixaPage() {
           {/* Total */}
           <Box sx={{ p: 1.5, borderTop: '2px solid #e5e7eb', bgcolor: '#f9fafb' }}>
             <Stack direction="row" alignItems="center">
-              <Box sx={{ width: 28 }} />
-              <Typography variant="body2" fontWeight={700} sx={{ flex: 1 }}>Total</Typography>
-              <Typography variant="body2" fontWeight={700} sx={{ width: 70, textAlign: 'right', color: '#22c55e' }}>
-                {formatCurrency(accounts.reduce((sum, a) => sum + a.confirmedBalance, 0))}
+              <Box sx={{ width: 36 }} />
+              <Typography variant="body2" fontWeight={700} sx={{ flex: 1, fontSize: '0.85rem' }}>Total</Typography>
+              <Typography variant="body2" fontWeight={700} sx={{ width: 85, textAlign: 'right', color: '#22c55e', fontSize: '0.85rem', letterSpacing: '0.3px' }}>
+                {formatCurrency(accounts.filter(a => selectedAccounts.includes(a.id)).reduce((sum, a) => sum + a.confirmedBalance, 0))}
               </Typography>
-              <Typography variant="body2" fontWeight={700} sx={{ width: 70, textAlign: 'right', ml: 1, color: '#ef4444' }}>
-                {formatCurrency(accounts.reduce((sum, a) => sum + a.projectedBalance, 0))}
+              <Typography variant="body2" fontWeight={700} sx={{ width: 85, textAlign: 'right', ml: 1.5, color: '#ef4444', fontSize: '0.85rem', letterSpacing: '0.3px' }}>
+                {formatCurrency(accounts.filter(a => selectedAccounts.includes(a.id)).reduce((sum, a) => sum + a.projectedBalance, 0))}
               </Typography>
             </Stack>
           </Box>
