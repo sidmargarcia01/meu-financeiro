@@ -311,34 +311,32 @@ export default function LancamentosCaixaPage() {
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', bgcolor: '#f5f5f5' }}>
       {/* Header */}
-      <Paper sx={{ p: 2, borderRadius: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Stack direction="row" alignItems="center" spacing={2}>
-          <Typography variant="h6" fontWeight={600}>Lançamentos de caixa</Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: '#f3f4f6', borderRadius: 1, px: 1 }}>
-            <IconButton size="small" onClick={goToPrevDay}>
-              <PrevIcon fontSize="small" />
-            </IconButton>
-            <Typography
-              sx={{ mx: 1, fontWeight: 500, minWidth: 120, textAlign: 'center', cursor: 'pointer' }}
-              onClick={() => dateInputRef.current?.showPicker?.()}
-            >
-              {currentDateStr}
-            </Typography>
-            <IconButton size="small" onClick={goToNextDay}>
-              <NextIcon fontSize="small" />
-            </IconButton>
-            <IconButton size="small" sx={{ ml: 1 }} onClick={() => dateInputRef.current?.showPicker?.()}>
-              <CalendarIcon fontSize="small" />
-            </IconButton>
-            <input
-              ref={dateInputRef}
-              type="date"
-              value={currentDate.toISOString().split('T')[0]}
-              onChange={(e) => e.target.value && setCurrentDate(new Date(e.target.value))}
-              style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
-            />
-          </Box>
-        </Stack>
+      <Paper sx={{ p: 1.5, borderRadius: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e5e7eb' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <IconButton size="small" onClick={goToPrevDay}>
+            <PrevIcon fontSize="small" />
+          </IconButton>
+          <Typography
+            variant="body1"
+            sx={{ fontWeight: 500, fontSize: '0.95rem', cursor: 'pointer', minWidth: 90, textAlign: 'center' }}
+            onClick={() => dateInputRef.current?.showPicker?.()}
+          >
+            {currentDateStr}
+          </Typography>
+          <IconButton size="small" onClick={goToNextDay}>
+            <NextIcon fontSize="small" />
+          </IconButton>
+          <IconButton size="small" onClick={() => dateInputRef.current?.showPicker?.()}>
+            <CalendarIcon fontSize="small" />
+          </IconButton>
+          <input
+            ref={dateInputRef}
+            type="date"
+            value={currentDate.toISOString().split('T')[0]}
+            onChange={(e) => e.target.value && setCurrentDate(new Date(e.target.value))}
+            style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
+          />
+        </Box>
 
         <Stack direction="row" spacing={1}>
           <IconButton size="small"><SearchIcon /></IconButton>
@@ -386,38 +384,59 @@ export default function LancamentosCaixaPage() {
       <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* Sidebar - Contas */}
         <Paper sx={{ width: 280, borderRadius: 0, borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' }}>
-          <Box sx={{ p: 2, borderBottom: '1px solid #e5e7eb' }}>
-            <Typography variant="subtitle2" fontWeight={600} color="text.secondary">CONTAS</Typography>
+          {/* Header Contas com colunas */}
+          <Box sx={{ p: 1.5, borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center' }}>
+            <Box sx={{ width: 28 }} /> {/* Espaço checkbox */}
+            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ flex: 1 }}>CONTAS</Typography>
+            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ width: 70, textAlign: 'right', fontSize: '0.7rem' }}>Confirmado</Typography>
+            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ width: 70, textAlign: 'right', fontSize: '0.7rem', ml: 1 }}>Projetado</Typography>
           </Box>
 
-          <Box sx={{ flex: 1, overflow: 'auto', p: 1 }}>
+          <Box sx={{ flex: 1, overflow: 'auto' }}>
             {accounts.map(acc => (
               <Box
                 key={acc.id}
                 sx={{
-                  p: 1.5,
-                  borderRadius: 1,
-                  mb: 0.5,
-                  bgcolor: selectedAccounts.includes(acc.id) ? '#f3f4f6' : 'transparent',
+                  p: 1,
+                  borderBottom: '1px solid #f3f4f6',
+                  bgcolor: selectedAccounts.includes(acc.id) ? '#fafafa' : 'transparent',
                   '&:hover': { bgcolor: '#f9fafb' }
                 }}
               >
-                <Stack direction="row" alignItems="center" spacing={1}>
+                <Stack direction="row" alignItems="center" spacing={0.5}>
                   <Checkbox
                     size="small"
                     checked={selectedAccounts.includes(acc.id)}
                     onChange={() => toggleAccount(acc.id)}
+                    sx={{ p: 0.5 }}
                   />
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" fontWeight={500} noWrap>{acc.name}</Typography>
-                    <Typography variant="caption" color="text.secondary">{acc.type}</Typography>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="caption" fontWeight={600} noWrap display="block">{acc.name}</Typography>
+                    <Typography variant="caption" color="text.secondary" fontSize="0.65rem">{acc.type}</Typography>
                   </Box>
-                </Stack>
-                <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.5, pl: 4 }}>
-                  <Typography variant="caption" color={acc.confirmedBalance >= 0 ? 'success.main' : 'error.main'}>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      width: 70,
+                      textAlign: 'right',
+                      fontSize: '0.75rem',
+                      color: acc.confirmedBalance >= 0 ? '#22c55e' : '#ef4444',
+                      fontWeight: 500
+                    }}
+                  >
                     {formatCurrency(acc.confirmedBalance)}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      width: 70,
+                      textAlign: 'right',
+                      fontSize: '0.75rem',
+                      color: acc.projectedBalance >= 0 ? '#22c55e' : '#ef4444',
+                      ml: 1,
+                      fontWeight: 500
+                    }}
+                  >
                     {formatCurrency(acc.projectedBalance)}
                   </Typography>
                 </Stack>
@@ -426,16 +445,71 @@ export default function LancamentosCaixaPage() {
           </Box>
 
           {/* Total */}
-          <Box sx={{ p: 2, borderTop: '2px solid #e5e7eb', bgcolor: '#f9fafb' }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Typography variant="subtitle2" fontWeight={700}>Total</Typography>
-              <Typography variant="subtitle2" fontWeight={700}>
+          <Box sx={{ p: 1.5, borderTop: '2px solid #e5e7eb', bgcolor: '#f9fafb' }}>
+            <Stack direction="row" alignItems="center">
+              <Box sx={{ width: 28 }} />
+              <Typography variant="body2" fontWeight={700} sx={{ flex: 1 }}>Total</Typography>
+              <Typography variant="body2" fontWeight={700} sx={{ width: 70, textAlign: 'right', color: '#22c55e' }}>
                 {formatCurrency(accounts.reduce((sum, a) => sum + a.confirmedBalance, 0))}
               </Typography>
+              <Typography variant="body2" fontWeight={700} sx={{ width: 70, textAlign: 'right', ml: 1, color: '#ef4444' }}>
+                {formatCurrency(accounts.reduce((sum, a) => sum + a.projectedBalance, 0))}
+              </Typography>
             </Stack>
-            <Typography variant="caption" color="text.secondary" display="block" align="right">
-              {formatCurrency(accounts.reduce((sum, a) => sum + a.projectedBalance, 0))}
+          </Box>
+
+          {/* Resumo - Resultados */}
+          <Box sx={{ p: 1.5, borderTop: '1px solid #e5e7eb', bgcolor: '#f9fafb' }}>
+            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ display: 'block', mb: 1, textAlign: 'center', fontSize: '0.7rem' }}>
+              Resultados (R$)
             </Typography>
+
+            <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+              <Typography variant="caption" fontSize="0.75rem">Entradas</Typography>
+              <Typography variant="caption" fontWeight={600} sx={{ color: '#22c55e', fontSize: '0.75rem' }}>
+                {formatCurrency(totals.entradas)}
+              </Typography>
+            </Stack>
+            <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5, pl: 1 }}>
+              <Typography variant="caption" fontSize="0.7rem" color="text.secondary">Receitas</Typography>
+              <Typography variant="caption" fontSize="0.7rem" sx={{ color: '#22c55e' }}>
+                {formatCurrency(totals.receitas)}
+              </Typography>
+            </Stack>
+            <Stack direction="row" justifyContent="space-between" sx={{ mb: 1, pl: 1 }}>
+              <Typography variant="caption" fontSize="0.7rem" color="text.secondary">Transferências</Typography>
+              <Typography variant="caption" fontSize="0.7rem" sx={{ color: '#6b7280' }}>
+                0,00
+              </Typography>
+            </Stack>
+
+            <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+              <Typography variant="caption" fontSize="0.75rem">Saídas</Typography>
+              <Typography variant="caption" fontWeight={600} sx={{ color: '#ef4444', fontSize: '0.75rem' }}>
+                {formatCurrency(totals.saidas)}
+              </Typography>
+            </Stack>
+            <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5, pl: 1 }}>
+              <Typography variant="caption" fontSize="0.7rem" color="text.secondary">Despesas</Typography>
+              <Typography variant="caption" fontSize="0.7rem" sx={{ color: '#ef4444' }}>
+                {formatCurrency(totals.despesas)}
+              </Typography>
+            </Stack>
+            <Stack direction="row" justifyContent="space-between" sx={{ mb: 1, pl: 1 }}>
+              <Typography variant="caption" fontSize="0.7rem" color="text.secondary">Transferências</Typography>
+              <Typography variant="caption" fontSize="0.7rem" sx={{ color: '#6b7280' }}>
+                0,00
+              </Typography>
+            </Stack>
+
+            <Divider sx={{ my: 1 }} />
+
+            <Stack direction="row" justifyContent="space-between">
+              <Typography variant="caption" fontWeight={600} fontSize="0.75rem">Resultado</Typography>
+              <Typography variant="caption" fontWeight={700} sx={{ color: totals.resultado >= 0 ? '#22c55e' : '#ef4444', fontSize: '0.75rem' }}>
+                {formatCurrency(totals.resultado)}
+              </Typography>
+            </Stack>
           </Box>
         </Paper>
 
@@ -452,7 +526,7 @@ export default function LancamentosCaixaPage() {
           </Box>
 
           {/* Lista de lançamentos */}
-          <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+          <Box sx={{ flex: 1, overflow: 'auto', bgcolor: '#f9fafb' }}>
             {loading ? (
               <Box display="flex" justifyContent="center" py={6}><CircularProgress /></Box>
             ) : error ? (
@@ -463,150 +537,90 @@ export default function LancamentosCaixaPage() {
                 <Button variant="text" onClick={openNew} sx={{ mt: 1 }}>Criar primeiro lançamento</Button>
               </Box>
             ) : (
-              <Stack spacing={2}>
-                {groupedByDate.map(([date, txs]) => (
-                  <Box key={date}>
-                    {/* Data */}
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        display: 'inline-block',
-                        bgcolor: '#fee2e2',
-                        color: '#991b1b',
-                        px: 1,
-                        py: 0.5,
-                        borderRadius: 1,
-                        fontWeight: 600,
-                        mb: 1
-                      }}
-                    >
-                      {formatDate(date)}
-                    </Typography>
-
-                    {/* Lançamentos do dia */}
-                    <Stack spacing={1}>
-                      {txs.map(tx => {
+              <Box>
+                {groupedByDate.map(([date, txs]) => {
+                  const [year, month, day] = date.split('-')
+                  const monthShort = ['', '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'][parseInt(month)]
+                  return (
+                    <Box key={date}>
+                      {txs.map((tx, idx) => {
                         const isReceita = tx.type === 'RECEITA'
-                        const statusCfg = STATUS_CONFIG[tx.status]
+                        const isFirstOfDate = idx === 0
                         return (
                           <Paper
                             key={tx.id}
+                            elevation={0}
                             sx={{
-                              p: 2,
+                              p: 1.5,
                               display: 'flex',
-                              alignItems: 'center',
+                              alignItems: 'flex-start',
                               gap: 2,
-                              borderLeft: 3,
-                              borderColor: isReceita ? '#22c55e' : '#ef4444',
+                              borderBottom: '1px solid #e5e7eb',
+                              bgcolor: 'white',
                               cursor: 'pointer',
                               '&:hover': { bgcolor: '#fafafa' }
                             }}
                             onClick={() => openEdit(tx)}
                           >
-                            {/* Indicador de tipo */}
-                            <Box
-                              sx={{
-                                width: 32,
-                                height: 32,
-                                borderRadius: '50%',
-                                bgcolor: isReceita ? '#dcfce7' : '#fee2e2',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                              }}
-                            >
-                              {isReceita ?
-                                <ArrowUpIcon sx={{ color: '#22c55e', fontSize: 18 }} /> :
-                                <ArrowDownIcon sx={{ color: '#ef4444', fontSize: 18 }} />
-                              }
+                            {/* Data com bolinha */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 70 }}>
+                              {isFirstOfDate && (
+                                <>
+                                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#ef4444', flexShrink: 0 }} />
+                                  <Box>
+                                    <Typography variant="body2" fontWeight={700} lineHeight={1.2}>{day}</Typography>
+                                    <Typography variant="caption" color="text.secondary" fontSize="0.7rem">{monthShort}/{year.substring(2)}</Typography>
+                                  </Box>
+                                </>
+                              )}
                             </Box>
 
-                            {/* Conteúdo */}
-                            <Box sx={{ flex: 1 }}>
-                              <Stack direction="row" alignItems="center" spacing={1}>
-                                <Typography variant="subtitle2" fontWeight={600}>
-                                  {tx.description}
-                                </Typography>
-                                <Chip
-                                  size="small"
-                                  label={tx.status.substring(0, 3)}
-                                  sx={{
-                                    bgcolor: statusCfg?.bgColor,
-                                    color: statusCfg?.textColor,
-                                    fontSize: '10px',
-                                    height: 18
-                                  }}
-                                />
-                              </Stack>
-                              <Typography variant="caption" color="text.secondary">
-                                {tx.account_name || '—'} • {tx.category_name || '—'}
+                            {/* Conta/Categoria indicador */}
+                            <Box sx={{ width: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                              <AccountIcon sx={{ fontSize: 14, color: '#9ca3af' }} />
+                              <Box sx={{ width: 1, height: 1, borderRadius: '50%', bgcolor: '#ef4444' }} />
+                            </Box>
+
+                            {/* Descrição e detalhes */}
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Typography variant="body2" fontWeight={600} noWrap>
+                                {tx.description}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
+                                {tx.status.substring(0, 3).toUpperCase()} • {tx.account_name || '—'} • {tx.category_name || '—'}
                               </Typography>
                             </Box>
 
                             {/* Valor */}
                             <Typography
-                              variant="subtitle1"
-                              fontWeight={700}
-                              color={isReceita ? 'success.main' : 'error.main'}
+                              variant="body2"
+                              fontWeight={600}
+                              sx={{ color: isReceita ? '#22c55e' : '#ef4444', minWidth: 80, textAlign: 'right' }}
                             >
                               {isReceita ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
                             </Typography>
 
                             {/* Ações */}
-                            <Stack direction="row" spacing={0.5}>
-                              <IconButton size="small" onClick={(e) => { e.stopPropagation(); openEdit(tx) }}>
-                                <EditIcon fontSize="small" />
+                            <Stack direction="row" spacing={0} sx={{ ml: 1 }}>
+                              <IconButton size="small" sx={{ p: 0.5 }} onClick={(e) => { e.stopPropagation(); openEdit(tx) }}>
+                                <EditIcon fontSize="small" sx={{ fontSize: 16 }} />
                               </IconButton>
-                              <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); handleDelete(tx.id) }}>
-                                <DeleteIcon fontSize="small" />
+                              <IconButton size="small" color="error" sx={{ p: 0.5 }} onClick={(e) => { e.stopPropagation(); handleDelete(tx.id) }}>
+                                <DeleteIcon fontSize="small" sx={{ fontSize: 16 }} />
                               </IconButton>
                             </Stack>
                           </Paper>
                         )
                       })}
-                    </Stack>
-                  </Box>
-                ))}
-              </Stack>
+                    </Box>
+                  )
+                })}
+              </Box>
             )}
           </Box>
 
-          {/* Resumo inferior */}
-          <Paper sx={{ p: 2, borderRadius: 0, borderTop: '2px solid #e5e7eb' }}>
-            <Stack direction="row" justifyContent="space-around" alignItems="center">
-              <Box textAlign="center">
-                <Typography variant="caption" color="text.secondary">Entradas</Typography>
-                <Typography variant="subtitle1" color="success.main" fontWeight={700}>
-                  {formatCurrency(totals.entradas)}
-                </Typography>
-                <Typography variant="caption" color="success.light">
-                  {formatCurrency(totals.receitas)}
-                </Typography>
-              </Box>
-              <Box textAlign="center">
-                <Typography variant="caption" color="text.secondary">Saídas</Typography>
-                <Typography variant="subtitle1" color="error.main" fontWeight={700}>
-                  {formatCurrency(totals.saidas)}
-                </Typography>
-                <Typography variant="caption" color="error.light">
-                  {formatCurrency(totals.despesas)}
-                </Typography>
-              </Box>
-              <Box textAlign="center">
-                <Typography variant="caption" color="text.secondary">Resultado</Typography>
-                <Typography
-                  variant="subtitle1"
-                  fontWeight={700}
-                  color={totals.resultado >= 0 ? 'success.main' : 'error.main'}
-                >
-                  {formatCurrency(totals.resultado)}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Saldo inicial: {formatCurrency(totals.saldoInicial)}
-                </Typography>
-              </Box>
-            </Stack>
-          </Paper>
+          {/* Rodapé vazio - resumo está na sidebar */}
+          <Box sx={{ p: 1, borderTop: '1px solid #e5e7eb', bgcolor: 'white' }} />
         </Box>
       </Box>
 
