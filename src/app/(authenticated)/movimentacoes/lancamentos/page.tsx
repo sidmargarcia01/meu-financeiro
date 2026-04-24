@@ -341,7 +341,7 @@ export default function LancamentosCaixaPage() {
         dueDate: toISODate(data.due_date),
         accountId: data.account_id || undefined,
         categoryId: data.category_id || undefined,
-        status: data.status || 'CONFIRMADO',
+        status: data.status || 'PENDENTE',
         regime: data.regime || 'CAIXA',
         notes: data.notes || undefined,
         tags: data.tags || [],
