@@ -48,7 +48,8 @@ import {
   DoneAll as DoneAllIcon,
   TrendingFlat as PartialIcon,
   ContentCopy as CopyIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
+  AttachFile as AttachFileIcon
 } from '@mui/icons-material'
 import { TransactionForm } from '@/components/transactions/TransactionForm'
 import type { TransactionFormData } from '@/components/transactions/TransactionForm'
@@ -886,159 +887,168 @@ export default function LancamentosCaixaPage() {
       <Dialog
         open={conciliationOpen}
         onClose={closeConciliationModal}
-        maxWidth="sm"
+        maxWidth="md"
         fullWidth
-        PaperProps={{ sx: { borderRadius: 2 } }}
+        PaperProps={{ sx: { borderRadius: 2, minWidth: 600 } }}
       >
-        <DialogTitle sx={{ pb: 1 }}>
+        <DialogTitle sx={{ pb: 2, pt: 2.5, px: 3 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Typography variant="h6" fontWeight={600}>
-              Conciliar {selectedTransaction?.description}
-            </Typography>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography variant="h6" fontWeight={600}>
+                Conciliar
+              </Typography>
+              <Typography variant="h6" fontWeight={600} color="text.primary">
+                {selectedTransaction?.description}
+              </Typography>
+              {selectedTransaction?.type === 'TRANSFERENCIA' && (
+                <SwapHoriz sx={{ color: '#14b8a6', fontSize: 24 }} />
+              )}
+            </Stack>
             <IconButton onClick={closeConciliationModal} size="small">
               <CloseIcon fontSize="small" />
             </IconButton>
           </Stack>
         </DialogTitle>
 
-        <DialogContent sx={{ pt: 2 }}>
-          <Stack spacing={3}>
-            {/* Valor e Data */}
-            <Stack direction="row" spacing={2}>
-              <TextField
-                label="Valor efetivo (R$)"
-                fullWidth
-                value={conciliationData.amount}
-                onChange={(e) => {
-                  // Permitir apenas números e vírgula
-                  let val = e.target.value.replace(/[^0-9,]/g, '')
-                  // Limitar a uma vírgula
-                  const parts = val.split(',')
-                  if (parts.length > 2) val = parts[0] + ',' + parts.slice(1).join('')
-                  // Limitar casas decimais a 2
-                  if (parts[1] && parts[1].length > 2) val = parts[0] + ',' + parts[1].slice(0, 2)
-                  setConciliationData(prev => ({ ...prev, amount: val }))
-                }}
-                placeholder="0,00"
-                InputProps={{
-                  startAdornment: <InputAdornment position="start" sx={{ fontSize: '1.1rem' }}>R$</InputAdornment>,
-                  sx: { fontSize: '1.1rem', py: 0.5 }
-                }}
-                InputLabelProps={{ sx: { fontSize: '1rem' } }}
-              />
-              <TextField
-                label="Data efetiva"
-                type="date"
-                fullWidth
-                value={conciliationData.date}
-                onChange={(e) => setConciliationData(prev => ({ ...prev, date: e.target.value }))}
-                InputLabelProps={{ shrink: true, sx: { fontSize: '1rem' } }}
-                InputProps={{ sx: { fontSize: '1.1rem', py: 0.5 } }}
-              />
-            </Stack>
-
-            {/* Descrição e Tipo */}
-            <Stack direction="row" spacing={2}>
-              <TextField
-                label="Descrição"
-                fullWidth
-                value={selectedTransaction?.description || ''}
-                InputProps={{ readOnly: true, sx: { fontSize: '1.05rem' } }}
-                InputLabelProps={{ sx: { fontSize: '1rem' } }}
-                sx={{ bgcolor: '#f9fafb' }}
-              />
-              <FormControl fullWidth>
-                <InputLabel sx={{ fontSize: '1rem' }}>Tipo</InputLabel>
-                <Select
-                  value={selectedTransaction?.type || 'RECEITA'}
-                  label="Tipo"
-                  onChange={(e) => {
-                    if (selectedTransaction) {
-                      setSelectedTransaction({ ...selectedTransaction, type: e.target.value as any })
-                    }
-                  }}
-                  sx={{ fontSize: '1.1rem' }}
-                >
-                  <MenuItem value="RECEITA" sx={{ fontSize: '1.05rem' }}>Receita</MenuItem>
-                  <MenuItem value="DESPESA" sx={{ fontSize: '1.05rem' }}>Despesa</MenuItem>
-                  <MenuItem value="TRANSFERENCIA" sx={{ fontSize: '1.05rem' }}>Transferência</MenuItem>
-                </Select>
-              </FormControl>
-            </Stack>
-
-            {/* Contas (readonly) */}
-            <Stack direction="row" spacing={2} alignItems="center">
-              <TextField
-                label="Conta"
-                fullWidth
-                value={selectedTransaction?.account_name || '—'}
-                InputProps={{ readOnly: true, sx: { fontSize: '1.05rem' } }}
-                InputLabelProps={{ sx: { fontSize: '1rem' } }}
-                sx={{ bgcolor: '#f9fafb' }}
-              />
-              <SwapHoriz sx={{ color: '#9ca3af', fontSize: 28 }} />
-              <TextField
-                label="Conta destino"
-                fullWidth
-                value={selectedTransaction?.destination_account_name || '—'}
-                InputProps={{ readOnly: true, sx: { fontSize: '1.05rem' } }}
-                InputLabelProps={{ sx: { fontSize: '1rem' } }}
-                sx={{ bgcolor: '#f9fafb' }}
-              />
-            </Stack>
-
-            <Divider sx={{ my: 1 }} />
-
-            {/* Número do documento */}
+        <DialogContent sx={{ pt: 0, pb: 2, px: 3 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+            {/* Valor efetivo */}
             <TextField
-              label="Número do documento"
+              label="Valor efetivo (R$)"
+              size="small"
               fullWidth
-              value={conciliationData.documentNumber}
-              onChange={(e) => setConciliationData(prev => ({ ...prev, documentNumber: e.target.value }))}
-              placeholder="Ex: 12345"
-              InputProps={{ sx: { fontSize: '1.1rem' } }}
-              InputLabelProps={{ sx: { fontSize: '1rem' } }}
+              value={conciliationData.amount}
+              onChange={(e) => {
+                let val = e.target.value.replace(/[^0-9,]/g, '')
+                const parts = val.split(',')
+                if (parts.length > 2) val = parts[0] + ',' + parts.slice(1).join('')
+                if (parts[1] && parts[1].length > 2) val = parts[0] + ',' + parts[1].slice(0, 2)
+                setConciliationData(prev => ({ ...prev, amount: val }))
+              }}
+              placeholder="0,00"
+              InputProps={{
+                startAdornment: <InputAdornment position="start">R$</InputAdornment>,
+              }}
             />
 
-            {/* Observações */}
+            {/* Data efetiva */}
             <TextField
-              label="Observações"
+              label="Data efetiva"
+              type="date"
+              size="small"
               fullWidth
-              multiline
-              rows={2}
-              value={conciliationData.notes}
-              onChange={(e) => setConciliationData(prev => ({ ...prev, notes: e.target.value }))}
-              placeholder="Adicione observações..."
-              InputProps={{ sx: { fontSize: '1.05rem' } }}
-              InputLabelProps={{ sx: { fontSize: '1rem' } }}
+              value={conciliationData.date}
+              onChange={(e) => setConciliationData(prev => ({ ...prev, date: e.target.value }))}
+              InputLabelProps={{ shrink: true }}
             />
 
-            {/* Tags */}
+            {/* Descrição */}
             <TextField
-              label="Tags"
+              label="Descrição"
+              size="small"
               fullWidth
-              value={conciliationData.tags}
-              onChange={(e) => setConciliationData(prev => ({ ...prev, tags: e.target.value }))}
-              placeholder="tag1, tag2, tag3"
-              helperText="Separe as tags por vírgula"
-              InputProps={{ sx: { fontSize: '1.05rem' } }}
-              InputLabelProps={{ sx: { fontSize: '1rem' } }}
-              FormHelperTextProps={{ sx: { fontSize: '0.9rem' } }}
+              value={selectedTransaction?.description || ''}
+              InputProps={{ readOnly: true }}
+              sx={{ bgcolor: '#f8fafc' }}
             />
-          </Stack>
+
+            {/* Conta */}
+            <TextField
+              label="Conta"
+              size="small"
+              fullWidth
+              value={selectedTransaction?.account_name || '—'}
+              InputProps={{ readOnly: true }}
+              sx={{ bgcolor: '#f8fafc' }}
+            />
+
+            {/* Categoria */}
+            <TextField
+              label="Categoria"
+              size="small"
+              fullWidth
+              value={selectedTransaction?.category_name || '—'}
+              InputProps={{ readOnly: true }}
+              sx={{ bgcolor: '#f8fafc' }}
+            />
+
+            {/* Competência */}
+            <TextField
+              label="Competência"
+              type="month"
+              size="small"
+              fullWidth
+              value={conciliationData.date ? conciliationData.date.substring(0, 7) : ''}
+              onChange={(e) => {
+                const month = e.target.value
+                const day = conciliationData.date ? conciliationData.date.substring(8, 10) : '01'
+                setConciliationData(prev => ({ ...prev, date: `${month}-${day}` }))
+              }}
+              InputLabelProps={{ shrink: true }}
+            />
+          </Box>
+
+          <Divider sx={{ my: 2 }} />
+
+          {/* Número do documento */}
+          <TextField
+            label="Número do documento"
+            size="small"
+            fullWidth
+            value={conciliationData.documentNumber}
+            onChange={(e) => {
+              const val = e.target.value.slice(0, 80)
+              setConciliationData(prev => ({ ...prev, documentNumber: val }))
+            }}
+            placeholder="Ex: 12345"
+            helperText={`${conciliationData.documentNumber.length} / 80`}
+            FormHelperTextProps={{ sx: { textAlign: 'right' } }}
+            sx={{ mb: 2 }}
+          />
+
+          {/* Observações */}
+          <TextField
+            label="Observações"
+            size="small"
+            fullWidth
+            multiline
+            rows={2}
+            value={conciliationData.notes}
+            onChange={(e) => {
+              const val = e.target.value.slice(0, 400)
+              setConciliationData(prev => ({ ...prev, notes: val }))
+            }}
+            placeholder="Adicione observações..."
+            helperText={`${conciliationData.notes.length} / 400`}
+            FormHelperTextProps={{ sx: { textAlign: 'right' } }}
+            sx={{ mb: 2 }}
+          />
+
+          {/* Tags */}
+          <TextField
+            label="Tags"
+            size="small"
+            fullWidth
+            value={conciliationData.tags}
+            onChange={(e) => setConciliationData(prev => ({ ...prev, tags: e.target.value }))}
+            placeholder="tag1, tag2, tag3"
+          />
         </DialogContent>
 
-        <DialogActions sx={{ px: 3, pb: 3, pt: 2 }}>
-          <Button onClick={closeConciliationModal} variant="outlined" sx={{ fontSize: '1rem', px: 3, py: 1 }}>
-            CANCELAR
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <IconButton sx={{ mr: 'auto' }}>
+            <AttachFileIcon fontSize="small" />
+          </IconButton>
+          <Button onClick={closeConciliationModal} variant="outlined" size="small">
+            Cancelar
           </Button>
           <Button
             onClick={handleSubmitConciliation}
             variant="contained"
+            size="small"
             sx={{
               bgcolor: '#14b8a6',
               '&:hover': { bgcolor: '#0d9488' },
-              borderRadius: 1.5,
               textTransform: 'none',
               fontWeight: 600
             }}
