@@ -156,12 +156,21 @@ export default function LancamentosCaixaPage() {
   const [conciliationData, setConciliationData] = useState({
     amount: '',
     date: '',
+    accountId: '',
     documentNumber: '',
     notes: '',
     tags: ''
   })
 
-  // Carregar dados
+  // Buscar saldos das contas
+  const fetchAccounts = useCallback(async () => {
+    try {
+      const accs = await fetch('/api/accounts?balances=true').then(r => r.json())
+      setAccounts(Array.isArray(accs) ? accs : [])
+    } catch { /* silencioso */ }
+  }, [])
+
+  // Carregar dados iniciais
   useEffect(() => {
     Promise.all([
       fetch('/api/accounts?balances=true').then(r => r.json()),
@@ -306,6 +315,7 @@ export default function LancamentosCaixaPage() {
         setFormOpen(false)
         setEditTarget(null)
         fetchTransactions()
+        fetchAccounts()
       } else {
         const err = await res.json().catch(() => ({}))
         setSubmitError(err.error || `Erro ${res.status}`)
@@ -321,6 +331,7 @@ export default function LancamentosCaixaPage() {
     if (!confirm('Excluir este lançamento?')) return
     await fetch(`/api/transactions/${id}`, { method: 'DELETE' })
     fetchTransactions()
+    fetchAccounts()
   }
 
   const toggleStatus = (status: string) => {
@@ -358,6 +369,7 @@ export default function LancamentosCaixaPage() {
       body: JSON.stringify({ status: 'CONFIRMADO' })
     })
     fetchTransactions()
+    fetchAccounts()
     closeMenu()
   }
 
@@ -370,6 +382,7 @@ export default function LancamentosCaixaPage() {
       body: JSON.stringify({ status: 'CONFIRMADO', due_date: today })
     })
     fetchTransactions()
+    fetchAccounts()
     closeMenu()
   }
 
@@ -387,6 +400,7 @@ export default function LancamentosCaixaPage() {
       body: JSON.stringify({ status: 'CONCILIADO' })
     })
     fetchTransactions()
+    fetchAccounts()
     closeMenu()
   }
 
@@ -403,6 +417,7 @@ export default function LancamentosCaixaPage() {
       })
     })
     fetchTransactions()
+    fetchAccounts()
     closeMenu()
   }
 
@@ -437,6 +452,7 @@ export default function LancamentosCaixaPage() {
     setConciliationData({
       amount: formattedAmount,
       date: dateToUse,
+      accountId: selectedTransaction.account_id || '',
       documentNumber: selectedTransaction.document_number || '',
       notes: selectedTransaction.notes || '',
       tags: selectedTransaction.tags?.join(', ') || ''
@@ -447,7 +463,7 @@ export default function LancamentosCaixaPage() {
 
   const closeConciliationModal = () => {
     setConciliationOpen(false)
-    setConciliationData({ amount: '', date: '', documentNumber: '', notes: '', tags: '' })
+    setConciliationData({ amount: '', date: '', accountId: '', documentNumber: '', notes: '', tags: '' })
     setSelectedTransaction(null)  // Limpa a transação selecionada ao fechar
   }
 
@@ -461,6 +477,7 @@ export default function LancamentosCaixaPage() {
         status: 'CONCILIADO',
         amount: parseFloat(conciliationData.amount),
         due_date: conciliationData.date,
+        account_id: conciliationData.accountId,
         document_number: conciliationData.documentNumber,
         notes: conciliationData.notes,
         tags: conciliationData.tags.split(',').map(t => t.trim()).filter(Boolean)
@@ -468,6 +485,7 @@ export default function LancamentosCaixaPage() {
     })
 
     fetchTransactions()
+    fetchAccounts()
     closeConciliationModal()
   }
 
@@ -926,13 +944,14 @@ export default function LancamentosCaixaPage() {
           </Stack>
         </DialogTitle>
 
-        <DialogContent sx={{ pt: 0, pb: 2, px: 3 }}>
-          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+        <DialogContent sx={{ pt: 4, pb: 2, px: 3 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, mb: 2 }}>
             {/* Valor efetivo */}
             <TextField
               label="Valor efetivo (R$)"
               size="small"
               fullWidth
+              margin="normal"
               value={conciliationData.amount}
               onChange={(e) => {
                 let val = e.target.value.replace(/[^0-9,]/g, '')
@@ -945,6 +964,7 @@ export default function LancamentosCaixaPage() {
               InputProps={{
                 startAdornment: <InputAdornment position="start">R$</InputAdornment>,
               }}
+              InputLabelProps={{ shrink: true }}
             />
 
             {/* Data efetiva */}
@@ -953,6 +973,7 @@ export default function LancamentosCaixaPage() {
               type="date"
               size="small"
               fullWidth
+              margin="normal"
               value={conciliationData.date}
               onChange={(e) => setConciliationData(prev => ({ ...prev, date: e.target.value }))}
               InputLabelProps={{ shrink: true }}
@@ -963,28 +984,40 @@ export default function LancamentosCaixaPage() {
               label="Descrição"
               size="small"
               fullWidth
+              margin="normal"
               value={selectedTransaction?.description || ''}
               InputProps={{ readOnly: true }}
+              InputLabelProps={{ shrink: true }}
               sx={{ bgcolor: '#f8fafc' }}
             />
 
             {/* Conta */}
-            <TextField
-              label="Conta"
-              size="small"
-              fullWidth
-              value={selectedTransaction?.account_name || '—'}
-              InputProps={{ readOnly: true }}
-              sx={{ bgcolor: '#f8fafc' }}
-            />
+            <FormControl size="small" fullWidth margin="normal">
+              <InputLabel id="conta-select-label" shrink>Conta</InputLabel>
+              <Select
+                labelId="conta-select-label"
+                id="conta-select"
+                value={conciliationData.accountId}
+                label="Conta"
+                onChange={(e) => setConciliationData(prev => ({ ...prev, accountId: e.target.value }))}
+              >
+                {accounts.map((acc) => (
+                  <MenuItem key={acc.id} value={acc.id}>
+                    {acc.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
             {/* Categoria */}
             <TextField
               label="Categoria"
               size="small"
               fullWidth
+              margin="normal"
               value={selectedTransaction?.category_name || '—'}
               InputProps={{ readOnly: true }}
+              InputLabelProps={{ shrink: true }}
               sx={{ bgcolor: '#f8fafc' }}
             />
 
@@ -994,6 +1027,7 @@ export default function LancamentosCaixaPage() {
               type="month"
               size="small"
               fullWidth
+              margin="normal"
               value={conciliationData.date ? conciliationData.date.substring(0, 7) : ''}
               onChange={(e) => {
                 const month = e.target.value
@@ -1011,6 +1045,7 @@ export default function LancamentosCaixaPage() {
             label="Número do documento"
             size="small"
             fullWidth
+            margin="normal"
             value={conciliationData.documentNumber}
             onChange={(e) => {
               const val = e.target.value.slice(0, 80)
@@ -1019,7 +1054,7 @@ export default function LancamentosCaixaPage() {
             placeholder="Ex: 12345"
             helperText={`${conciliationData.documentNumber.length} / 80`}
             FormHelperTextProps={{ sx: { textAlign: 'right' } }}
-            sx={{ mb: 2 }}
+            InputLabelProps={{ shrink: true }}
           />
 
           {/* Observações */}
@@ -1027,6 +1062,7 @@ export default function LancamentosCaixaPage() {
             label="Observações"
             size="small"
             fullWidth
+            margin="normal"
             multiline
             rows={2}
             value={conciliationData.notes}
@@ -1037,7 +1073,7 @@ export default function LancamentosCaixaPage() {
             placeholder="Adicione observações..."
             helperText={`${conciliationData.notes.length} / 400`}
             FormHelperTextProps={{ sx: { textAlign: 'right' } }}
-            sx={{ mb: 2 }}
+            InputLabelProps={{ shrink: true }}
           />
 
           {/* Tags */}
@@ -1045,9 +1081,11 @@ export default function LancamentosCaixaPage() {
             label="Tags"
             size="small"
             fullWidth
+            margin="normal"
             value={conciliationData.tags}
             onChange={(e) => setConciliationData(prev => ({ ...prev, tags: e.target.value }))}
             placeholder="tag1, tag2, tag3"
+            InputLabelProps={{ shrink: true }}
           />
         </DialogContent>
 
