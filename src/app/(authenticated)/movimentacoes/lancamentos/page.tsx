@@ -441,13 +441,14 @@ export default function LancamentosCaixaPage() {
       notes: selectedTransaction.notes || '',
       tags: selectedTransaction.tags?.join(', ') || ''
     })
+    setMenuAnchor(null)  // Fecha o menu sem limpar selectedTransaction
     setConciliationOpen(true)
-    closeMenu()
   }
 
   const closeConciliationModal = () => {
     setConciliationOpen(false)
     setConciliationData({ amount: '', date: '', documentNumber: '', notes: '', tags: '' })
+    setSelectedTransaction(null)  // Limpa a transação selecionada ao fechar
   }
 
   const handleSubmitConciliation = async () => {
