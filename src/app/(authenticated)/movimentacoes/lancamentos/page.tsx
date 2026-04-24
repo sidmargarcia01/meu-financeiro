@@ -18,10 +18,12 @@ import {
   Box, Button, Typography, Drawer, IconButton, Chip, Paper,
   CircularProgress, Alert, Tooltip, Stack, Divider, Checkbox,
   FormControlLabel, ToggleButton, ToggleButtonGroup, Fab, TextField,
-  Menu, MenuItem
+  Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions,
+  InputAdornment
 } from '@mui/material'
 import {
   Add as AddIcon,
+  Close as CloseIcon,
   CheckCircle as ConfirmedIcon,
   RadioButtonUnchecked as PendingIcon,
   Schedule as ScheduledIcon,
@@ -40,6 +42,7 @@ import {
   ArrowUpward as ArrowUpIcon,
   ArrowDownward as ArrowDownIcon,
   SwapHoriz as SwapIcon,
+  SwapHoriz,
   MoreVert as MoreIcon,
   Done as DoneIcon,
   DoneAll as DoneAllIcon,
@@ -106,6 +109,8 @@ interface Transaction {
   category_id?: string
   account_name?: string
   category_name?: string
+  destination_account_id?: string
+  destination_account_name?: string
 }
 
 interface AccountWithBalance {
@@ -140,6 +145,16 @@ export default function LancamentosCaixaPage() {
   // Estado do menu de ações
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null)
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
+
+  // Estado do modal de conciliação
+  const [conciliationOpen, setConciliationOpen] = useState(false)
+  const [conciliationData, setConciliationData] = useState({
+    amount: '',
+    date: '',
+    documentNumber: '',
+    notes: '',
+    tags: ''
+  })
 
   // Carregar dados
   useEffect(() => {
@@ -398,6 +413,45 @@ export default function LancamentosCaixaPage() {
       handleDelete(selectedTransaction.id)
       closeMenu()
     }
+  }
+
+  // Handler para abrir modal de conciliação
+  const openConciliationModal = () => {
+    if (!selectedTransaction) return
+    setConciliationData({
+      amount: Math.abs(selectedTransaction.amount).toFixed(2),
+      date: selectedTransaction.due_date || new Date().toISOString().split('T')[0],
+      documentNumber: '',
+      notes: '',
+      tags: ''
+    })
+    setConciliationOpen(true)
+    closeMenu()
+  }
+
+  const closeConciliationModal = () => {
+    setConciliationOpen(false)
+    setConciliationData({ amount: '', date: '', documentNumber: '', notes: '', tags: '' })
+  }
+
+  const handleSubmitConciliation = async () => {
+    if (!selectedTransaction) return
+
+    await fetch(`/api/transactions/${selectedTransaction.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: 'CONCILIADO',
+        amount: parseFloat(conciliationData.amount),
+        due_date: conciliationData.date,
+        document_number: conciliationData.documentNumber,
+        notes: conciliationData.notes,
+        tags: conciliationData.tags.split(',').map(t => t.trim()).filter(Boolean)
+      })
+    })
+
+    fetchTransactions()
+    closeConciliationModal()
   }
 
   const monthNames = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
@@ -800,7 +854,7 @@ export default function LancamentosCaixaPage() {
           <PartialIcon fontSize="small" sx={{ color: '#3b82f6' }} />
           <Typography variant="body2">Confirmar parcialmente</Typography>
         </MenuItem>
-        <MenuItem onClick={handleConciliar} sx={{ gap: 1.5 }}>
+        <MenuItem onClick={openConciliationModal} sx={{ gap: 1.5 }}>
           <ConciliatedIcon fontSize="small" sx={{ color: '#8b5cf6' }} />
           <Typography variant="body2">Conciliar</Typography>
         </MenuItem>
@@ -827,6 +881,150 @@ export default function LancamentosCaixaPage() {
           <Typography variant="body2">Detalhar</Typography>
         </MenuItem>
       </Menu>
+
+      {/* Modal de Conciliação */}
+      <Dialog
+        open={conciliationOpen}
+        onClose={closeConciliationModal}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 2 } }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6" fontWeight={600}>
+              Conciliar {selectedTransaction?.description}
+            </Typography>
+            <IconButton onClick={closeConciliationModal} size="small">
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Stack>
+        </DialogTitle>
+
+        <DialogContent sx={{ pt: 1 }}>
+          <Stack spacing={2.5}>
+            {/* Valor e Data */}
+            <Stack direction="row" spacing={2}>
+              <TextField
+                label="Valor efetivo (R$)"
+                type="number"
+                size="small"
+                fullWidth
+                value={conciliationData.amount}
+                onChange={(e) => setConciliationData(prev => ({ ...prev, amount: e.target.value }))}
+                InputProps={{
+                  startAdornment: <InputAdornment position="start">R$</InputAdornment>,
+                }}
+              />
+              <TextField
+                label="Data efetiva"
+                type="date"
+                size="small"
+                fullWidth
+                value={conciliationData.date}
+                onChange={(e) => setConciliationData(prev => ({ ...prev, date: e.target.value }))}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Stack>
+
+            {/* Descrição e Tipo (readonly) */}
+            <Stack direction="row" spacing={2}>
+              <TextField
+                label="Descrição"
+                size="small"
+                fullWidth
+                value={selectedTransaction?.description || ''}
+                InputProps={{ readOnly: true }}
+                sx={{ bgcolor: '#f9fafb' }}
+              />
+              <TextField
+                label="Tipo"
+                size="small"
+                fullWidth
+                value={selectedTransaction?.type === 'RECEITA' ? 'Receita' : selectedTransaction?.type === 'DESPESA' ? 'Despesa' : 'Transferência'}
+                InputProps={{ readOnly: true }}
+                sx={{ bgcolor: '#f9fafb' }}
+              />
+            </Stack>
+
+            {/* Contas (readonly) */}
+            <Stack direction="row" spacing={2} alignItems="center">
+              <TextField
+                label="Conta"
+                size="small"
+                fullWidth
+                value={selectedTransaction?.account_name || '—'}
+                InputProps={{ readOnly: true }}
+                sx={{ bgcolor: '#f9fafb' }}
+              />
+              <SwapHoriz sx={{ color: '#9ca3af' }} />
+              <TextField
+                label="Conta destino"
+                size="small"
+                fullWidth
+                value={selectedTransaction?.destination_account_name || '—'}
+                InputProps={{ readOnly: true }}
+                sx={{ bgcolor: '#f9fafb' }}
+              />
+            </Stack>
+
+            <Divider />
+
+            {/* Número do documento */}
+            <TextField
+              label="Número do documento"
+              size="small"
+              fullWidth
+              value={conciliationData.documentNumber}
+              onChange={(e) => setConciliationData(prev => ({ ...prev, documentNumber: e.target.value }))}
+              placeholder="Ex: 12345"
+            />
+
+            {/* Observações */}
+            <TextField
+              label="Observações"
+              size="small"
+              fullWidth
+              multiline
+              rows={2}
+              value={conciliationData.notes}
+              onChange={(e) => setConciliationData(prev => ({ ...prev, notes: e.target.value }))}
+              placeholder="Adicione observações..."
+            />
+
+            {/* Tags */}
+            <TextField
+              label="Tags"
+              size="small"
+              fullWidth
+              value={conciliationData.tags}
+              onChange={(e) => setConciliationData(prev => ({ ...prev, tags: e.target.value }))}
+              placeholder="tag1, tag2, tag3"
+              helperText="Separe as tags por vírgula"
+            />
+          </Stack>
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={closeConciliationModal} variant="outlined" size="small">
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleSubmitConciliation}
+            variant="contained"
+            size="small"
+            sx={{
+              bgcolor: '#14b8a6',
+              '&:hover': { bgcolor: '#0d9488' },
+              borderRadius: 1.5,
+              textTransform: 'none',
+              fontWeight: 600
+            }}
+          >
+            Conciliar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }
