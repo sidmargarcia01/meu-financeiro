@@ -808,8 +808,8 @@ export default function LancamentosCaixaPage() {
                             }}
                             onClick={() => openEdit(tx)}
                           >
-                            {/* Ponto + Data + Bolinha de atraso (coluna esquerda) */}
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0, minWidth: 90 }}>
+                            {/* Ponto + Data (coluna esquerda) */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0, minWidth: 80 }}>
                               <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: dotColor, flexShrink: 0 }} />
                               {isToday ? (
                                 <Typography variant="caption"
@@ -820,17 +820,6 @@ export default function LancamentosCaixaPage() {
                                   sx={{ color: '#9ca3af', fontSize: '0.72rem', lineHeight: 1, whiteSpace: 'nowrap' }}
                                 >{day}/{monthShort}/{year.substring(2)}</Typography>
                               )}
-                              {/* Bolinha vermelha de atraso ao lado da data */}
-                              {daysOverdue !== null && (
-                                <Box sx={{
-                                  bgcolor: '#ef4444', color: 'white',
-                                  minWidth: 20, height: 20, borderRadius: '10px',
-                                  px: daysOverdue > 9 ? 0.5 : 0,
-                                  fontSize: '0.62rem', fontWeight: 700,
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  flexShrink: 0
-                                }}>{daysOverdue}</Box>
-                              )}
                             </Box>
 
                             {/* Descrição + linha secundaria com chips */}
@@ -839,6 +828,16 @@ export default function LancamentosCaixaPage() {
                                 {tx.description}
                               </Typography>
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap', mt: 0.3 }}>
+                                {/* Bolinha de atraso (antes dos chips) */}
+                                {daysOverdue !== null && (
+                                  <Box sx={{
+                                    bgcolor: '#ef4444', color: 'white',
+                                    borderRadius: '50%', minWidth: 22, height: 22,
+                                    fontSize: '0.7rem', fontWeight: 700,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    flexShrink: 0, px: daysOverdue > 99 ? 0.3 : 0
+                                  }}>{daysOverdue}</Box>
+                                )}
                                 {/* Chip da conta */}
                                 {tx.account_name && (
                                   <Box sx={{
