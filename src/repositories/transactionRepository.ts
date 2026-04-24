@@ -7,7 +7,6 @@
  */
 
 import { supabase } from '@/lib/supabase'
-import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 import {
   Transaction,
   TransactionWithRelations,
@@ -230,13 +229,13 @@ export class TransactionRepository {
     const accountIds = [...new Set(transactions.map((t: any) => t.account_id).filter(Boolean))]
     const categoryIds = [...new Set(transactions.map((t: any) => t.category_id).filter(Boolean))]
 
-    const adminClient = getSupabaseAdmin()
+    // Usar supabase normal (com RLS) para respeitar as políticas do usuário
     const [accountsRes, categoriesRes] = await Promise.all([
       accountIds.length > 0
-        ? adminClient.from('accounts').select('id, name').in('id', accountIds)
+        ? supabase.from('accounts').select('id, name').in('id', accountIds)
         : Promise.resolve({ data: [] }),
       categoryIds.length > 0
-        ? adminClient.from('categories').select('id, name').in('id', categoryIds)
+        ? supabase.from('categories').select('id, name').in('id', categoryIds)
         : Promise.resolve({ data: [] }),
     ])
 
