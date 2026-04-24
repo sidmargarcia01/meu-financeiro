@@ -202,43 +202,65 @@ export default function LancamentosCaixaPage() {
     }).catch(() => setError('Erro ao carregar dados.'))
   }, [])
 
-  // Buscar transações do mês corrente + PENDENTEs atrasados de meses anteriores
+  // Buscar transações baseado no dia selecionado
+  // Se for HOJE: busca transações de hoje + PENDENTEs atrasados
+  // Se for outro dia: busca só transações daquele dia
   const fetchTransactions = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const year = currentDate.getFullYear()
-      const month = currentDate.getMonth()
-      const startDate = new Date(year, month, 1).toISOString().split('T')[0]
-      const endDate = currentDate.toISOString().split('T')[0]
-      const prevMonthEnd = new Date(year, month, 0).toISOString().split('T')[0]  // último dia do mês anterior
+      const todayStr = new Date().toISOString().split('T')[0]
+      const selectedDateStr = currentDate.toISOString().split('T')[0]
+      const isToday = selectedDateStr === todayStr
 
-      // Fetch 1: transações do mês corrente até hoje
-      const params = new URLSearchParams()
-      params.set('limit', '500')
-      params.set('startDate', startDate)
-      params.set('endDate', endDate)
-      if (searchTerm) params.set('search', searchTerm)
+      if (isToday) {
+        // HOJE: transações do dia + PENDENTEs atrasados
+        const year = currentDate.getFullYear()
+        const month = currentDate.getMonth()
+        const startDate = new Date(year, month, 1).toISOString().split('T')[0]
+        const endDate = selectedDateStr
+        const prevMonthEnd = new Date(year, month, 0).toISOString().split('T')[0]
 
-      // Fetch 2: PENDENTEs atrasados de meses anteriores (para mostrar em atraso)
-      const overdueParams = new URLSearchParams()
-      overdueParams.set('status', 'PENDENTE')
-      overdueParams.set('endDate', prevMonthEnd)
-      overdueParams.set('limit', '300')
+        // Fetch 1: transações do mês até hoje
+        const params = new URLSearchParams()
+        params.set('limit', '500')
+        params.set('startDate', startDate)
+        params.set('endDate', endDate)
+        if (searchTerm) params.set('search', searchTerm)
 
-      const [res1, res2] = await Promise.all([
-        fetch(`/api/transactions?${params}`),
-        fetch(`/api/transactions?${overdueParams}`)
-      ])
-      if (!res1.ok) throw new Error()
+        // Fetch 2: PENDENTEs atrasados de meses anteriores
+        const overdueParams = new URLSearchParams()
+        overdueParams.set('status', 'PENDENTE')
+        overdueParams.set('endDate', prevMonthEnd)
+        overdueParams.set('limit', '300')
 
-      const [data1, data2] = await Promise.all([res1.json(), res2.json()])
-      const txs1: Transaction[] = Array.isArray(data1) ? data1 : (data1.data ?? [])
-      const txs2: Transaction[] = Array.isArray(data2) ? data2 : (data2.data ?? [])
+        const [res1, res2] = await Promise.all([
+          fetch(`/api/transactions?${params}`),
+          fetch(`/api/transactions?${overdueParams}`)
+        ])
+        if (!res1.ok) throw new Error()
 
-      // Mesclar sem duplicatas
-      const seen = new Set(txs1.map(t => t.id))
-      setTransactions([...txs1, ...txs2.filter(t => !seen.has(t.id))])
+        const [data1, data2] = await Promise.all([res1.json(), res2.json()])
+        const txs1: Transaction[] = Array.isArray(data1) ? data1 : (data1.data ?? [])
+        const txs2: Transaction[] = Array.isArray(data2) ? data2 : (data2.data ?? [])
+
+        const seen = new Set(txs1.map(t => t.id))
+        setTransactions([...txs1, ...txs2.filter(t => !seen.has(t.id))])
+      } else {
+        // OUTRO DIA: só transações daquele dia específico
+        const params = new URLSearchParams()
+        params.set('limit', '500')
+        params.set('startDate', selectedDateStr)
+        params.set('endDate', selectedDateStr)
+        if (searchTerm) params.set('search', searchTerm)
+
+        const res = await fetch(`/api/transactions?${params}`)
+        if (!res.ok) throw new Error()
+
+        const data = await res.json()
+        const txs: Transaction[] = Array.isArray(data) ? data : (data.data ?? [])
+        setTransactions(txs)
+      }
     } catch {
       setError('Erro ao carregar lançamentos.')
     } finally {
@@ -263,8 +285,7 @@ export default function LancamentosCaixaPage() {
     return filteredTransactions.filter(tx => tx.due_date === selectedDateStr)
   }, [filteredTransactions, selectedDateStr])
 
-  // Agrupar por data: todos os filtrados (hoje + pendentes atrasados)
-  const todayStr = new Date().toISOString().split('T')[0]
+  // Agrupar por data usando a data selecionada no calendario como referencia
   const groupedByDate = useMemo(() => {
     const groups: { [key: string]: Transaction[] } = {}
     filteredTransactions.forEach(tx => {
@@ -274,11 +295,11 @@ export default function LancamentosCaixaPage() {
     })
     return Object.entries(groups)
       .sort(([a], [b]) => {
-        if (a === todayStr) return -1   // hoje sempre primeiro
-        if (b === todayStr) return 1
+        if (a === selectedDateStr) return -1   // data selecionada sempre primeiro
+        if (b === selectedDateStr) return 1
         return new Date(a).getTime() - new Date(b).getTime()  // passado: mais atrasado primeiro
       })
-  }, [filteredTransactions, todayStr])
+  }, [filteredTransactions, selectedDateStr])
 
   // Calcular totais (apenas do dia selecionado)
   const totals = useMemo(() => {
@@ -784,7 +805,7 @@ export default function LancamentosCaixaPage() {
                 {groupedByDate.map(([date, txs]) => {
                   const [year, month, day] = date.split('-')
                   const monthShort = ['', '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'][parseInt(month)]
-                  const isToday = date === todayStr
+                  const isToday = date === selectedDateStr
                   return (
                     <Box key={date}>
                       {txs.map((tx, idx) => {
