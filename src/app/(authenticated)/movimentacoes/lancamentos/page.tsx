@@ -106,12 +106,16 @@ interface Transaction {
   type: 'RECEITA' | 'DESPESA' | 'TRANSFERENCIA'
   status: 'PENDENTE' | 'AGENDADO' | 'CONFIRMADO' | 'CONCILIADO'
   due_date: string
+  competence_date?: string
   account_id?: string
   category_id?: string
   account_name?: string
   category_name?: string
   destination_account_id?: string
   destination_account_name?: string
+  document_number?: string
+  notes?: string
+  tags?: string[]
 }
 
 interface AccountWithBalance {
@@ -419,12 +423,23 @@ export default function LancamentosCaixaPage() {
   // Handler para abrir modal de conciliação
   const openConciliationModal = () => {
     if (!selectedTransaction) return
+
+    // Formatar valor no padrão brasileiro (vírgula como decimal)
+    const formattedAmount = selectedTransaction.amount
+      ? Math.abs(selectedTransaction.amount).toFixed(2).replace('.', ',')
+      : '0,00'
+
+    // Usar competence_date se existir, senão due_date, senão hoje
+    const dateToUse = selectedTransaction.competence_date
+      || selectedTransaction.due_date
+      || new Date().toISOString().split('T')[0]
+
     setConciliationData({
-      amount: Math.abs(selectedTransaction.amount).toFixed(2),
-      date: selectedTransaction.due_date || new Date().toISOString().split('T')[0],
-      documentNumber: '',
-      notes: '',
-      tags: ''
+      amount: formattedAmount,
+      date: dateToUse,
+      documentNumber: selectedTransaction.document_number || '',
+      notes: selectedTransaction.notes || '',
+      tags: selectedTransaction.tags?.join(', ') || ''
     })
     setConciliationOpen(true)
     closeMenu()
