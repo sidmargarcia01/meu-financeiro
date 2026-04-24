@@ -147,9 +147,19 @@ export class TransactionService {
       this.validateTransactionType(data.type, data.accountId)
     }
 
+    // Aplica sinal ao amount: DESPESA=negativo, outros=positivo
+    // Usa o tipo da atualização ou o tipo atual da transação
+    let signedAmount = data.amount
+    if (signedAmount !== undefined) {
+      const effectiveType = data.type ?? transaction.type
+      signedAmount = effectiveType === 'DESPESA'
+        ? -Math.abs(signedAmount)
+        : Math.abs(signedAmount)
+    }
+
     return this.transactionRepository.update(transactionId, userId, {
       description: data.description,
-      amount: data.amount,
+      amount: signedAmount,
       type: data.type,
       dueDate: data.dueDate,
       paymentDate: data.paymentDate,

@@ -169,21 +169,30 @@ export class AccountRepository {
 
     if (error) throw error
 
-    // Calcular saldos — amounts já têm sinal no DB (DESPESA=negativo, RECEITA=positivo)
+    // Calcular saldos — fórmula robusta: usa type para determinar sinal,
+    // ignorando o sinal armazenado no DB (corrige inconsistências históricas)
     return (accounts || []).map((account: any) => {
       const transactions = account.transactions || []
       const initialBalance = Number(account.initial_balance) || 0
 
-      // Saldo projetado: todas as transações + saldo inicial
+      // Impacto de uma transação no saldo (RECEITA=+, qualquer outra=-),
+      // sempre usa valor absoluto para neutralizar inconsistências no DB
+      const impact = (t: any): number => {
+        const abs = Math.abs(Number(t.amount) || 0)
+        return t.type === 'RECEITA' ? abs : -abs
+      }
+
+      // Projetado = saldo inicial + TODAS as transações (pendentes, confirmadas, conciliadas)
       const projectedBalance = transactions.reduce(
-        (sum: number, t: any) => sum + Number(t.amount),
+        (sum: number, t: any) => sum + impact(t),
         initialBalance
       )
 
-      // Saldo confirmado: apenas CONFIRMADO/CONCILIADO + saldo inicial
+      // Confirmado = saldo inicial + somente CONCILIADO
+      // (reflete o saldo real reconciliado com o extrato bancário)
       const confirmedBalance = transactions
-        .filter((t: any) => ['CONFIRMADO', 'CONCILIADO'].includes(t.status))
-        .reduce((sum: number, t: any) => sum + Number(t.amount), initialBalance)
+        .filter((t: any) => t.status === 'CONCILIADO')
+        .reduce((sum: number, t: any) => sum + impact(t), initialBalance)
 
       return {
         id: account.id,

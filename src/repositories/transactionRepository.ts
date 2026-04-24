@@ -259,12 +259,12 @@ export class TransactionRepository {
 
     if (errorAll) throw errorAll
 
-    // Buscar apenas CONFIRMADO/CONCILIADO para calcular saldo confirmado
+    // Buscar apenas CONCILIADO para calcular saldo confirmado (reconciliado com extrato)
     const { data: confirmedTransactions, error: errorConfirmed } = await supabase
       .from('transactions')
       .select('account_id, status, amount, type')
       .eq('user_id', userId)
-      .in('status', ['CONFIRMADO', 'CONCILIADO'])
+      .eq('status', 'CONCILIADO')
 
     if (errorConfirmed) throw errorConfirmed
 
@@ -293,16 +293,22 @@ export class TransactionRepository {
       }
     })
 
-    // Calcula saldo projetado — amounts já têm sinal no DB
+    // Impacto robusto: usa type + Math.abs para neutralizar inconsistências no DB
+    const impact = (t: any): number => {
+      const abs = Math.abs(Number(t.amount) || 0)
+      return t.type === 'RECEITA' ? abs : -abs
+    }
+
+    // Projetado = todas as transações
     transactions.forEach((transaction: any) => {
       const accountId = transaction.account_id
-      balances[accountId].projectedBalance += Number(transaction.amount)
+      balances[accountId].projectedBalance += impact(transaction)
     })
 
-    // Calcula saldo confirmado (apenas CONFIRMADO/CONCILIADO)
+    // Confirmado = apenas CONCILIADO
     confirmedTxs.forEach((transaction: any) => {
       const accountId = transaction.account_id
-      balances[accountId].confirmedBalance += Number(transaction.amount)
+      balances[accountId].confirmedBalance += impact(transaction)
     })
 
     return Object.values(balances)
