@@ -293,28 +293,16 @@ export class TransactionRepository {
       }
     })
 
-    // Calcula saldo projetado (todas as transações)
+    // Calcula saldo projetado — amounts já têm sinal no DB
     transactions.forEach((transaction: any) => {
       const accountId = transaction.account_id
-      const amount = Number(transaction.amount)
-
-      if (transaction.type === 'RECEITA') {
-        balances[accountId].projectedBalance += amount
-      } else {
-        balances[accountId].projectedBalance -= amount
-      }
+      balances[accountId].projectedBalance += Number(transaction.amount)
     })
 
     // Calcula saldo confirmado (apenas CONFIRMADO/CONCILIADO)
     confirmedTxs.forEach((transaction: any) => {
       const accountId = transaction.account_id
-      const amount = Number(transaction.amount)
-
-      if (transaction.type === 'RECEITA') {
-        balances[accountId].confirmedBalance += amount
-      } else {
-        balances[accountId].confirmedBalance -= amount
-      }
+      balances[accountId].confirmedBalance += Number(transaction.amount)
     })
 
     return Object.values(balances)

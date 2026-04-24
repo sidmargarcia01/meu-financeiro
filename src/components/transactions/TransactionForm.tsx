@@ -21,7 +21,7 @@
 'use client'
 
 import { useForm, Controller } from 'react-hook-form'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
@@ -148,22 +148,45 @@ export function TransactionForm({
   const [amountFormatted, setAmountFormatted] = useState('')
   const [installmentAmountFormatted, setInstallmentAmountFormatted] = useState('')
 
-  // Função para formatar o valor enquanto digita
-  const handleAmountChange = (value: string, setter: (val: string) => void) => {
-    // Remove tudo exceto números e vírgula
-    let val = value.replace(/[^0-9,]/g, '')
-    // Garante apenas uma vírgula
-    const parts = val.split(',')
-    if (parts.length > 2) val = parts[0] + ',' + parts.slice(1).join('')
-    // Limita a 2 casas decimais
-    if (parts[1] && parts[1].length > 2) val = parts[0] + ',' + parts[1].slice(0, 2)
-    setter(val)
+  // Máscara BRL: converte dígitos em valor com vírgula decimal automática
+  // Ex: digitar "13200" → "132,00" | "1320000" → "13.200,00"
+  const formatAsCurrency = (inputValue: string): string => {
+    const digits = inputValue.replace(/\D/g, '')
+    if (!digits) return ''
+    const numericValue = parseInt(digits, 10)
+    if (!numericValue) return ''
+    return (numericValue / 100).toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
   }
 
-  // Função de submit que converte os valores formatados para number
+  // Converte valor formatado ("1.320,00") de volta para número (1320)
+  const parseCurrencyToNumber = (formatted: string): number => {
+    return parseFloat(formatted.replace(/\./g, '').replace(',', '.')) || 0
+  }
+
+  // Inicializa o campo formatado quando há dados de edição
+  useEffect(() => {
+    if (initialData?.amount != null) {
+      const absAmount = Math.abs(Number(initialData.amount))
+      if (absAmount > 0) {
+        setAmountFormatted(
+          absAmount.toLocaleString('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })
+        )
+      }
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Função de submit: converte valores formatados para número
   const handleFormSubmit = (data: TransactionFormData) => {
-    const numericValue = parseFloat(amountFormatted.replace(',', '.')) || 0
-    const installmentValue = parseFloat(installmentAmountFormatted.replace(',', '.')) || undefined
+    const numericValue = parseCurrencyToNumber(amountFormatted)
+    const installmentValue = installmentAmountFormatted
+      ? parseCurrencyToNumber(installmentAmountFormatted)
+      : undefined
     onSubmit({
       ...data,
       amount: numericValue,
@@ -209,10 +232,9 @@ export function TransactionForm({
               label="Valor *"
               value={amountFormatted}
               onChange={(e) => {
-                handleAmountChange(e.target.value, setAmountFormatted)
-                // Atualiza o valor numérico no form
-                const numericValue = parseFloat(e.target.value.replace(',', '.')) || 0
-                field.onChange(numericValue)
+                const formatted = formatAsCurrency(e.target.value)
+                setAmountFormatted(formatted)
+                field.onChange(parseCurrencyToNumber(formatted))
               }}
               placeholder="0,00"
               InputProps={{
@@ -443,9 +465,9 @@ export function TransactionForm({
                   label="Valor da Parcela *"
                   value={installmentAmountFormatted}
                   onChange={(e) => {
-                    handleAmountChange(e.target.value, setInstallmentAmountFormatted)
-                    const numericValue = parseFloat(e.target.value.replace(',', '.')) || 0
-                    field.onChange(numericValue)
+                    const formatted = formatAsCurrency(e.target.value)
+                    setInstallmentAmountFormatted(formatted)
+                    field.onChange(parseCurrencyToNumber(formatted))
                   }}
                   placeholder="0,00"
                   InputProps={{

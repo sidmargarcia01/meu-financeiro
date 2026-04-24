@@ -169,38 +169,21 @@ export class AccountRepository {
 
     if (error) throw error
 
-    // Calcular saldos considerando tipo de transação
+    // Calcular saldos — amounts já têm sinal no DB (DESPESA=negativo, RECEITA=positivo)
     return (accounts || []).map((account: any) => {
       const transactions = account.transactions || []
       const initialBalance = Number(account.initial_balance) || 0
 
-      // Função para calcular impacto da transação no saldo
-      const calculateTransactionImpact = (t: any): number => {
-        const amount = Number(t.amount) || 0
-        const type = t.type
-
-        if (type === 'RECEITA') {
-          return amount // Receita aumenta o saldo
-        } else if (type === 'DESPESA') {
-          return -amount // Despesa diminui o saldo
-        } else if (type === 'TRANSFERENCIA') {
-          // Para transferências, verificar se é saída ou entrada
-          // Neste contexto (conta origem), transferência é saída
-          return -amount
-        }
-        return amount
-      }
-
       // Saldo projetado: todas as transações + saldo inicial
       const projectedBalance = transactions.reduce(
-        (sum: number, t: any) => sum + calculateTransactionImpact(t),
+        (sum: number, t: any) => sum + Number(t.amount),
         initialBalance
       )
 
       // Saldo confirmado: apenas CONFIRMADO/CONCILIADO + saldo inicial
       const confirmedBalance = transactions
         .filter((t: any) => ['CONFIRMADO', 'CONCILIADO'].includes(t.status))
-        .reduce((sum: number, t: any) => sum + calculateTransactionImpact(t), initialBalance)
+        .reduce((sum: number, t: any) => sum + Number(t.amount), initialBalance)
 
       return {
         id: account.id,
