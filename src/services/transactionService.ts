@@ -50,6 +50,10 @@ export class TransactionService {
     // Para DESPESA, amount deve ser negativo para cálculo correto de saldos
     const signedAmount = data.type === 'DESPESA' ? -Math.abs(data.amount) : Math.abs(data.amount)
 
+    // Status baseado no informado ou PENDENTE como padrao
+    // A cor do ponto sera determinada por getStatusDotColor baseado na data
+    const autoStatus = data.status || 'PENDENTE'
+
     return this.transactionRepository.create({
       userId,
       description: data.description,
@@ -64,7 +68,7 @@ export class TransactionService {
       centerId: data.centerId,
       projectId: data.projectId,
       contactId: data.contactId,
-      status: data.status || 'PENDENTE',
+      status: autoStatus,
       isRecurring: data.isRecurring || false,
       attachmentUrl: data.attachmentUrl,
       notes: data.notes,
