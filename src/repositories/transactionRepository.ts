@@ -192,8 +192,8 @@ export class TransactionRepository {
       .from('transactions')
       .select(`
         *,
-        account:accounts!left(name),
-        category:categories!left(name)
+        account:accounts(name),
+        category:categories(name)
       `)
       .eq('user_id', userId)
       .order('due_date', { ascending: false })
