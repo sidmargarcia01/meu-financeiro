@@ -21,18 +21,21 @@
 'use client'
 
 import { useForm, Controller } from 'react-hook-form'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
   Box, TextField, Select, MenuItem, FormControl, InputLabel,
-  FormHelperText, Switch, FormControlLabel, Button, Divider,
+  FormHelperText, Button, Divider, Tooltip, IconButton,
   ToggleButtonGroup, ToggleButton, Typography, InputAdornment,
 } from '@mui/material'
 import {
   ArrowUpward as ReceitaIcon,
   ArrowDownward as DespesaIcon,
   SwapHoriz as TransfIcon,
+  Done as DoneIcon,
+  DoneAll as DoneAllIcon,
+  AttachFile as AttachFileIcon,
 } from '@mui/icons-material'
 
 const transactionSchema = z.object({
@@ -43,7 +46,7 @@ const transactionSchema = z.object({
   account_id: z.string().min(1, 'Conta é obrigatória'),
   category_id: z.string().optional(),
   destination_account_id: z.string().optional(),
-  status: z.enum(['PENDENTE', 'CONFIRMADO']),
+  status: z.enum(['PENDENTE', 'CONFIRMADO', 'CONCILIADO']),
   competence_date: z.string().optional(),
   regime: z.enum(['CAIXA', 'COMPETENCIA']),
   repetition_type: z.enum(['NONE', 'FIXO', 'PARCELADO']),
@@ -132,11 +135,13 @@ export function TransactionForm({
     },
   })
 
+  // Ref para sobrepor o status no submit via botões de ação
+  const formRef = useRef<HTMLFormElement>(null)
+  const statusOverrideRef = useRef<'CONFIRMADO' | 'CONCILIADO' | null>(null)
+
   const transactionType = watch('type')
   const repetitionType = watch('repetition_type')
-  const statusValue = watch('status')
   const centerIdValue = watch('center_id')
-  const isConfirmed = statusValue === 'CONFIRMADO'
 
   const filteredCategories = categories.filter(c => {
     if (transactionType === 'RECEITA') return c.type === 'RECEITA'
@@ -181,21 +186,31 @@ export function TransactionForm({
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Função de submit: converte valores formatados para número
+  // Função de submit: converte valores formatados e aplica status de ação se houver
   const handleFormSubmit = (data: TransactionFormData) => {
     const numericValue = parseCurrencyToNumber(amountFormatted)
     const installmentValue = installmentAmountFormatted
       ? parseCurrencyToNumber(installmentAmountFormatted)
       : undefined
+    const finalStatus = statusOverrideRef.current ?? data.status ?? 'PENDENTE'
+    statusOverrideRef.current = null
     onSubmit({
       ...data,
       amount: numericValue,
-      installment_amount: installmentValue
+      installment_amount: installmentValue,
+      status: finalStatus as TransactionFormData['status']
     })
+  }
+
+  // Submete o form com um status específico (Confirmar / Conciliar)
+  const submitWithStatus = (status: 'CONFIRMADO' | 'CONCILIADO') => {
+    statusOverrideRef.current = status
+    formRef.current?.requestSubmit()
   }
 
   return (
     <Box
+      ref={formRef}
       component="form"
       onSubmit={handleSubmit(handleFormSubmit)}
       sx={{ display: 'flex', flexDirection: 'column', gap: 2, p: 2 }}
@@ -358,23 +373,6 @@ export function TransactionForm({
         />
       )}
 
-      {/* STATUS — Pendente / Confirmado */}
-      <Controller
-        name="status"
-        control={control}
-        render={({ field }) => (
-          <FormControlLabel
-            control={
-              <Switch
-                checked={field.value === 'CONFIRMADO'}
-                onChange={e => field.onChange(e.target.checked ? 'CONFIRMADO' : 'PENDENTE')}
-                color="success"
-              />
-            }
-            label={isConfirmed ? 'Confirmado ✓' : 'Pendente'}
-          />
-        )}
-      />
 
       {/* DATA DE COMPETÊNCIA — condicional ao flag */}
       {settings.enable_competence_date && (
@@ -581,13 +579,62 @@ export function TransactionForm({
         )}
       />
 
-      {/* BOTÕES */}
-      <Box display="flex" gap={2} justifyContent="flex-end" pt={1}>
-        <Button variant="outlined" onClick={onCancel} disabled={isLoading}>
-          Cancelar
-        </Button>
-        <Button type="submit" variant="contained" disabled={isLoading}>
-          {isLoading ? 'Salvando...' : 'Salvar Lançamento'}
+      {/* BOTÕES — ações de status + salvar */}
+      <Divider />
+      <Box display="flex" alignItems="center" justifyContent="space-between" pt={0.5}>
+        {/* Ações rápidas de status */}
+        <Box display="flex" gap={1}>
+          <Tooltip title="Confirmar lançamento">
+            <span>
+              <IconButton
+                onClick={() => submitWithStatus('CONFIRMADO')}
+                disabled={isLoading}
+                sx={{
+                  color: '#22c55e',
+                  border: '1.5px solid #22c55e',
+                  borderRadius: 1.5,
+                  p: 0.8,
+                  '&:hover': { bgcolor: '#dcfce7' }
+                }}
+              >
+                <DoneIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title="Conciliar lançamento">
+            <span>
+              <IconButton
+                onClick={() => submitWithStatus('CONCILIADO')}
+                disabled={isLoading}
+                sx={{
+                  color: '#06b6d4',
+                  border: '1.5px solid #06b6d4',
+                  borderRadius: 1.5,
+                  p: 0.8,
+                  '&:hover': { bgcolor: '#cffafe' }
+                }}
+              >
+                <DoneAllIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title="Anexar arquivo">
+            <span>
+              <IconButton
+                disabled
+                sx={{ color: '#9ca3af', border: '1.5px solid #e5e7eb', borderRadius: 1.5, p: 0.8 }}
+              >
+                <AttachFileIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Box>
+
+        {/* Salvar como Pendente */}
+        <Button type="submit" variant="contained" disabled={isLoading}
+          sx={{ bgcolor: '#10b981', '&:hover': { bgcolor: '#059669' }, borderRadius: 2, px: 3 }}
+        >
+          {isLoading ? 'Salvando...' : 'Salvar'}
         </Button>
       </Box>
     </Box>

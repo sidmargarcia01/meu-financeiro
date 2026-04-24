@@ -88,6 +88,26 @@ const STATUS_CONFIG = {
   },
 }
 
+// Retorna a cor da bolinha de status da transação
+// Pendente atrasado = vermelho, agendado = amarelo, confirmado = verde, conciliado = azul
+const getStatusDotColor = (tx: { status: string; due_date: string }): string => {
+  if (tx.status === 'CONCILIADO') return '#06b6d4'
+  if (tx.status === 'CONFIRMADO') return '#22c55e'
+  // PENDENTE: verifica se está atrasado
+  const today = new Date().toISOString().split('T')[0]
+  if (tx.due_date < today) return '#ef4444'  // atrasado
+  return '#f59e0b'                           // agendado
+}
+
+// Retorna quantos dias de atraso (apenas para PENDENTE atrasado)
+const getDaysOverdue = (tx: { status: string; due_date: string }): number | null => {
+  if (tx.status !== 'PENDENTE') return null
+  const today = new Date()
+  const dueDate = new Date(tx.due_date + 'T12:00:00')
+  const diff = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
+  return diff > 0 ? diff : null
+}
+
 const DEFAULT_SETTINGS = {
   enable_competence_date: false,
   require_cost_center: false,
@@ -744,6 +764,8 @@ export default function LancamentosCaixaPage() {
                       {txs.map((tx, idx) => {
                         const isReceita = tx.type === 'RECEITA'
                         const isFirstOfDate = idx === 0
+                        const dotColor = getStatusDotColor(tx)
+                        const daysOverdue = getDaysOverdue(tx)
                         return (
                           <Paper
                             key={tx.id}
@@ -752,7 +774,7 @@ export default function LancamentosCaixaPage() {
                               p: 1.5,
                               display: 'flex',
                               alignItems: 'flex-start',
-                              gap: 2,
+                              gap: 1.5,
                               borderBottom: '1px solid #e5e7eb',
                               bgcolor: 'white',
                               cursor: 'pointer',
@@ -760,23 +782,20 @@ export default function LancamentosCaixaPage() {
                             }}
                             onClick={() => openEdit(tx)}
                           >
-                            {/* Data com bolinha */}
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 70 }}>
-                              {isFirstOfDate && (
-                                <>
-                                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#ef4444', flexShrink: 0 }} />
-                                  <Box>
-                                    <Typography variant="body2" fontWeight={700} lineHeight={1.2}>{day}</Typography>
-                                    <Typography variant="caption" color="text.secondary" fontSize="0.7rem">{monthShort}/{year.substring(2)}</Typography>
-                                  </Box>
-                                </>
+                            {/* Bolinha de status + Data */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 74 }}>
+                              <Box sx={{
+                                width: 10, height: 10, borderRadius: '50%',
+                                bgcolor: dotColor, flexShrink: 0, mt: 0.3
+                              }} />
+                              {isFirstOfDate ? (
+                                <Box>
+                                  <Typography variant="body2" fontWeight={700} lineHeight={1.2}>{day}</Typography>
+                                  <Typography variant="caption" color="text.secondary" fontSize="0.68rem">{monthShort}/{year.substring(2)}</Typography>
+                                </Box>
+                              ) : (
+                                <Box sx={{ minWidth: 34 }} />
                               )}
-                            </Box>
-
-                            {/* Conta/Categoria indicador */}
-                            <Box sx={{ width: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
-                              <AccountIcon sx={{ fontSize: 14, color: '#9ca3af' }} />
-                              <Box sx={{ width: 1, height: 1, borderRadius: '50%', bgcolor: '#ef4444' }} />
                             </Box>
 
                             {/* Descrição e detalhes */}
@@ -784,9 +803,22 @@ export default function LancamentosCaixaPage() {
                               <Typography variant="body2" fontWeight={600} noWrap>
                                 {tx.description}
                               </Typography>
-                              <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
-                                {tx.status.substring(0, 3).toUpperCase()} • {tx.account_name || '—'} • {tx.category_name || '—'}
-                              </Typography>
+                              {/* Info row: conta • categoria + badge dias atraso */}
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap', mt: 0.2 }}>
+                                {daysOverdue !== null && (
+                                  <Box sx={{
+                                    bgcolor: '#ef4444', color: 'white',
+                                    px: 0.8, borderRadius: 0.8,
+                                    fontSize: '0.68rem', fontWeight: 700,
+                                    lineHeight: '18px', flexShrink: 0
+                                  }}>
+                                    {daysOverdue}
+                                  </Box>
+                                )}
+                                <Typography variant="caption" color="text.secondary" fontSize="0.72rem" noWrap>
+                                  {tx.account_name || '—'} • {tx.category_name || '—'}
+                                </Typography>
+                              </Box>
                             </Box>
 
                             {/* Valor */}
