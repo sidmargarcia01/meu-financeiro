@@ -19,7 +19,7 @@ import {
   CircularProgress, Alert, Tooltip, Stack, Divider, Checkbox,
   FormControlLabel, ToggleButton, ToggleButtonGroup, Fab, TextField,
   Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions,
-  InputAdornment
+  InputAdornment, FormControl, InputLabel, Select
 } from '@mui/material'
 import {
   Add as AddIcon,
@@ -901,118 +901,140 @@ export default function LancamentosCaixaPage() {
           </Stack>
         </DialogTitle>
 
-        <DialogContent sx={{ pt: 1 }}>
-          <Stack spacing={2.5}>
+        <DialogContent sx={{ pt: 2 }}>
+          <Stack spacing={3}>
             {/* Valor e Data */}
             <Stack direction="row" spacing={2}>
               <TextField
                 label="Valor efetivo (R$)"
-                type="number"
-                size="small"
                 fullWidth
                 value={conciliationData.amount}
-                onChange={(e) => setConciliationData(prev => ({ ...prev, amount: e.target.value }))}
-                InputProps={{
-                  startAdornment: <InputAdornment position="start">R$</InputAdornment>,
+                onChange={(e) => {
+                  // Permitir apenas números e vírgula
+                  let val = e.target.value.replace(/[^0-9,]/g, '')
+                  // Limitar a uma vírgula
+                  const parts = val.split(',')
+                  if (parts.length > 2) val = parts[0] + ',' + parts.slice(1).join('')
+                  // Limitar casas decimais a 2
+                  if (parts[1] && parts[1].length > 2) val = parts[0] + ',' + parts[1].slice(0, 2)
+                  setConciliationData(prev => ({ ...prev, amount: val }))
                 }}
+                placeholder="0,00"
+                InputProps={{
+                  startAdornment: <InputAdornment position="start" sx={{ fontSize: '1.1rem' }}>R$</InputAdornment>,
+                  sx: { fontSize: '1.1rem', py: 0.5 }
+                }}
+                InputLabelProps={{ sx: { fontSize: '1rem' } }}
               />
               <TextField
                 label="Data efetiva"
                 type="date"
-                size="small"
                 fullWidth
                 value={conciliationData.date}
                 onChange={(e) => setConciliationData(prev => ({ ...prev, date: e.target.value }))}
-                InputLabelProps={{ shrink: true }}
+                InputLabelProps={{ shrink: true, sx: { fontSize: '1rem' } }}
+                InputProps={{ sx: { fontSize: '1.1rem', py: 0.5 } }}
               />
             </Stack>
 
-            {/* Descrição e Tipo (readonly) */}
+            {/* Descrição e Tipo */}
             <Stack direction="row" spacing={2}>
               <TextField
                 label="Descrição"
-                size="small"
                 fullWidth
                 value={selectedTransaction?.description || ''}
-                InputProps={{ readOnly: true }}
+                InputProps={{ readOnly: true, sx: { fontSize: '1.05rem' } }}
+                InputLabelProps={{ sx: { fontSize: '1rem' } }}
                 sx={{ bgcolor: '#f9fafb' }}
               />
-              <TextField
-                label="Tipo"
-                size="small"
-                fullWidth
-                value={selectedTransaction?.type === 'RECEITA' ? 'Receita' : selectedTransaction?.type === 'DESPESA' ? 'Despesa' : 'Transferência'}
-                InputProps={{ readOnly: true }}
-                sx={{ bgcolor: '#f9fafb' }}
-              />
+              <FormControl fullWidth>
+                <InputLabel sx={{ fontSize: '1rem' }}>Tipo</InputLabel>
+                <Select
+                  value={selectedTransaction?.type || 'RECEITA'}
+                  label="Tipo"
+                  onChange={(e) => {
+                    if (selectedTransaction) {
+                      setSelectedTransaction({ ...selectedTransaction, type: e.target.value as any })
+                    }
+                  }}
+                  sx={{ fontSize: '1.1rem' }}
+                >
+                  <MenuItem value="RECEITA" sx={{ fontSize: '1.05rem' }}>Receita</MenuItem>
+                  <MenuItem value="DESPESA" sx={{ fontSize: '1.05rem' }}>Despesa</MenuItem>
+                  <MenuItem value="TRANSFERENCIA" sx={{ fontSize: '1.05rem' }}>Transferência</MenuItem>
+                </Select>
+              </FormControl>
             </Stack>
 
             {/* Contas (readonly) */}
             <Stack direction="row" spacing={2} alignItems="center">
               <TextField
                 label="Conta"
-                size="small"
                 fullWidth
                 value={selectedTransaction?.account_name || '—'}
-                InputProps={{ readOnly: true }}
+                InputProps={{ readOnly: true, sx: { fontSize: '1.05rem' } }}
+                InputLabelProps={{ sx: { fontSize: '1rem' } }}
                 sx={{ bgcolor: '#f9fafb' }}
               />
-              <SwapHoriz sx={{ color: '#9ca3af' }} />
+              <SwapHoriz sx={{ color: '#9ca3af', fontSize: 28 }} />
               <TextField
                 label="Conta destino"
-                size="small"
                 fullWidth
                 value={selectedTransaction?.destination_account_name || '—'}
-                InputProps={{ readOnly: true }}
+                InputProps={{ readOnly: true, sx: { fontSize: '1.05rem' } }}
+                InputLabelProps={{ sx: { fontSize: '1rem' } }}
                 sx={{ bgcolor: '#f9fafb' }}
               />
             </Stack>
 
-            <Divider />
+            <Divider sx={{ my: 1 }} />
 
             {/* Número do documento */}
             <TextField
               label="Número do documento"
-              size="small"
               fullWidth
               value={conciliationData.documentNumber}
               onChange={(e) => setConciliationData(prev => ({ ...prev, documentNumber: e.target.value }))}
               placeholder="Ex: 12345"
+              InputProps={{ sx: { fontSize: '1.1rem' } }}
+              InputLabelProps={{ sx: { fontSize: '1rem' } }}
             />
 
             {/* Observações */}
             <TextField
               label="Observações"
-              size="small"
               fullWidth
               multiline
               rows={2}
               value={conciliationData.notes}
               onChange={(e) => setConciliationData(prev => ({ ...prev, notes: e.target.value }))}
               placeholder="Adicione observações..."
+              InputProps={{ sx: { fontSize: '1.05rem' } }}
+              InputLabelProps={{ sx: { fontSize: '1rem' } }}
             />
 
             {/* Tags */}
             <TextField
               label="Tags"
-              size="small"
               fullWidth
               value={conciliationData.tags}
               onChange={(e) => setConciliationData(prev => ({ ...prev, tags: e.target.value }))}
               placeholder="tag1, tag2, tag3"
               helperText="Separe as tags por vírgula"
+              InputProps={{ sx: { fontSize: '1.05rem' } }}
+              InputLabelProps={{ sx: { fontSize: '1rem' } }}
+              FormHelperTextProps={{ sx: { fontSize: '0.9rem' } }}
             />
           </Stack>
         </DialogContent>
 
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={closeConciliationModal} variant="outlined" size="small">
-            Cancelar
+        <DialogActions sx={{ px: 3, pb: 3, pt: 2 }}>
+          <Button onClick={closeConciliationModal} variant="outlined" sx={{ fontSize: '1rem', px: 3, py: 1 }}>
+            CANCELAR
           </Button>
           <Button
             onClick={handleSubmitConciliation}
             variant="contained"
-            size="small"
             sx={{
               bgcolor: '#14b8a6',
               '&:hover': { bgcolor: '#0d9488' },
