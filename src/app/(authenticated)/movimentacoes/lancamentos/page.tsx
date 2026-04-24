@@ -808,50 +808,66 @@ export default function LancamentosCaixaPage() {
                             }}
                             onClick={() => openEdit(tx)}
                           >
-                            {/* Bolinha de status + Data (exibida em cada linha) */}
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 80, flexShrink: 0 }}>
-                              <Box sx={{
-                                width: 10, height: 10, borderRadius: '50%',
-                                bgcolor: dotColor, flexShrink: 0, mt: 0.2
-                              }} />
-                              {isFirstOfDate ? (
-                                isToday ? (
-                                  <Typography variant="caption"
-                                    sx={{ color: '#f59e0b', fontWeight: 700, fontSize: '0.78rem', lineHeight: 1 }}
-                                  >hoje</Typography>
-                                ) : (
-                                  <Typography variant="caption" color="text.secondary"
-                                    sx={{ fontSize: '0.72rem', lineHeight: 1 }}
-                                  >{day}/{monthShort}/{year.substring(2)}</Typography>
-                                )
+                            {/* Bolinha + Data em cada linha */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 82, flexShrink: 0 }}>
+                              <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: dotColor, flexShrink: 0 }} />
+                              {isToday ? (
+                                <Typography variant="caption"
+                                  sx={{ color: '#f59e0b', fontWeight: 700, fontSize: '0.78rem', lineHeight: 1 }}
+                                >hoje</Typography>
                               ) : (
-                                <Box sx={{ minWidth: 45 }} />
+                                <Typography variant="caption"
+                                  sx={{ color: '#9ca3af', fontSize: '0.72rem', lineHeight: 1, whiteSpace: 'nowrap' }}
+                                >{day}/{monthShort}/{year.substring(2)}</Typography>
                               )}
                             </Box>
 
-                            {/* Descrição e detalhes */}
+                            {/* Descrição + linha secundaria com chips */}
                             <Box sx={{ flex: 1, minWidth: 0 }}>
-                              <Typography variant="body2" fontWeight={600} noWrap>
+                              <Typography variant="body2" fontWeight={700} noWrap>
                                 {tx.description}
                               </Typography>
-                              {/* Info row: conta • categoria + badge dias atraso */}
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap', mt: 0.2 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap', mt: 0.3 }}>
+                                {/* Badge de dias em atraso (pill) */}
                                 {daysOverdue !== null && (
                                   <Box sx={{
                                     bgcolor: '#ef4444', color: 'white',
-                                    minWidth: 20, height: 20,
-                                    borderRadius: '50%',
-                                    fontSize: '0.62rem', fontWeight: 700,
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    px: daysOverdue > 99 ? 0.6 : 0,
-                                    flexShrink: 0, lineHeight: 1
-                                  }}>
-                                    {daysOverdue}
-                                  </Box>
+                                    borderRadius: '8px', px: 0.8, py: 0.1,
+                                    fontSize: '0.65rem', fontWeight: 700, lineHeight: '18px', flexShrink: 0
+                                  }}>{daysOverdue}</Box>
                                 )}
-                                <Typography variant="caption" color="text.secondary" fontSize="0.72rem" noWrap>
-                                  {tx.account_name || '—'} • {tx.category_name || '—'}
-                                </Typography>
+                                {/* Chip da conta */}
+                                {tx.account_name && (
+                                  <Box sx={{
+                                    bgcolor: '#f3f4f6', color: '#4b5563',
+                                    borderRadius: '6px', px: 0.8, py: 0.1,
+                                    fontSize: '0.68rem', fontWeight: 600, lineHeight: '18px', flexShrink: 0
+                                  }}>{tx.account_name}</Box>
+                                )}
+                                {/* Transferência: ícone + conta destino + label */}
+                                {tx.type === 'TRANSFERENCIA' ? (
+                                  <>
+                                    <SwapHoriz sx={{ fontSize: '0.95rem', color: '#9ca3af', flexShrink: 0 }} />
+                                    {tx.destination_account_name && (
+                                      <Typography variant="caption"
+                                        sx={{ fontSize: '0.68rem', color: '#6b7280', fontWeight: 500, flexShrink: 0 }}
+                                      >{tx.destination_account_name}</Typography>
+                                    )}
+                                    <Box sx={{
+                                      bgcolor: '#f3f4f6', color: '#6b7280',
+                                      borderRadius: '6px', px: 0.8, py: 0.1,
+                                      fontSize: '0.68rem', lineHeight: '18px', flexShrink: 0
+                                    }}>Transferência</Box>
+                                  </>
+                                ) : (
+                                  tx.category_name && (
+                                    <Box sx={{
+                                      bgcolor: '#f3f4f6', color: '#6b7280',
+                                      borderRadius: '6px', px: 0.8, py: 0.1,
+                                      fontSize: '0.68rem', lineHeight: '18px', flexShrink: 0
+                                    }}>{tx.category_name}</Box>
+                                  )
+                                )}
                               </Box>
                             </Box>
 
