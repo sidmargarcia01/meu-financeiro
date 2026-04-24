@@ -792,9 +792,6 @@ export default function LancamentosCaixaPage() {
                         const isFirstOfDate = idx === 0
                         const dotColor = getStatusDotColor(tx)
                         const daysOverdue = getDaysOverdue(tx)
-                        // DEBUG: log para verificar calculo de atraso
-                        // eslint-disable-next-line no-console
-                        console.log('TX:', tx.description, 'status:', tx.status, 'due:', tx.due_date, 'daysOverdue:', daysOverdue)
                         return (
                           <Paper
                             key={tx.id}
