@@ -201,16 +201,27 @@ export function TransactionForm({
 
       {/* VALOR e DATA */}
       <Box display="grid" gridTemplateColumns="1fr 1fr" gap={2}>
-        <TextField
-          label="Valor *"
-          value={amountFormatted}
-          onChange={(e) => handleAmountChange(e.target.value, setAmountFormatted)}
-          placeholder="0,00"
-          InputProps={{
-            startAdornment: <InputAdornment position="start">R$</InputAdornment>,
-          }}
-          error={!!errors.amount}
-          helperText={errors.amount?.message}
+        <Controller
+          name="amount"
+          control={control}
+          render={({ field }) => (
+            <TextField
+              label="Valor *"
+              value={amountFormatted}
+              onChange={(e) => {
+                handleAmountChange(e.target.value, setAmountFormatted)
+                // Atualiza o valor numérico no form
+                const numericValue = parseFloat(e.target.value.replace(',', '.')) || 0
+                field.onChange(numericValue)
+              }}
+              placeholder="0,00"
+              InputProps={{
+                startAdornment: <InputAdornment position="start">R$</InputAdornment>,
+              }}
+              error={!!errors.amount}
+              helperText={errors.amount?.message}
+            />
+          )}
         />
 
         <Controller
@@ -424,14 +435,24 @@ export function TransactionForm({
           />
 
           {settings.installment_default === 'VALOR_PARCELA' ? (
-            <TextField
-              label="Valor da Parcela *"
-              value={installmentAmountFormatted}
-              onChange={(e) => handleAmountChange(e.target.value, setInstallmentAmountFormatted)}
-              placeholder="0,00"
-              InputProps={{
-                startAdornment: <InputAdornment position="start">R$</InputAdornment>,
-              }}
+            <Controller
+              name="installment_amount"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  label="Valor da Parcela *"
+                  value={installmentAmountFormatted}
+                  onChange={(e) => {
+                    handleAmountChange(e.target.value, setInstallmentAmountFormatted)
+                    const numericValue = parseFloat(e.target.value.replace(',', '.')) || 0
+                    field.onChange(numericValue)
+                  }}
+                  placeholder="0,00"
+                  InputProps={{
+                    startAdornment: <InputAdornment position="start">R$</InputAdornment>,
+                  }}
+                />
+              )}
             />
           ) : (
             <TextField

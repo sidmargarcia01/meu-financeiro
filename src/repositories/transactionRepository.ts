@@ -251,14 +251,27 @@ export class TransactionRepository {
 
   // Buscar saldos por conta
   async getBalancesByAccount(userId: string): Promise<AccountBalance[]> {
-    const { data: transactions, error } = await supabase
+    // Buscar TODAS as transações para calcular saldo projetado
+    const { data: allTransactions, error: errorAll } = await supabase
+      .from('transactions')
+      .select('account_id, status, amount, type')
+      .eq('user_id', userId)
+
+    if (errorAll) throw errorAll
+
+    // Buscar apenas CONFIRMADO/CONCILIADO para calcular saldo confirmado
+    const { data: confirmedTransactions, error: errorConfirmed } = await supabase
       .from('transactions')
       .select('account_id, status, amount, type')
       .eq('user_id', userId)
       .in('status', ['CONFIRMADO', 'CONCILIADO'])
 
-    if (error) throw error
-    if (!transactions || transactions.length === 0) return []
+    if (errorConfirmed) throw errorConfirmed
+
+    const transactions = allTransactions || []
+    const confirmedTxs = confirmedTransactions || []
+
+    if (transactions.length === 0) return []
 
     const accountIds = [...new Set(transactions.map((t: any) => t.account_id).filter(Boolean))]
     const { data: accountsData } = accountIds.length > 0
@@ -269,26 +282,38 @@ export class TransactionRepository {
 
     const balances: { [key: string]: AccountBalance } = {}
 
+    // Inicializa todas as contas
+    accountIds.forEach((accountId: string) => {
+      const accountName = accountsMap.get(accountId) || '—'
+      balances[accountId] = {
+        accountId,
+        accountName,
+        confirmedBalance: 0,
+        projectedBalance: 0,
+      }
+    })
+
+    // Calcula saldo projetado (todas as transações)
     transactions.forEach((transaction: any) => {
       const accountId = transaction.account_id
-      const accountName = accountsMap.get(accountId) || '—'
-
-      if (!balances[accountId]) {
-        balances[accountId] = {
-          accountId,
-          accountName,
-          confirmedBalance: 0,
-          projectedBalance: 0,
-        }
-      }
-
       const amount = Number(transaction.amount)
+
       if (transaction.type === 'RECEITA') {
-        balances[accountId].confirmedBalance += amount
         balances[accountId].projectedBalance += amount
       } else {
-        balances[accountId].confirmedBalance -= amount
         balances[accountId].projectedBalance -= amount
+      }
+    })
+
+    // Calcula saldo confirmado (apenas CONFIRMADO/CONCILIADO)
+    confirmedTxs.forEach((transaction: any) => {
+      const accountId = transaction.account_id
+      const amount = Number(transaction.amount)
+
+      if (transaction.type === 'RECEITA') {
+        balances[accountId].confirmedBalance += amount
+      } else {
+        balances[accountId].confirmedBalance -= amount
       }
     })
 

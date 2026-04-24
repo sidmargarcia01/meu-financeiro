@@ -158,7 +158,8 @@ export class AccountRepository {
         *,
         transactions (
           amount,
-          status
+          status,
+          type
         )
       `)
       .eq('user_id', userId)
@@ -168,24 +169,45 @@ export class AccountRepository {
 
     if (error) throw error
 
-    // Calcular saldos
+    // Calcular saldos considerando tipo de transação
     return (accounts || []).map((account: any) => {
       const transactions = account.transactions || []
+      const initialBalance = Number(account.initial_balance) || 0
+
+      // Função para calcular impacto da transação no saldo
+      const calculateTransactionImpact = (t: any): number => {
+        const amount = Number(t.amount) || 0
+        const type = t.type
+
+        if (type === 'RECEITA') {
+          return amount // Receita aumenta o saldo
+        } else if (type === 'DESPESA') {
+          return -amount // Despesa diminui o saldo
+        } else if (type === 'TRANSFERENCIA') {
+          // Para transferências, verificar se é saída ou entrada
+          // Neste contexto (conta origem), transferência é saída
+          return -amount
+        }
+        return amount
+      }
+
+      // Saldo projetado: todas as transações + saldo inicial
       const projectedBalance = transactions.reduce(
-        (sum: number, t: any) => sum + Number(t.amount),
-        Number(account.initial_balance)
+        (sum: number, t: any) => sum + calculateTransactionImpact(t),
+        initialBalance
       )
 
+      // Saldo confirmado: apenas CONFIRMADO/CONCILIADO + saldo inicial
       const confirmedBalance = transactions
         .filter((t: any) => ['CONFIRMADO', 'CONCILIADO'].includes(t.status))
-        .reduce((sum: number, t: any) => sum + Number(t.amount), Number(account.initial_balance))
+        .reduce((sum: number, t: any) => sum + calculateTransactionImpact(t), initialBalance)
 
       return {
         id: account.id,
         userId: account.user_id,
         name: account.name,
         type: account.type,
-        initialBalance: Number(account.initial_balance),
+        initialBalance: initialBalance,
         currency: account.currency,
         icon: account.icon,
         isActive: account.is_active,
