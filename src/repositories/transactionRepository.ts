@@ -191,7 +191,25 @@ export class TransactionRepository {
     let query = supabase
       .from('transactions')
       .select(`
-        *,
+        id,
+        description,
+        amount,
+        type,
+        status,
+        due_date,
+        competence_date,
+        account_id,
+        category_id,
+        document_number,
+        notes,
+        tags,
+        payment_date,
+        recurrence_id,
+        attachment_url,
+        is_recurring,
+        regime,
+        created_at,
+        updated_at,
         account:accounts(name),
         category:categories(name)
       `)
