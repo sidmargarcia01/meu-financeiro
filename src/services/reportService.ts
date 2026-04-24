@@ -210,23 +210,51 @@ export class ReportService {
       categorias.filter(c => c.dreGroup === g).reduce((s, c) => s + c.total, 0)
     const pctRL = (v: number, rl: number) => rl !== 0 ? (v / rl) * 100 : null
 
-    const receitasOperacionais = sumGroup('RECEITAS_OPERACIONAIS')
-    const impostosFaturamento = sumGroup('IMPOSTOS_FATURAMENTO')
+    // Verificar se há categorias com dre_group definido
+    const hasDreGroup = categorias.some(c => c.dreGroup !== null && c.dreGroup !== undefined)
+
+    let receitasOperacionais: number
+    let impostosFaturamento: number
+    let custosOperacionais: number
+    let despesasVariaveis: number
+    let despesasFixas: number
+    let receitasNaoOperacionais: number
+    let despesasNaoOperacionais: number
+    let impostosLucro: number
+    let distribuicaoLucros: number
+
+    if (hasDreGroup) {
+      // Usar classificação por dre_group quando disponível
+      receitasOperacionais = sumGroup('RECEITAS_OPERACIONAIS')
+      impostosFaturamento = sumGroup('IMPOSTOS_FATURAMENTO')
+      custosOperacionais = sumGroup('CUSTOS_OPERACIONAIS')
+      despesasVariaveis = sumGroup('DESPESAS_VARIAVEIS')
+      despesasFixas = sumGroup('DESPESAS_FIXAS')
+      receitasNaoOperacionais = sumGroup('RECEITAS_NAO_OPERACIONAIS')
+      despesasNaoOperacionais = sumGroup('DESPESAS_NAO_OPERACIONAIS')
+      impostosLucro = sumGroup('IMPOSTOS_LUCRO')
+      distribuicaoLucros = sumGroup('DISTRIBUICAO_LUCROS')
+    } else {
+      // Fallback: usar totais quando não há dre_group definido
+      receitasOperacionais = totalReceitas
+      impostosFaturamento = 0
+      custosOperacionais = 0
+      despesasVariaveis = 0
+      despesasFixas = totalDespesas
+      receitasNaoOperacionais = 0
+      despesasNaoOperacionais = 0
+      impostosLucro = 0
+      distribuicaoLucros = 0
+    }
+
     const receitaLiquida = receitasOperacionais - impostosFaturamento
-    const custosOperacionais = sumGroup('CUSTOS_OPERACIONAIS')
     const margemBruta = receitaLiquida - custosOperacionais
     const margemBrutaPercent = pctRL(margemBruta, receitaLiquida)
-    const despesasVariaveis = sumGroup('DESPESAS_VARIAVEIS')
     const margemContribuicao = margemBruta - despesasVariaveis
     const margemContribuicaoPercent = pctRL(margemContribuicao, receitaLiquida)
-    const despesasFixas = sumGroup('DESPESAS_FIXAS')
     const ebitda = margemContribuicao - despesasFixas
     const ebitdaPercent = pctRL(ebitda, receitaLiquida)
-    const receitasNaoOperacionais = sumGroup('RECEITAS_NAO_OPERACIONAIS')
-    const despesasNaoOperacionais = sumGroup('DESPESAS_NAO_OPERACIONAIS')
     const resultadoAntesIR = ebitda + receitasNaoOperacionais - despesasNaoOperacionais
-    const impostosLucro = sumGroup('IMPOSTOS_LUCRO')
-    const distribuicaoLucros = sumGroup('DISTRIBUICAO_LUCROS')
     const resultadoLiquido = resultadoAntesIR - impostosLucro - distribuicaoLucros
     const margemLiquidaPercent = pctRL(resultadoLiquido, receitaLiquida)
 
