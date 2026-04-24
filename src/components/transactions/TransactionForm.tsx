@@ -21,6 +21,7 @@
 'use client'
 
 import { useForm, Controller } from 'react-hook-form'
+import { useState } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
@@ -143,10 +144,37 @@ export function TransactionForm({
     return false
   })
 
+  // Estado para valor formatado em moeda brasileira
+  const [amountFormatted, setAmountFormatted] = useState('')
+  const [installmentAmountFormatted, setInstallmentAmountFormatted] = useState('')
+
+  // Função para formatar o valor enquanto digita
+  const handleAmountChange = (value: string, setter: (val: string) => void) => {
+    // Remove tudo exceto números e vírgula
+    let val = value.replace(/[^0-9,]/g, '')
+    // Garante apenas uma vírgula
+    const parts = val.split(',')
+    if (parts.length > 2) val = parts[0] + ',' + parts.slice(1).join('')
+    // Limita a 2 casas decimais
+    if (parts[1] && parts[1].length > 2) val = parts[0] + ',' + parts[1].slice(0, 2)
+    setter(val)
+  }
+
+  // Função de submit que converte os valores formatados para number
+  const handleFormSubmit = (data: TransactionFormData) => {
+    const numericValue = parseFloat(amountFormatted.replace(',', '.')) || 0
+    const installmentValue = parseFloat(installmentAmountFormatted.replace(',', '.')) || undefined
+    onSubmit({
+      ...data,
+      amount: numericValue,
+      installment_amount: installmentValue
+    })
+  }
+
   return (
     <Box
       component="form"
-      onSubmit={handleSubmit(onSubmit)}
+      onSubmit={handleSubmit(handleFormSubmit)}
       sx={{ display: 'flex', flexDirection: 'column', gap: 2, p: 2 }}
     >
       {/* TIPO DE LANÇAMENTO */}
@@ -173,22 +201,16 @@ export function TransactionForm({
 
       {/* VALOR e DATA */}
       <Box display="grid" gridTemplateColumns="1fr 1fr" gap={2}>
-        <Controller
-          name="amount"
-          control={control}
-          render={({ field }) => (
-            <TextField
-              {...field}
-              label="Valor *"
-              type="number"
-              inputProps={{ min: 0, step: 0.01, 'aria-label': 'valor' }}
-              InputProps={{
-                startAdornment: <InputAdornment position="start">R$</InputAdornment>,
-              }}
-              error={!!errors.amount}
-              helperText={errors.amount?.message}
-            />
-          )}
+        <TextField
+          label="Valor *"
+          value={amountFormatted}
+          onChange={(e) => handleAmountChange(e.target.value, setAmountFormatted)}
+          placeholder="0,00"
+          InputProps={{
+            startAdornment: <InputAdornment position="start">R$</InputAdornment>,
+          }}
+          error={!!errors.amount}
+          helperText={errors.amount?.message}
         />
 
         <Controller
@@ -402,20 +424,14 @@ export function TransactionForm({
           />
 
           {settings.installment_default === 'VALOR_PARCELA' ? (
-            <Controller
-              name="installment_amount"
-              control={control}
-              render={({ field }) => (
-                <TextField
-                  {...field}
-                  label="Valor da Parcela *"
-                  type="number"
-                  inputProps={{ min: 0.01, step: 0.01, 'aria-label': 'valor da parcela' }}
-                  InputProps={{
-                    startAdornment: <InputAdornment position="start">R$</InputAdornment>,
-                  }}
-                />
-              )}
+            <TextField
+              label="Valor da Parcela *"
+              value={installmentAmountFormatted}
+              onChange={(e) => handleAmountChange(e.target.value, setInstallmentAmountFormatted)}
+              placeholder="0,00"
+              InputProps={{
+                startAdornment: <InputAdornment position="start">R$</InputAdornment>,
+              }}
             />
           ) : (
             <TextField
