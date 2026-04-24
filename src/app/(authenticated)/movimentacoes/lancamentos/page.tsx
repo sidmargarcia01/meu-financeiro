@@ -832,8 +832,9 @@ export default function LancamentosCaixaPage() {
                                 {daysOverdue !== null && (
                                   <Box sx={{
                                     bgcolor: '#ef4444', color: 'white',
-                                    borderRadius: '8px', px: 0.8, py: 0.1,
-                                    fontSize: '0.65rem', fontWeight: 700, lineHeight: '18px', flexShrink: 0
+                                    borderRadius: '8px', px: 1, py: 0.2,
+                                    fontSize: '0.72rem', fontWeight: 700, lineHeight: '18px',
+                                    letterSpacing: '0.01em', flexShrink: 0
                                   }}>{daysOverdue}</Box>
                                 )}
                                 {/* Chip da conta */}
