@@ -495,7 +495,7 @@ export default function LancamentosCaixaPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         status: 'CONCILIADO',
-        amount: parseFloat(conciliationData.amount),
+        amount: parseFloat(conciliationData.amount.replace(/\./g, '').replace(',', '.')),  // converte formato BRL (1.234,56 → 1234.56)
         due_date: conciliationData.date,
         account_id: conciliationData.accountId,
         document_number: conciliationData.documentNumber,
@@ -808,9 +808,12 @@ export default function LancamentosCaixaPage() {
                                 {daysOverdue !== null && (
                                   <Box sx={{
                                     bgcolor: '#ef4444', color: 'white',
-                                    px: 0.8, borderRadius: 0.8,
-                                    fontSize: '0.68rem', fontWeight: 700,
-                                    lineHeight: '18px', flexShrink: 0
+                                    minWidth: 20, height: 20,
+                                    borderRadius: '50%',
+                                    fontSize: '0.62rem', fontWeight: 700,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    px: daysOverdue > 99 ? 0.6 : 0,
+                                    flexShrink: 0, lineHeight: 1
                                   }}>
                                     {daysOverdue}
                                   </Box>
