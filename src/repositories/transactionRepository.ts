@@ -7,6 +7,7 @@
  */
 
 import { supabase } from '@/lib/supabase'
+import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 import {
   Transaction,
   TransactionWithRelations,
@@ -188,13 +189,10 @@ export class TransactionRepository {
     limit?: number
     page?: number
   }): Promise<any[]> {
+    // Buscar transações
     let query = supabase
       .from('transactions')
-      .select(`
-        *,
-        account:accounts(name),
-        category:categories(name)
-      `)
+      .select('*')
       .eq('user_id', userId)
       .order('due_date', { ascending: false })
 
@@ -223,37 +221,58 @@ export class TransactionRepository {
       query = query.limit(filters.limit)
     }
 
-    const { data, error } = await query
+    const { data: transactions, error } = await query
     if (error) throw error
 
-    return (data || []).map((t: any) => ({
+    if (!transactions || transactions.length === 0) return []
+
+    // Buscar contas e categorias separadamente para evitar join problemático
+    const accountIds = [...new Set(transactions.map((t: any) => t.account_id).filter(Boolean))]
+    const categoryIds = [...new Set(transactions.map((t: any) => t.category_id).filter(Boolean))]
+
+    const adminClient = getSupabaseAdmin()
+    const [accountsRes, categoriesRes] = await Promise.all([
+      accountIds.length > 0
+        ? adminClient.from('accounts').select('id, name').in('id', accountIds)
+        : Promise.resolve({ data: [] }),
+      categoryIds.length > 0
+        ? adminClient.from('categories').select('id, name').in('id', categoryIds)
+        : Promise.resolve({ data: [] }),
+    ])
+
+    const accountsMap = new Map((accountsRes.data || []).map((a: any) => [a.id, a.name]))
+    const categoriesMap = new Map((categoriesRes.data || []).map((c: any) => [c.id, c.name]))
+
+    return transactions.map((t: any) => ({
       ...t,
-      account_name: (t.account as any)?.name ?? null,
-      category_name: (t.category as any)?.name ?? null,
+      account_name: accountsMap.get(t.account_id) ?? null,
+      category_name: categoriesMap.get(t.category_id) ?? null,
     }))
   }
 
   // Buscar saldos por conta
   async getBalancesByAccount(userId: string): Promise<AccountBalance[]> {
-    const { data, error } = await supabase
+    const { data: transactions, error } = await supabase
       .from('transactions')
-      .select(`
-        account_id,
-        accounts!inner(name),
-        status,
-        amount,
-        type
-      `)
+      .select('account_id, status, amount, type')
       .eq('user_id', userId)
       .in('status', ['CONFIRMADO', 'CONCILIADO'])
 
     if (error) throw error
+    if (!transactions || transactions.length === 0) return []
+
+    const accountIds = [...new Set(transactions.map((t: any) => t.account_id).filter(Boolean))]
+    const { data: accountsData } = accountIds.length > 0
+      ? await supabase.from('accounts').select('id, name').in('id', accountIds)
+      : { data: [] }
+
+    const accountsMap = new Map((accountsData || []).map((a: any) => [a.id, a.name]))
 
     const balances: { [key: string]: AccountBalance } = {}
 
-    data.forEach(transaction => {
+    transactions.forEach((transaction: any) => {
       const accountId = transaction.account_id
-      const accountName = (transaction.accounts as any).name
+      const accountName = accountsMap.get(accountId) || '—'
 
       if (!balances[accountId]) {
         balances[accountId] = {
