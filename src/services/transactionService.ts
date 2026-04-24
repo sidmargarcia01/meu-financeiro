@@ -613,11 +613,13 @@ export class TransactionService {
       throw new Error('Uma ou ambas as contas não foram encontradas')
     }
 
-    // Criar transação de débito na origem
+    // Criar transação de débito na origem (valor negativo = saída da conta)
+    const debitAmount = -Math.abs(data.amount)
+    const creditAmount = Math.abs(data.amount)
     const debitTransaction = await this.transactionRepository.create({
       userId,
       description: `Transferência para ${destinationAccount.name}`,
-      amount: data.amount,
+      amount: debitAmount,
       type: 'DESPESA',
       dueDate: new Date(data.dueDate),
       regime: data.regime || 'CAIXA',
@@ -627,11 +629,11 @@ export class TransactionService {
       notes: data.notes,
     })
 
-    // Criar transação de crédito no destino
+    // Criar transação de crédito no destino (valor positivo = entrada na conta)
     await this.transactionRepository.create({
       userId,
       description: `Transferência de ${sourceAccount.name}`,
-      amount: data.amount,
+      amount: creditAmount,
       type: 'RECEITA',
       dueDate: new Date(data.dueDate),
       regime: data.regime || 'CAIXA',

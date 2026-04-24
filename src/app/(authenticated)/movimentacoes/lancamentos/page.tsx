@@ -202,27 +202,43 @@ export default function LancamentosCaixaPage() {
     }).catch(() => setError('Erro ao carregar dados.'))
   }, [])
 
-  // Buscar transações (desde o início do mês até a data selecionada)
+  // Buscar transações do mês corrente + PENDENTEs atrasados de meses anteriores
   const fetchTransactions = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const params = new URLSearchParams()
-      params.set('limit', '500')
-      if (searchTerm) params.set('search', searchTerm)
-
-      // Buscar desde o início do mês até a data selecionada
       const year = currentDate.getFullYear()
       const month = currentDate.getMonth()
       const startDate = new Date(year, month, 1).toISOString().split('T')[0]
       const endDate = currentDate.toISOString().split('T')[0]
+      const prevMonthEnd = new Date(year, month, 0).toISOString().split('T')[0]  // último dia do mês anterior
+
+      // Fetch 1: transações do mês corrente até hoje
+      const params = new URLSearchParams()
+      params.set('limit', '500')
       params.set('startDate', startDate)
       params.set('endDate', endDate)
+      if (searchTerm) params.set('search', searchTerm)
 
-      const res = await fetch(`/api/transactions?${params}`)
-      if (!res.ok) throw new Error()
-      const data = await res.json()
-      setTransactions(Array.isArray(data) ? data : (data.data ?? []))
+      // Fetch 2: PENDENTEs atrasados de meses anteriores (para mostrar em atraso)
+      const overdueParams = new URLSearchParams()
+      overdueParams.set('status', 'PENDENTE')
+      overdueParams.set('endDate', prevMonthEnd)
+      overdueParams.set('limit', '300')
+
+      const [res1, res2] = await Promise.all([
+        fetch(`/api/transactions?${params}`),
+        fetch(`/api/transactions?${overdueParams}`)
+      ])
+      if (!res1.ok) throw new Error()
+
+      const [data1, data2] = await Promise.all([res1.json(), res2.json()])
+      const txs1: Transaction[] = Array.isArray(data1) ? data1 : (data1.data ?? [])
+      const txs2: Transaction[] = Array.isArray(data2) ? data2 : (data2.data ?? [])
+
+      // Mesclar sem duplicatas
+      const seen = new Set(txs1.map(t => t.id))
+      setTransactions([...txs1, ...txs2.filter(t => !seen.has(t.id))])
     } catch {
       setError('Erro ao carregar lançamentos.')
     } finally {
@@ -247,17 +263,22 @@ export default function LancamentosCaixaPage() {
     return filteredTransactions.filter(tx => tx.due_date === selectedDateStr)
   }, [filteredTransactions, selectedDateStr])
 
-  // Agrupar por data (apenas para timeline - mostrar apenas dia atual)
+  // Agrupar por data: todos os filtrados (hoje + pendentes atrasados)
+  const todayStr = new Date().toISOString().split('T')[0]
   const groupedByDate = useMemo(() => {
     const groups: { [key: string]: Transaction[] } = {}
-    currentDayTransactions.forEach(tx => {
+    filteredTransactions.forEach(tx => {
       const date = tx.due_date
       if (!groups[date]) groups[date] = []
       groups[date].push(tx)
     })
     return Object.entries(groups)
-      .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
-  }, [currentDayTransactions])
+      .sort(([a], [b]) => {
+        if (a === todayStr) return -1   // hoje sempre primeiro
+        if (b === todayStr) return 1
+        return new Date(a).getTime() - new Date(b).getTime()  // passado: mais atrasado primeiro
+      })
+  }, [filteredTransactions, todayStr])
 
   // Calcular totais (apenas do dia selecionado)
   const totals = useMemo(() => {
@@ -313,7 +334,7 @@ export default function LancamentosCaixaPage() {
     try {
       const method = editTarget ? 'PUT' : 'POST'
       const url = editTarget ? `/api/transactions/${editTarget.id}` : '/api/transactions'
-      const payload = {
+      const payload: Record<string, unknown> = {
         description: data.description,
         amount: data.amount,
         type: data.type,
@@ -325,6 +346,10 @@ export default function LancamentosCaixaPage() {
         notes: data.notes || undefined,
         tags: data.tags || [],
         isRecurring: data.repetition_type !== 'NONE',
+        // Para transferência: inclui conta destino como transferData
+        ...(data.type === 'TRANSFERENCIA' && data.destination_account_id ? {
+          transferData: { destinationAccountId: data.destination_account_id }
+        } : {}),
       }
       const res = await fetch(url, {
         method,
@@ -759,6 +784,7 @@ export default function LancamentosCaixaPage() {
                 {groupedByDate.map(([date, txs]) => {
                   const [year, month, day] = date.split('-')
                   const monthShort = ['', '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'][parseInt(month)]
+                  const isToday = date === todayStr
                   return (
                     <Box key={date}>
                       {txs.map((tx, idx) => {
@@ -782,19 +808,24 @@ export default function LancamentosCaixaPage() {
                             }}
                             onClick={() => openEdit(tx)}
                           >
-                            {/* Bolinha de status + Data */}
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 74 }}>
+                            {/* Bolinha de status + Data (exibida em cada linha) */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 80, flexShrink: 0 }}>
                               <Box sx={{
                                 width: 10, height: 10, borderRadius: '50%',
-                                bgcolor: dotColor, flexShrink: 0, mt: 0.3
+                                bgcolor: dotColor, flexShrink: 0, mt: 0.2
                               }} />
                               {isFirstOfDate ? (
-                                <Box>
-                                  <Typography variant="body2" fontWeight={700} lineHeight={1.2}>{day}</Typography>
-                                  <Typography variant="caption" color="text.secondary" fontSize="0.68rem">{monthShort}/{year.substring(2)}</Typography>
-                                </Box>
+                                isToday ? (
+                                  <Typography variant="caption"
+                                    sx={{ color: '#f59e0b', fontWeight: 700, fontSize: '0.78rem', lineHeight: 1 }}
+                                  >hoje</Typography>
+                                ) : (
+                                  <Typography variant="caption" color="text.secondary"
+                                    sx={{ fontSize: '0.72rem', lineHeight: 1 }}
+                                  >{day}/{monthShort}/{year.substring(2)}</Typography>
+                                )
                               ) : (
-                                <Box sx={{ minWidth: 34 }} />
+                                <Box sx={{ minWidth: 45 }} />
                               )}
                             </Box>
 
