@@ -202,38 +202,31 @@ export default function LancamentosCaixaPage() {
     }).catch(() => setError('Erro ao carregar dados.'))
   }, [])
 
-  // Buscar transações baseado no dia selecionado
-  // Se for HOJE: busca transações de hoje + PENDENTEs atrasados
-  // Se for outro dia: busca só transações daquele dia
+  // Buscar transações:
+  // 1. PENDENTE: todas (para nao perder de vista)
+  // 2. CONFIRMADO/CONCILIADO: apenas do dia selecionado
   const fetchTransactions = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const todayStr = new Date().toISOString().split('T')[0]
-      const selectedDateStr = currentDate.toISOString().split('T')[0]
-      const isToday = selectedDateStr === todayStr
+      const selectedDate = currentDate.toISOString().split('T')[0]
 
-      // Buscar todas transações até a data selecionada (para calcular saldo acumulado)
-      const endDate = selectedDateStr
-      const year = currentDate.getFullYear()
-      const month = currentDate.getMonth()
-      const prevMonthEnd = new Date(year, month, 0).toISOString().split('T')[0]
+      // Fetch 1: CONFIRMADOS/CONCILIADOS apenas do dia selecionado
+      const confirmedParams = new URLSearchParams()
+      confirmedParams.set('limit', '500')
+      confirmedParams.set('startDate', selectedDate)
+      confirmedParams.set('endDate', selectedDate)
+      if (searchTerm) confirmedParams.set('search', searchTerm)
 
-      // Fetch 1: todas transações até a data selecionada (inclusive)
-      const params = new URLSearchParams()
-      params.set('limit', '500')
-      params.set('endDate', endDate)
-      if (searchTerm) params.set('search', searchTerm)
-
-      // Fetch 2: PENDENTEs atrasados de meses anteriores (sempre buscar para manter visíveis)
-      const overdueParams = new URLSearchParams()
-      overdueParams.set('status', 'PENDENTE')
-      overdueParams.set('endDate', prevMonthEnd)
-      overdueParams.set('limit', '300')
+      // Fetch 2: todos PENDENTEs (sempre visíveis)
+      const pendingParams = new URLSearchParams()
+      pendingParams.set('status', 'PENDENTE')
+      pendingParams.set('limit', '500')
+      if (searchTerm) pendingParams.set('search', searchTerm)
 
       const [res1, res2] = await Promise.all([
-        fetch(`/api/transactions?${params}`),
-        fetch(`/api/transactions?${overdueParams}`)
+        fetch(`/api/transactions?${confirmedParams}`),
+        fetch(`/api/transactions?${pendingParams}`)
       ])
       if (!res1.ok) throw new Error()
 
