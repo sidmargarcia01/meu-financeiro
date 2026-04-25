@@ -325,6 +325,43 @@ export default function LancamentosCaixaPage() {
     }
   }, [currentDayTransactions, accounts, selectedAccounts])
 
+  // Calcular saldos das contas baseado na data selecionada (ate o dia, inclusive)
+  const accountBalances = useMemo(() => {
+    const selectedDate = currentDate.toISOString().split('T')[0]
+    const balances: { [accountId: string]: { confirmed: number; projected: number } } = {}
+
+    accounts.forEach(acc => {
+      const initial = acc.initialBalance || 0
+
+      // Transacoes ate a data selecionada (inclusive)
+      const txsUntilDate = transactions.filter(t =>
+        t.due_date <= selectedDate &&
+        t.account_id === acc.id
+      )
+
+      // Confirmado: apenas CONFIRMADO e CONCILIADO
+      const confirmed = txsUntilDate
+        .filter(t => ['CONFIRMADO', 'CONCILIADO'].includes(t.status))
+        .reduce((sum, t) => {
+          if (t.type === 'RECEITA') return sum + Math.abs(t.amount)
+          if (t.type === 'DESPESA') return sum - Math.abs(t.amount)
+          return sum
+        }, initial)
+
+      // Projetado: todas as transacoes (PENDENTE tambem)
+      const projected = txsUntilDate
+        .reduce((sum, t) => {
+          if (t.type === 'RECEITA') return sum + Math.abs(t.amount)
+          if (t.type === 'DESPESA') return sum - Math.abs(t.amount)
+          return sum
+        }, initial)
+
+      balances[acc.id] = { confirmed, projected }
+    })
+
+    return balances
+  }, [transactions, accounts, currentDate])
+
   // Calcular saldo anterior (baseado na data selecionada)
   const saldoAnterior = useMemo(() => {
     const selectedDate = currentDate.toISOString().split('T')[0]
@@ -655,57 +692,60 @@ export default function LancamentosCaixaPage() {
           </Box>
 
           <Box sx={{ flex: 1, overflow: 'auto' }}>
-            {accounts.map(acc => (
-              <Box
-                key={acc.id}
-                sx={{
-                  p: 1.25,
-                  borderBottom: '1px solid #f3f4f6',
-                  bgcolor: selectedAccounts.includes(acc.id) ? '#fafafa' : 'transparent',
-                  '&:hover': { bgcolor: '#f9fafb' }
-                }}
-              >
-                <Stack direction="row" alignItems="center" spacing={0.75}>
-                  <Checkbox
-                    size="small"
-                    checked={selectedAccounts.includes(acc.id)}
-                    onChange={() => toggleAccount(acc.id)}
-                    sx={{ p: 0.5 }}
-                  />
-                  <Box sx={{ flex: 1, minWidth: 0, mr: 1 }}>
-                    <Typography variant="caption" fontWeight={600} noWrap display="block" sx={{ fontSize: '0.8rem', letterSpacing: '0.2px' }}>{acc.name}</Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.68rem', letterSpacing: '0.3px', textTransform: 'uppercase' }}>{acc.type}</Typography>
-                  </Box>
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      width: 85,
-                      textAlign: 'right',
-                      fontSize: '0.78rem',
-                      color: acc.confirmedBalance >= 0 ? '#22c55e' : '#ef4444',
-                      fontWeight: 500,
-                      letterSpacing: '0.3px'
-                    }}
-                  >
-                    {formatCurrency(acc.confirmedBalance)}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      width: 85,
-                      textAlign: 'right',
-                      fontSize: '0.78rem',
-                      color: acc.projectedBalance >= 0 ? '#22c55e' : '#ef4444',
-                      ml: 1.5,
-                      fontWeight: 500,
-                      letterSpacing: '0.3px'
-                    }}
-                  >
-                    {formatCurrency(acc.projectedBalance)}
-                  </Typography>
-                </Stack>
-              </Box>
-            ))}
+            {accounts.map(acc => {
+              const bal = accountBalances[acc.id] || { confirmed: 0, projected: 0 }
+              return (
+                <Box
+                  key={acc.id}
+                  sx={{
+                    p: 1.25,
+                    borderBottom: '1px solid #f3f4f6',
+                    bgcolor: selectedAccounts.includes(acc.id) ? '#fafafa' : 'transparent',
+                    '&:hover': { bgcolor: '#f9fafb' }
+                  }}
+                >
+                  <Stack direction="row" alignItems="center" spacing={0.75}>
+                    <Checkbox
+                      size="small"
+                      checked={selectedAccounts.includes(acc.id)}
+                      onChange={() => toggleAccount(acc.id)}
+                      sx={{ p: 0.5 }}
+                    />
+                    <Box sx={{ flex: 1, minWidth: 0, mr: 1 }}>
+                      <Typography variant="caption" fontWeight={600} noWrap display="block" sx={{ fontSize: '0.8rem', letterSpacing: '0.2px' }}>{acc.name}</Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.68rem', letterSpacing: '0.3px', textTransform: 'uppercase' }}>{acc.type}</Typography>
+                    </Box>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        width: 85,
+                        textAlign: 'right',
+                        fontSize: '0.78rem',
+                        color: bal.confirmed >= 0 ? '#22c55e' : '#ef4444',
+                        fontWeight: 500,
+                        letterSpacing: '0.3px'
+                      }}
+                    >
+                      {formatCurrency(bal.confirmed)}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        width: 85,
+                        textAlign: 'right',
+                        fontSize: '0.78rem',
+                        color: bal.projected >= 0 ? '#22c55e' : '#ef4444',
+                        ml: 1.5,
+                        fontWeight: 500,
+                        letterSpacing: '0.3px'
+                      }}
+                    >
+                      {formatCurrency(bal.projected)}
+                    </Typography>
+                  </Stack>
+                </Box>
+              )
+            })}
           </Box>
 
           {/* Total */}
@@ -714,10 +754,10 @@ export default function LancamentosCaixaPage() {
               <Box sx={{ width: 36 }} />
               <Typography variant="body2" fontWeight={700} sx={{ flex: 1, fontSize: '0.85rem' }}>Total</Typography>
               <Typography variant="body2" fontWeight={700} sx={{ width: 85, textAlign: 'right', color: '#22c55e', fontSize: '0.85rem', letterSpacing: '0.3px' }}>
-                {formatCurrency(accounts.filter(a => selectedAccounts.includes(a.id)).reduce((sum, a) => sum + a.confirmedBalance, 0))}
+                {formatCurrency(accounts.filter(a => selectedAccounts.includes(a.id)).reduce((sum, a) => sum + (accountBalances[a.id]?.confirmed || 0), 0))}
               </Typography>
               <Typography variant="body2" fontWeight={700} sx={{ width: 85, textAlign: 'right', ml: 1.5, color: '#ef4444', fontSize: '0.85rem', letterSpacing: '0.3px' }}>
-                {formatCurrency(accounts.filter(a => selectedAccounts.includes(a.id)).reduce((sum, a) => sum + a.projectedBalance, 0))}
+                {formatCurrency(accounts.filter(a => selectedAccounts.includes(a.id)).reduce((sum, a) => sum + (accountBalances[a.id]?.projected || 0), 0))}
               </Typography>
             </Stack>
           </Box>
