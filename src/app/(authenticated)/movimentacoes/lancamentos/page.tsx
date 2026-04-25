@@ -213,54 +213,36 @@ export default function LancamentosCaixaPage() {
       const selectedDateStr = currentDate.toISOString().split('T')[0]
       const isToday = selectedDateStr === todayStr
 
-      if (isToday) {
-        // HOJE: transações do dia + PENDENTEs atrasados
-        const year = currentDate.getFullYear()
-        const month = currentDate.getMonth()
-        const startDate = new Date(year, month, 1).toISOString().split('T')[0]
-        const endDate = selectedDateStr
-        const prevMonthEnd = new Date(year, month, 0).toISOString().split('T')[0]
+      // Buscar todas transações até a data selecionada (para calcular saldo acumulado)
+      const endDate = selectedDateStr
+      const year = currentDate.getFullYear()
+      const month = currentDate.getMonth()
+      const prevMonthEnd = new Date(year, month, 0).toISOString().split('T')[0]
 
-        // Fetch 1: transações do mês até hoje
-        const params = new URLSearchParams()
-        params.set('limit', '500')
-        params.set('startDate', startDate)
-        params.set('endDate', endDate)
-        if (searchTerm) params.set('search', searchTerm)
+      // Fetch 1: todas transações até a data selecionada (inclusive)
+      const params = new URLSearchParams()
+      params.set('limit', '500')
+      params.set('endDate', endDate)
+      if (searchTerm) params.set('search', searchTerm)
 
-        // Fetch 2: PENDENTEs atrasados de meses anteriores
-        const overdueParams = new URLSearchParams()
-        overdueParams.set('status', 'PENDENTE')
-        overdueParams.set('endDate', prevMonthEnd)
-        overdueParams.set('limit', '300')
+      // Fetch 2: PENDENTEs atrasados de meses anteriores (sempre buscar para manter visíveis)
+      const overdueParams = new URLSearchParams()
+      overdueParams.set('status', 'PENDENTE')
+      overdueParams.set('endDate', prevMonthEnd)
+      overdueParams.set('limit', '300')
 
-        const [res1, res2] = await Promise.all([
-          fetch(`/api/transactions?${params}`),
-          fetch(`/api/transactions?${overdueParams}`)
-        ])
-        if (!res1.ok) throw new Error()
+      const [res1, res2] = await Promise.all([
+        fetch(`/api/transactions?${params}`),
+        fetch(`/api/transactions?${overdueParams}`)
+      ])
+      if (!res1.ok) throw new Error()
 
-        const [data1, data2] = await Promise.all([res1.json(), res2.json()])
-        const txs1: Transaction[] = Array.isArray(data1) ? data1 : (data1.data ?? [])
-        const txs2: Transaction[] = Array.isArray(data2) ? data2 : (data2.data ?? [])
+      const [data1, data2] = await Promise.all([res1.json(), res2.json()])
+      const txs1: Transaction[] = Array.isArray(data1) ? data1 : (data1.data ?? [])
+      const txs2: Transaction[] = Array.isArray(data2) ? data2 : (data2.data ?? [])
 
-        const seen = new Set(txs1.map(t => t.id))
-        setTransactions([...txs1, ...txs2.filter(t => !seen.has(t.id))])
-      } else {
-        // OUTRO DIA: só transações daquele dia específico
-        const params = new URLSearchParams()
-        params.set('limit', '500')
-        params.set('startDate', selectedDateStr)
-        params.set('endDate', selectedDateStr)
-        if (searchTerm) params.set('search', searchTerm)
-
-        const res = await fetch(`/api/transactions?${params}`)
-        if (!res.ok) throw new Error()
-
-        const data = await res.json()
-        const txs: Transaction[] = Array.isArray(data) ? data : (data.data ?? [])
-        setTransactions(txs)
-      }
+      const seen = new Set(txs1.map(t => t.id))
+      setTransactions([...txs1, ...txs2.filter(t => !seen.has(t.id))])
     } catch {
       setError('Erro ao carregar lançamentos.')
     } finally {
