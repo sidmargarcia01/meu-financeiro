@@ -14,6 +14,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { calculateTotals } from '@/utils/calculateTotals'
 import {
   Box, Button, Typography, Drawer, IconButton, Chip, Paper,
   CircularProgress, Alert, Tooltip, Stack, Divider, Checkbox,
@@ -276,29 +277,16 @@ export default function LancamentosCaixaPage() {
       })
   }, [filteredTransactions, selectedDateStr])
 
-  // Calcular totais (apenas do dia selecionado)
+  // Calcular totais (até a data selecionada D, inclusive)
+  // FASE 1: Alterado de currentDayTransactions (=== D) para filteredTransactions (<= D)
   const totals = useMemo(() => {
-    const entradas = currentDayTransactions
-      .filter(t => t.type === 'RECEITA' && ['CONFIRMADO', 'CONCILIADO'].includes(t.status))
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0)
-    const saidas = currentDayTransactions
-      .filter(t => t.type === 'DESPESA' && ['CONFIRMADO', 'CONCILIADO'].includes(t.status))
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0)
-    const receitasProj = currentDayTransactions
-      .filter(t => t.type === 'RECEITA')
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0)
-    const despesasProj = currentDayTransactions
-      .filter(t => t.type === 'DESPESA')
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0)
-    return {
-      entradas,
-      saidas,
-      resultado: entradas - saidas,
-      receitas: receitasProj,
-      despesas: despesasProj,
-      saldoInicial: accounts.filter(a => selectedAccounts.includes(a.id)).reduce((sum, a) => sum + (a.initialBalance || 0), 0)
-    }
-  }, [currentDayTransactions, accounts, selectedAccounts])
+    return calculateTotals(
+      filteredTransactions,
+      selectedDateStr,
+      selectedAccounts,
+      accounts.map(a => ({ id: a.id, initialBalance: a.initialBalance || 0 }))
+    )
+  }, [filteredTransactions, selectedDateStr, selectedAccounts, accounts])
 
   // Calcular saldos das contas baseado na data selecionada (ate o dia, inclusive)
   const accountBalances = useMemo(() => {
