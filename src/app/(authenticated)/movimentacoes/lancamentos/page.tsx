@@ -260,6 +260,31 @@ export default function LancamentosCaixaPage() {
     return filterTransactionsForList(filteredTransactions, selectedDateStr, todayStr)
   }, [filteredTransactions, selectedDateStr, todayStr])
 
+  // Calcular saldo anterior (até o dia anterior à data selecionada)
+  const previousBalance = useMemo(() => {
+    const previousDateStr = getPreviousDay(selectedDateStr)
+
+    // Soma dos saldos iniciais das contas selecionadas
+    const initialBalanceSum = accounts
+      .filter(acc => selectedAccounts.includes(acc.id))
+      .reduce((sum, acc) => sum + (acc.initialBalance || 0), 0)
+
+    // Soma das transações confirmadas/conciliadas até o dia anterior
+    const transactionsSum = transactions
+      .filter(t =>
+        selectedAccounts.includes(t.account_id) &&
+        t.due_date <= previousDateStr &&
+        ['CONFIRMADO', 'CONCILIADO'].includes(t.status)
+      )
+      .reduce((sum, t) => {
+        if (t.type === 'RECEITA') return sum + Math.abs(t.amount)
+        if (t.type === 'DESPESA') return sum - Math.abs(t.amount)
+        return sum
+      }, 0)
+
+    return initialBalanceSum + transactionsSum
+  }, [transactions, accounts, selectedAccounts, selectedDateStr])
+
   // Calcular saldos por conta
   const accountBalances = useMemo(() => {
     const balances: { [accountId: string]: { confirmed: number; projected: number } } = {}
@@ -745,8 +770,12 @@ export default function LancamentosCaixaPage() {
                 <Typography variant="body2" color="text.secondary">
                   Saldo anterior
                 </Typography>
-                <Typography variant="h6" fontWeight={600} color={colors.success}>
-                  {formatCurrency(0)}
+                <Typography
+                  variant="h6"
+                  fontWeight={600}
+                  color={previousBalance >= 0 ? colors.success : colors.danger}
+                >
+                  {formatCurrency(previousBalance)}
                 </Typography>
               </Box>
 
@@ -1110,4 +1139,13 @@ export default function LancamentosCaixaPage() {
       </Fab>
     </Box>
   )
+}
+
+/**
+ * Retorna a data anterior (D-1) no formato YYYY-MM-DD
+ */
+function getPreviousDay(dateStr: string): string {
+  const date = new Date(dateStr + 'T12:00:00.000Z')
+  date.setDate(date.getDate() - 1)
+  return date.toISOString().split('T')[0]
 }
