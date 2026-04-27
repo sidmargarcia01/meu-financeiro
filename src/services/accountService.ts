@@ -21,20 +21,20 @@ export class AccountService {
     private accountRepository: AccountRepository = new AccountRepository(),
     private transactionRepository: TransactionRepository = new TransactionRepository(),
     private userRepository: UserRepository = new UserRepository()
-  ) {}
+  ) { }
 
   async create(userId: string, data: z.infer<typeof createAccountSchema>) {
     // Validações de negócio
     this.validateAccountData(data)
-    
+
     // Verificar limite de contas do plano
     const accountCount = await this.accountRepository.count(userId)
     const maxAccounts = await this.getMaxAccountsForUser(userId)
-    
+
     if (accountCount >= maxAccounts) {
       throw new Error(`Limite de contas atingido (${maxAccounts} contas)`)
     }
-    
+
     // Criar conta
     return this.accountRepository.create({
       userId,
@@ -57,11 +57,11 @@ export class AccountService {
 
   async findById(userId: string, accountId: string) {
     const account = await this.accountRepository.findById(accountId, userId)
-    
+
     if (!account) {
       throw new Error('Conta não encontrada')
     }
-    
+
     return account
   }
 
@@ -71,12 +71,12 @@ export class AccountService {
     if (!existingAccount) {
       throw new Error('Conta não encontrada')
     }
-    
+
     // Validações
     if (data.name !== undefined && data.name.trim().length === 0) {
       throw new Error('Nome da conta é obrigatório')
     }
-    
+
     return this.accountRepository.update(accountId, userId, data)
   }
 
@@ -86,13 +86,13 @@ export class AccountService {
     if (!account) {
       throw new Error('Conta não encontrada')
     }
-    
+
     // Verificar se há transações vinculadas
     const hasTransactions = await this.accountRepository.hasTransactions(accountId)
     if (hasTransactions) {
       throw new Error('Conta possui lançamentos e não pode ser excluída. Arquive-a em vez de excluir.')
     }
-    
+
     return this.accountRepository.delete(accountId, userId)
   }
 
@@ -101,15 +101,15 @@ export class AccountService {
     if (data.closingDay < 1 || data.closingDay > 31) {
       throw new Error('Dia de fechamento deve estar entre 1 e 31')
     }
-    
+
     if (data.dueDay < 1 || data.dueDay > 31) {
       throw new Error('Dia de vencimento deve estar entre 1 e 31')
     }
-    
+
     if (data.creditLimit !== undefined && data.creditLimit <= 0) {
       throw new Error('Limite de crédito deve ser positivo')
     }
-    
+
     return this.accountRepository.createCreditCard(data)
   }
 
@@ -127,20 +127,20 @@ export class AccountService {
     if (!existingCard) {
       throw new Error('Cartão de crédito não encontrado')
     }
-    
+
     // Validações
     if (data.closingDay !== undefined && (data.closingDay < 1 || data.closingDay > 31)) {
       throw new Error('Dia de fechamento deve estar entre 1 e 31')
     }
-    
+
     if (data.dueDay !== undefined && (data.dueDay < 1 || data.dueDay > 31)) {
       throw new Error('Dia de vencimento deve estar entre 1 e 31')
     }
-    
+
     if (data.creditLimit !== undefined && data.creditLimit <= 0) {
       throw new Error('Limite de crédito deve ser positivo')
     }
-    
+
     return this.accountRepository.updateCreditCard(creditCardId, data)
   }
 
@@ -150,7 +150,7 @@ export class AccountService {
     if (!existingCard) {
       throw new Error('Cartão de crédito não encontrado')
     }
-    
+
     return this.accountRepository.deleteCreditCard(creditCardId)
   }
 
@@ -168,13 +168,13 @@ export class AccountService {
 
     // Calcular saldo projetado (soma PENDENTE + CONFIRMADO + CONCILIADO)
     const projectedSum = await this.transactionRepository.sumByAccount(
-      accountId, 
+      accountId,
       ['PENDENTE', 'CONFIRMADO', 'CONCILIADO']
     )
 
     // Calcular saldo confirmado (soma apenas CONFIRMADO + CONCILIADO)
     const confirmedSum = await this.transactionRepository.sumByAccount(
-      accountId, 
+      accountId,
       ['CONFIRMADO', 'CONCILIADO']
     )
 
@@ -194,15 +194,15 @@ export class AccountService {
     if (!data.name || data.name.trim().length === 0) {
       throw new Error('Nome da conta é obrigatório')
     }
-    
+
     if (!data.type) {
       throw new Error('Tipo da conta é obrigatório')
     }
-    
+
     if (data.initialBalance !== undefined && data.initialBalance < 0) {
       throw new Error('Saldo inicial não pode ser negativo')
     }
-    
+
     if (data.currency && data.currency.length !== 3) {
       throw new Error('Moeda deve ter 3 caracteres (ex: BRL, USD)')
     }
@@ -211,12 +211,92 @@ export class AccountService {
   private async getMaxAccountsForUser(userId: string): Promise<number> {
     // Buscar plano do usuário
     const plan = await this.userRepository.getUserPlan(userId)
-    
+
     // Se não tem plano, é admin - sem limite
     if (!plan || !plan.userLimit) {
       return Number.MAX_SAFE_INTEGER
     }
-    
+
     return plan.userLimit
+  }
+
+  /**
+   * FASE 3: Calcular saldo anterior (até D-1) para múltiplas contas
+   * 
+   * Calcula o saldo acumulado até a data anterior à data informada (D-1),
+   * incluindo initialBalance e transações CONFIRMADO/CONCILIADO.
+   * 
+   * @param userId - ID do usuário autenticado
+   * @param accountIds - Lista de IDs das contas selecionadas
+   * @param date - Data D (formato ISO yyyy-mm-dd). Calcula saldo até D-1.
+   * @returns Objeto com saldos por conta e total
+   */
+  async getBalancesUntilDate(
+    userId: string,
+    accountIds: string[],
+    date: string
+  ): Promise<{
+    date: string
+    balances: Array<{ account_id: string; balance_until_previous_day: number }>
+    total_balance: number
+  }> {
+    // Validar inputs
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new Error('Data deve estar no formato yyyy-mm-dd')
+    }
+
+    if (!accountIds || accountIds.length === 0) {
+      throw new Error('Pelo menos uma conta deve ser informada')
+    }
+
+    // Buscar contas para obter initialBalance
+    const accounts = await this.accountRepository.list(userId, false)
+    const selectedAccounts = accounts.filter(a => accountIds.includes(a.id))
+
+    if (selectedAccounts.length === 0) {
+      throw new Error('Nenhuma conta válida encontrada')
+    }
+
+    // Calcular saldo para cada conta
+    const balances: Array<{ account_id: string; balance_until_previous_day: number }> = []
+
+    for (const account of selectedAccounts) {
+      const initialBalance = account.initialBalance || 0
+
+      // Buscar transações CONFIRMADO/CONCILIADO até D-1 (due_date < date)
+      const transactions = await this.transactionRepository.list(userId, {
+        accountId: account.id,
+        endDate: date,  // <= date (o repository faz lte, precisamos de <)
+        status: undefined  // Não filtrar por status aqui, filtramos depois
+      })
+
+      // Filtrar só CONFIRMADO/CONCILIADO e due_date < date (não <=)
+      const relevantTransactions = transactions.filter(t =>
+        t.due_date < date &&
+        (t.status === 'CONFIRMADO' || t.status === 'CONCILIADO')
+      )
+
+      // Calcular saldo
+      const transactionSum = relevantTransactions.reduce((sum, t) => {
+        if (t.type === 'RECEITA') return sum + Math.abs(t.amount || 0)
+        if (t.type === 'DESPESA') return sum - Math.abs(t.amount || 0)
+        return sum
+      }, 0)
+
+      const balanceUntilPreviousDay = initialBalance + transactionSum
+
+      balances.push({
+        account_id: account.id,
+        balance_until_previous_day: balanceUntilPreviousDay
+      })
+    }
+
+    const total_balance = balances.reduce((sum, b) => sum + b.balance_until_previous_day, 0)
+
+    return {
+      date,
+      balances,
+      total_balance
+    }
   }
 }

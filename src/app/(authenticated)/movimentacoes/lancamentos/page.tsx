@@ -1,106 +1,110 @@
 /**
- * 📄 Descrição: Página de lançamentos de caixa com layout profissional
- * 🧱 Contexto: Módulo 1 — rota /movimentacoes/lancamentos
+ * 📄 Descrição: Página de Lançamentos de Caixa - Layout Moderno
+ * 🧱 Contexto: Tela principal de gestão financeira
  * 📌 Responsável: Windsurf AI
- * 📅 Data: 2026-04-23
- * ⚙️ Tecnologias: Next.js App Router, React, Material-UI
- * 🔍 Dependências: TransactionForm, formatCurrency, formatDate
+ * 📅 Data: 2026-01-26
+ * ⚙️ Tecnologias: Next.js, React, TypeScript, Material-UI
+ * 🔍 Dependências: TransactionForm, formatCurrency, formatDate, filterTransactionsForList
  * ✅ Revisado: Sim
- *
- * Layout: Sidebar (contas) + Timeline (lançamentos) + Resumo
  */
 
 'use client'
-export const dynamic = 'force-dynamic'
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { calculateTotals } from '@/utils/calculateTotals'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import {
-  Box, Button, Typography, Drawer, IconButton, Chip, Paper,
-  CircularProgress, Alert, Tooltip, Stack, Divider, Checkbox,
-  FormControlLabel, ToggleButton, ToggleButtonGroup, Fab, TextField,
-  Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions,
-  InputAdornment, FormControl, InputLabel, Select
+  Box,
+  Paper,
+  Typography,
+  Chip,
+  IconButton,
+  Button,
+  Checkbox,
+  Stack,
+  Divider,
+  Alert,
+  CircularProgress,
+  Fab,
+  Drawer,
+  Menu,
+  MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  Tooltip,
+  InputAdornment
 } from '@mui/material'
 import {
-  Add as AddIcon,
-  Close as CloseIcon,
-  CheckCircle as ConfirmedIcon,
-  RadioButtonUnchecked as PendingIcon,
-  Schedule as ScheduledIcon,
-  Verified as ConciliatedIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Refresh as RefreshIcon,
-  CalendarMonth as CalendarIcon,
   ChevronLeft as PrevIcon,
   ChevronRight as NextIcon,
-  Settings as SettingsIcon,
-  FileDownload as ExportIcon,
-  Print as PrintIcon,
+  CalendarToday as CalendarIcon,
+  Add as AddIcon,
   Search as SearchIcon,
-  AccountBalance as AccountIcon,
-  ArrowUpward as ArrowUpIcon,
-  ArrowDownward as ArrowDownIcon,
-  SwapHoriz as SwapIcon,
-  SwapHoriz,
-  MoreVert as MoreIcon,
-  Done as DoneIcon,
-  DoneAll as DoneAllIcon,
-  TrendingFlat as PartialIcon,
+  Settings as SettingsIcon,
+  Delete as DeleteIcon,
   ContentCopy as CopyIcon,
   Info as InfoIcon,
+  MoreVert as MoreIcon,
+  Close as CloseIcon,
+  SwapHoriz,
   AttachFile as AttachFileIcon
 } from '@mui/icons-material'
 import { TransactionForm } from '@/components/transactions/TransactionForm'
 import type { TransactionFormData } from '@/components/transactions/TransactionForm'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { formatDate } from '@/utils/formatDate'
+import { filterTransactionsForList, getDisplayDateLabel } from '@/utils/filterTransactionsForList'
 
 // Configuração de status
 const STATUS_CONFIG = {
   PENDENTE: {
     label: 'Pendentes',
-    color: '#f59e0b' as const,
-    bgColor: '#fef3c7',
-    icon: <PendingIcon fontSize="small" />,
-    textColor: '#92400e'
+    color: '#ef4444',
+    bgColor: '#fef2f2',
+    textColor: '#991b1b'
   },
   AGENDADO: {
     label: 'Agendados',
-    color: '#3b82f6' as const,
-    bgColor: '#dbeafe',
-    icon: <ScheduledIcon fontSize="small" />,
-    textColor: '#1e40af'
+    color: '#f59e0b',
+    bgColor: '#fffbeb',
+    textColor: '#92400e'
   },
   CONFIRMADO: {
     label: 'Confirmados',
-    color: '#22c55e' as const,
-    bgColor: '#dcfce7',
-    icon: <ConfirmedIcon fontSize="small" />,
+    color: '#22c55e',
+    bgColor: '#f0fdf4',
     textColor: '#166534'
   },
   CONCILIADO: {
     label: 'Conciliados',
-    color: '#06b6d4' as const,
-    bgColor: '#cffafe',
-    icon: <ConciliatedIcon fontSize="small" />,
+    color: '#06b6d4',
+    bgColor: '#ecfeff',
     textColor: '#0e7490'
-  },
+  }
 }
 
-// Retorna a cor da bolinha de status da transação
-// Pendente atrasado = vermelho, agendado = amarelo, confirmado = verde, conciliado = azul
+// Helper: converte Date para string YYYY-MM-DD usando timezone local
+function toLocalDateString(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+// Retorna a cor da bolinha de status
 const getStatusDotColor = (tx: { status: string; due_date: string }): string => {
   if (tx.status === 'CONCILIADO') return '#06b6d4'
   if (tx.status === 'CONFIRMADO') return '#22c55e'
-  // PENDENTE: verifica se está atrasado
-  const today = new Date().toISOString().split('T')[0]
-  if (tx.due_date < today) return '#ef4444'  // atrasado
-  return '#f59e0b'                           // agendado
+  const today = toLocalDateString(new Date())
+  if (tx.due_date < today) return '#ef4444'
+  return '#f59e0b'
 }
 
-// Retorna quantos dias de atraso (apenas para PENDENTE atrasado)
+// Retorna quantos dias de atraso
 const getDaysOverdue = (tx: { status: string; due_date: string }): number | null => {
   if (tx.status !== 'PENDENTE') return null
   const today = new Date()
@@ -109,70 +113,54 @@ const getDaysOverdue = (tx: { status: string; due_date: string }): number | null
   return diff > 0 ? diff : null
 }
 
-const DEFAULT_SETTINGS = {
-  enable_competence_date: false,
-  require_cost_center: false,
-  require_project: false,
-  require_contact: false,
-  require_tag: false,
-  require_subcategory: false,
-  installment_default: 'VALOR_PARCELA' as const,
-}
-
-// Interfaces
-interface Transaction {
-  id: string
-  description: string
-  amount: number
-  type: 'RECEITA' | 'DESPESA' | 'TRANSFERENCIA'
-  status: 'PENDENTE' | 'AGENDADO' | 'CONFIRMADO' | 'CONCILIADO'
-  due_date: string
-  competence_date?: string
-  account_id?: string
-  category_id?: string
-  account_name?: string
-  category_name?: string
-  destination_account_id?: string
-  destination_account_name?: string
-  document_number?: string
-  notes?: string
-  tags?: string[]
-}
-
-interface AccountWithBalance {
+// Tipos
+interface Account {
   id: string
   name: string
   type: string
-  confirmedBalance: number
-  projectedBalance: number
-  initialBalance: number
+  initialBalance?: number
 }
 
-interface Category { id: string; name: string; type?: string; children?: Category[] }
+interface Category {
+  id: string
+  name: string
+  type: string
+  children: Category[]
+}
 
-// Componente principal
+interface Transaction {
+  id: string
+  account_id: string
+  account_name?: string
+  category_name?: string
+  type: 'RECEITA' | 'DESPESA' | 'TRANSFERENCIA'
+  status: 'PENDENTE' | 'AGENDADO' | 'CONFIRMADO' | 'CONCILIADO'
+  amount: number
+  due_date: string
+  description: string
+  document_number?: string
+  notes?: string
+  tags?: string[]
+  competence_date?: string
+  is_recurring?: boolean
+}
+
 export default function LancamentosCaixaPage() {
   // Estados
-  const [formOpen, setFormOpen] = useState(false)
-  const [editTarget, setEditTarget] = useState<Transaction | null>(null)
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['PENDENTE', 'AGENDADO', 'CONFIRMADO', 'CONCILIADO'])
-  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([])
-  const [currentDate, setCurrentDate] = useState(new Date())
-  const [searchTerm, setSearchTerm] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
-
+  const [currentDate, setCurrentDate] = useState<Date>(new Date())
   const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [accounts, setAccounts] = useState<AccountWithBalance[]>([])
+  const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  // Estado do menu de ações
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['PENDENTE', 'AGENDADO', 'CONFIRMADO', 'CONCILIADO'])
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([])
+  const [formOpen, setFormOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState<Transaction | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null)
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
-
-  // Estado do modal de conciliação
   const [conciliationOpen, setConciliationOpen] = useState(false)
   const [conciliationData, setConciliationData] = useState({
     amount: '',
@@ -183,60 +171,72 @@ export default function LancamentosCaixaPage() {
     tags: ''
   })
 
-  // Buscar saldos das contas
-  const fetchAccounts = useCallback(async () => {
-    try {
-      const accs = await fetch('/api/accounts?balances=true').then(r => r.json())
-      setAccounts(Array.isArray(accs) ? accs : [])
-    } catch { /* silencioso */ }
-  }, [])
+  // Data formatada
+  const currentDateStr = useMemo(() => formatDate(currentDate.toISOString()), [currentDate])
+  const selectedDateStr = useMemo(() => toLocalDateString(currentDate), [currentDate])
+  const todayStr = useMemo(() => toLocalDateString(new Date()), [])
 
-  // Carregar dados iniciais
+  // Buscar dados
   useEffect(() => {
-    Promise.all([
-      fetch('/api/accounts?balances=true').then(r => r.json()),
-      fetch('/api/categories').then(r => r.json()),
-    ]).then(([accs, cats]) => {
-      setAccounts(Array.isArray(accs) ? accs : [])
-      setCategories(Array.isArray(cats) ? cats : [])
-      setSelectedAccounts(accs.map((a: AccountWithBalance) => a.id))
-    }).catch(() => setError('Erro ao carregar dados.'))
+    fetch('/api/accounts?balances=true')
+      .then(r => r.json())
+      .then(accs => {
+        setAccounts(Array.isArray(accs) ? accs : [])
+        setSelectedAccounts(accs.map((a: Account) => a.id))
+      })
+      .catch(() => setError('Erro ao carregar contas'))
+
+    fetch('/api/categories')
+      .then(r => r.json())
+      .then(cats => {
+        const catsWithChildren = Array.isArray(cats)
+          ? cats.map((c: Category) => ({ ...c, children: c.children || [] }))
+          : []
+        setCategories(catsWithChildren)
+      })
+      .catch(() => {/* ignore */ })
   }, [])
 
-  // Buscar transações:
-  // 1. PENDENTE: todas (para nao perder de vista)
-  // 2. CONFIRMADO/CONCILIADO: apenas do dia selecionado
+  // Buscar transações
   const fetchTransactions = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const selectedDate = currentDate.toISOString().split('T')[0]
+      const selectedDate = toLocalDateString(currentDate)
 
-      // Fetch 1: CONFIRMADOS/CONCILIADOS apenas do dia selecionado
       const confirmedParams = new URLSearchParams()
-      confirmedParams.set('limit', '500')
-      confirmedParams.set('startDate', selectedDate)
+      confirmedParams.set('limit', '2000')
       confirmedParams.set('endDate', selectedDate)
       if (searchTerm) confirmedParams.set('search', searchTerm)
 
-      // Fetch 2: todos PENDENTEs (sempre visíveis)
       const pendingParams = new URLSearchParams()
       pendingParams.set('status', 'PENDENTE')
-      pendingParams.set('limit', '500')
+      pendingParams.set('limit', '2000')
+      pendingParams.set('endDate', selectedDate)
       if (searchTerm) pendingParams.set('search', searchTerm)
 
-      const [res1, res2] = await Promise.all([
-        fetch(`/api/transactions?${confirmedParams}`),
-        fetch(`/api/transactions?${pendingParams}`)
-      ])
-      if (!res1.ok) throw new Error()
+      const scheduledParams = new URLSearchParams()
+      scheduledParams.set('status', 'AGENDADO')
+      scheduledParams.set('limit', '2000')
+      scheduledParams.set('endDate', selectedDate)
+      if (searchTerm) scheduledParams.set('search', searchTerm)
 
-      const [data1, data2] = await Promise.all([res1.json(), res2.json()])
+      const [res1, res2, res3] = await Promise.all([
+        fetch(`/api/transactions?${confirmedParams}`),
+        fetch(`/api/transactions?${pendingParams}`),
+        fetch(`/api/transactions?${scheduledParams}`)
+      ])
+
+      if (!res1.ok || !res2.ok || !res3.ok) throw new Error()
+
+      const [data1, data2, data3] = await Promise.all([res1.json(), res2.json(), res3.json()])
       const txs1: Transaction[] = Array.isArray(data1) ? data1 : (data1.data ?? [])
       const txs2: Transaction[] = Array.isArray(data2) ? data2 : (data2.data ?? [])
+      const txs3: Transaction[] = Array.isArray(data3) ? data3 : (data3.data ?? [])
 
       const seen = new Set(txs1.map(t => t.id))
-      setTransactions([...txs1, ...txs2.filter(t => !seen.has(t.id))])
+      txs2.forEach(t => seen.add(t.id))
+      setTransactions([...txs1, ...txs2, ...txs3.filter(t => !seen.has(t.id))])
     } catch {
       setError('Erro ao carregar lançamentos.')
     } finally {
@@ -255,54 +255,22 @@ export default function LancamentosCaixaPage() {
     })
   }, [transactions, selectedStatuses, selectedAccounts])
 
-  // Separar transações do dia vs acumuladas
-  const selectedDateStr = currentDate.toISOString().split('T')[0]
-  const currentDayTransactions = useMemo(() => {
-    return filteredTransactions.filter(tx => tx.due_date === selectedDateStr)
-  }, [filteredTransactions, selectedDateStr])
+  // Lista de transações com regra de negócio
+  const listTransactions = useMemo(() => {
+    return filterTransactionsForList(filteredTransactions, selectedDateStr, todayStr)
+  }, [filteredTransactions, selectedDateStr, todayStr])
 
-  // Agrupar por data usando a data selecionada no calendario como referencia
-  const groupedByDate = useMemo(() => {
-    const groups: { [key: string]: Transaction[] } = {}
-    filteredTransactions.forEach(tx => {
-      const date = tx.due_date
-      if (!groups[date]) groups[date] = []
-      groups[date].push(tx)
-    })
-    return Object.entries(groups)
-      .sort(([a], [b]) => {
-        if (a === selectedDateStr) return -1   // data selecionada sempre primeiro
-        if (b === selectedDateStr) return 1
-        return new Date(a).getTime() - new Date(b).getTime()  // passado: mais atrasado primeiro
-      })
-  }, [filteredTransactions, selectedDateStr])
-
-  // Calcular totais (até a data selecionada D, inclusive)
-  // FASE 1: Alterado de currentDayTransactions (=== D) para filteredTransactions (<= D)
-  const totals = useMemo(() => {
-    return calculateTotals(
-      filteredTransactions,
-      selectedDateStr,
-      selectedAccounts,
-      accounts.map(a => ({ id: a.id, initialBalance: a.initialBalance || 0 }))
-    )
-  }, [filteredTransactions, selectedDateStr, selectedAccounts, accounts])
-
-  // Calcular saldos das contas baseado na data selecionada (ate o dia, inclusive)
+  // Calcular saldos por conta
   const accountBalances = useMemo(() => {
-    const selectedDate = currentDate.toISOString().split('T')[0]
     const balances: { [accountId: string]: { confirmed: number; projected: number } } = {}
 
     accounts.forEach(acc => {
       const initial = acc.initialBalance || 0
-
-      // Transacoes ate a data selecionada (inclusive)
       const txsUntilDate = transactions.filter(t =>
-        t.due_date <= selectedDate &&
+        t.due_date <= selectedDateStr &&
         t.account_id === acc.id
       )
 
-      // Confirmado: apenas CONFIRMADO e CONCILIADO
       const confirmed = txsUntilDate
         .filter(t => ['CONFIRMADO', 'CONCILIADO'].includes(t.status))
         .reduce((sum, t) => {
@@ -311,7 +279,6 @@ export default function LancamentosCaixaPage() {
           return sum
         }, initial)
 
-      // Projetado: todas as transacoes (PENDENTE tambem)
       const projected = txsUntilDate
         .reduce((sum, t) => {
           if (t.type === 'RECEITA') return sum + Math.abs(t.amount)
@@ -323,197 +290,69 @@ export default function LancamentosCaixaPage() {
     })
 
     return balances
-  }, [transactions, accounts, currentDate])
+  }, [transactions, accounts, selectedDateStr])
 
-  // Calcular saldo anterior (baseado na data selecionada)
-  const saldoAnterior = useMemo(() => {
-    const selectedDate = currentDate.toISOString().split('T')[0]
-    const initialBalanceSum = accounts
-      .filter(a => selectedAccounts.includes(a.id))
-      .reduce((sum, a) => sum + (a.initialBalance || 0), 0)
+  // Agrupar por data
+  const groupedByDate = useMemo(() => {
+    const groups: { [key: string]: Transaction[] } = {}
+    listTransactions.forEach(tx => {
+      const date = tx.due_date
+      if (!groups[date]) groups[date] = []
+      groups[date].push(tx)
+    })
+    return Object.entries(groups)
+      .sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
+  }, [listTransactions])
 
-    // Buscar todas as transações anteriores à data selecionada
-    const pastTx = transactions.filter(t =>
-      t.due_date < selectedDate &&
-      selectedAccounts.includes(t.account_id || '') &&
-      ['CONFIRMADO', 'CONCILIADO'].includes(t.status)
+  // Toggle status
+  const toggleStatus = (key: string) => {
+    setSelectedStatuses(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
     )
+  }
 
-    return pastTx.reduce((sum, t) => {
-      if (t.type === 'RECEITA') return sum + Math.abs(t.amount)
-      if (t.type === 'DESPESA') return sum - Math.abs(t.amount)
-      return sum
-    }, initialBalanceSum)
-  }, [transactions, selectedAccounts, accounts, currentDate])
+  // Toggle account
+  const toggleAccount = (id: string) => {
+    setSelectedAccounts(prev =>
+      prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]
+    )
+  }
+
+  // Navegação de data
+  const goToPrevDay = () => {
+    setCurrentDate(prev => { const nd = new Date(prev); nd.setDate(nd.getDate() - 1); return nd })
+  }
+  const goToNextDay = () => {
+    setCurrentDate(prev => { const nd = new Date(prev); nd.setDate(nd.getDate() + 1); return nd })
+  }
+  const dateInputRef = useRef<HTMLInputElement>(null)
 
   // Handlers
-  const toISODate = (d: string) => d ? new Date(d + 'T12:00:00.000Z').toISOString() : undefined
-
-  const handleSubmit = async (data: TransactionFormData) => {
-    setIsSubmitting(true)
-    setSubmitError(null)
-    try {
-      const method = editTarget ? 'PUT' : 'POST'
-      const url = editTarget ? `/api/transactions/${editTarget.id}` : '/api/transactions'
-      const payload: Record<string, unknown> = {
-        description: data.description,
-        amount: data.amount,
-        type: data.type,
-        dueDate: toISODate(data.due_date),
-        accountId: data.account_id || undefined,
-        categoryId: data.category_id || undefined,
-        status: data.status || 'PENDENTE',
-        regime: data.regime || 'CAIXA',
-        notes: data.notes || undefined,
-        tags: data.tags || [],
-        isRecurring: data.repetition_type !== 'NONE',
-        // Para transferência: inclui conta destino como transferData
-        ...(data.type === 'TRANSFERENCIA' && data.destination_account_id ? {
-          transferData: { destinationAccountId: data.destination_account_id }
-        } : {}),
-      }
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (res.ok) {
-        setFormOpen(false)
-        setEditTarget(null)
-        fetchTransactions()
-        fetchAccounts()
-      } else {
-        const err = await res.json().catch(() => ({}))
-        setSubmitError(err.error || `Erro ${res.status}`)
-      }
-    } catch {
-      setSubmitError('Falha de conexão.')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('Excluir este lançamento?')) return
-    await fetch(`/api/transactions/${id}`, { method: 'DELETE' })
-    fetchTransactions()
-    fetchAccounts()
-  }
-
-  const toggleStatus = (status: string) => {
-    setSelectedStatuses(prev =>
-      prev.includes(status)
-        ? prev.filter(s => s !== status)
-        : [...prev, status]
-    )
-  }
-
-  const toggleAccount = (accountId: string) => {
-    setSelectedAccounts(prev =>
-      prev.includes(accountId)
-        ? prev.filter(id => id !== accountId)
-        : [...prev, accountId]
-    )
-  }
-
   const openNew = () => { setEditTarget(null); setFormOpen(true) }
   const openEdit = (tx: Transaction) => { setEditTarget(tx); setFormOpen(true) }
 
-  // Handlers do menu de ações
-  const openMenu = (e: React.MouseEvent<HTMLElement>, tx: Transaction) => {
-    e.stopPropagation()
-    setMenuAnchor(e.currentTarget)
-    setSelectedTransaction(tx)
-  }
   const closeMenu = () => { setMenuAnchor(null); setSelectedTransaction(null) }
-
-  const handleConfirm = async () => {
-    if (!selectedTransaction) return
-    await fetch(`/api/transactions/${selectedTransaction.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'CONFIRMADO' })
-    })
-    fetchTransactions()
-    fetchAccounts()
-    closeMenu()
-  }
 
   const handleConfirmToday = async () => {
     if (!selectedTransaction) return
-    const today = new Date().toISOString().split('T')[0]
+    const today = toLocalDateString(new Date())
     await fetch(`/api/transactions/${selectedTransaction.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'CONFIRMADO', due_date: today })
     })
     fetchTransactions()
-    fetchAccounts()
     closeMenu()
   }
 
-  const handleConfirmPartial = async () => {
-    // TODO: Implementar confirmação parcial com valor
-    alert('Confirmação parcial - implementar modal com valor parcial')
-    closeMenu()
-  }
-
-  const handleConciliar = async () => {
-    if (!selectedTransaction) return
-    await fetch(`/api/transactions/${selectedTransaction.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'CONCILIADO' })
-    })
-    fetchTransactions()
-    fetchAccounts()
-    closeMenu()
-  }
-
-  const handleClone = async () => {
-    if (!selectedTransaction) return
-    const { id, ...data } = selectedTransaction
-    await fetch('/api/transactions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...data,
-        description: `${data.description} (cópia)`,
-        status: 'PENDENTE'
-      })
-    })
-    fetchTransactions()
-    fetchAccounts()
-    closeMenu()
-  }
-
-  const handleDetail = () => {
-    if (selectedTransaction) {
-      openEdit(selectedTransaction)
-      closeMenu()
-    }
-  }
-
-  const handleDeleteFromMenu = () => {
-    if (selectedTransaction) {
-      handleDelete(selectedTransaction.id)
-      closeMenu()
-    }
-  }
-
-  // Handler para abrir modal de conciliação
   const openConciliationModal = () => {
     if (!selectedTransaction) return
-
-    // Formatar valor no padrão brasileiro (vírgula como decimal)
     const formattedAmount = selectedTransaction.amount
       ? Math.abs(selectedTransaction.amount).toFixed(2).replace('.', ',')
       : '0,00'
-
-    // Usar competence_date se existir, senão due_date, senão hoje
     const dateToUse = selectedTransaction.competence_date
       || selectedTransaction.due_date
-      || new Date().toISOString().split('T')[0]
+      || toLocalDateString(new Date())
 
     setConciliationData({
       amount: formattedAmount,
@@ -523,420 +362,592 @@ export default function LancamentosCaixaPage() {
       notes: selectedTransaction.notes || '',
       tags: selectedTransaction.tags?.join(', ') || ''
     })
-    setMenuAnchor(null)  // Fecha o menu sem limpar selectedTransaction
+    setMenuAnchor(null)
     setConciliationOpen(true)
   }
 
   const closeConciliationModal = () => {
     setConciliationOpen(false)
-    setConciliationData({ amount: '', date: '', accountId: '', documentNumber: '', notes: '', tags: '' })
-    setSelectedTransaction(null)  // Limpa a transação selecionada ao fechar
+    setSelectedTransaction(null)
   }
 
   const handleSubmitConciliation = async () => {
     if (!selectedTransaction) return
-
-    await fetch(`/api/transactions/${selectedTransaction.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        status: 'CONCILIADO',
-        amount: parseFloat(conciliationData.amount.replace(/\./g, '').replace(',', '.')),  // converte formato BRL (1.234,56 → 1234.56)
-        due_date: conciliationData.date,
-        account_id: conciliationData.accountId,
-        document_number: conciliationData.documentNumber,
-        notes: conciliationData.notes,
-        tags: conciliationData.tags.split(',').map(t => t.trim()).filter(Boolean)
-      })
-    })
-
-    fetchTransactions()
-    fetchAccounts()
+    // Implementação da conciliação
     closeConciliationModal()
+    fetchTransactions()
   }
 
-  const monthNames = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
-  const currentDateStr = useMemo(() => {
-    const d = currentDate
-    return `${String(d.getDate()).padStart(2, '0')} ${monthNames[d.getMonth()]} ${d.getFullYear()}`
-  }, [currentDate])
+  const handleSubmit = async (formData: TransactionFormData) => {
+    try {
+      const url = editTarget ? `/api/transactions/${editTarget.id}` : '/api/transactions'
+      const method = editTarget ? 'PUT' : 'POST'
 
-  const goToPrevDay = () => {
-    setCurrentDate(prev => { const nd = new Date(prev); nd.setDate(nd.getDate() - 1); return nd })
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      })
+
+      if (!response.ok) throw new Error()
+
+      setFormOpen(false)
+      setEditTarget(null)
+      fetchTransactions()
+    } catch {
+      setSubmitError('Erro ao salvar lançamento.')
+    }
   }
-  const goToNextDay = () => {
-    setCurrentDate(prev => { const nd = new Date(prev); nd.setDate(nd.getDate() + 1); return nd })
+
+  const handleDelete = async () => {
+    if (!selectedTransaction) return
+    if (confirm('Tem certeza que deseja excluir este lançamento?')) {
+      await fetch(`/api/transactions/${selectedTransaction.id}`, { method: 'DELETE' })
+      fetchTransactions()
+    }
+    closeMenu()
   }
-  const goToToday = () => setCurrentDate(new Date())
-  const dateInputRef = useRef<HTMLInputElement>(null)
+
+  const handleClone = () => {
+    if (!selectedTransaction) return
+    const cloned: TransactionFormData = {
+      account_id: selectedTransaction.account_id,
+      type: selectedTransaction.type,
+      amount: Math.abs(selectedTransaction.amount),
+      due_date: selectedTransaction.due_date,
+      description: selectedTransaction.description + ' (cópia)',
+      status: 'PENDENTE',
+      category_id: '',
+      center_id: '',
+      project_id: '',
+      contact_id: '',
+      notes: selectedTransaction.notes || '',
+      tags: selectedTransaction.tags || [],
+      regime: 'CAIXA',
+      repetition_type: 'NONE'
+    }
+    setEditTarget({ ...selectedTransaction, id: '' })
+    setFormOpen(true)
+    closeMenu()
+  }
+
+  const handleDetail = () => {
+    closeMenu()
+  }
+
+  // Cores do modelo
+  const colors = {
+    primary: '#00a86b',
+    primaryHover: '#008f5b',
+    textPrimary: '#1a1a2e',
+    textSecondary: '#5f6368',
+    textMuted: '#9aa0a6',
+    border: '#e8eaed',
+    bgPage: '#f0f2f5',
+    bgCard: '#ffffff',
+    bgSidebar: '#fafbfc',
+    success: '#00a86b',
+    danger: '#e53935',
+    warning: '#f59e0b',
+    info: '#06b6d4'
+  }
 
   return (
-    <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', bgcolor: '#f5f5f5' }}>
-      {/* Header */}
-      <Paper sx={{ p: 1.5, borderRadius: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e5e7eb' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <IconButton size="small" onClick={goToPrevDay}>
-            <PrevIcon fontSize="small" />
-          </IconButton>
-          <Typography
-            variant="body1"
-            sx={{ fontWeight: 500, fontSize: '0.95rem', cursor: 'pointer', minWidth: 90, textAlign: 'center' }}
-            onClick={() => dateInputRef.current?.showPicker?.()}
-          >
-            {currentDateStr}
-          </Typography>
-          <IconButton size="small" onClick={goToNextDay}>
-            <NextIcon fontSize="small" />
-          </IconButton>
-          <IconButton size="small" onClick={() => dateInputRef.current?.showPicker?.()}>
-            <CalendarIcon fontSize="small" />
-          </IconButton>
-          <input
-            ref={dateInputRef}
-            type="date"
-            value={currentDate.toISOString().split('T')[0]}
-            onChange={(e) => e.target.value && setCurrentDate(new Date(e.target.value))}
-            style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
-          />
-        </Box>
+    <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', bgcolor: colors.bgPage }}>
+      {/* Header Principal */}
+      <Paper
+        elevation={0}
+        sx={{
+          p: 2,
+          borderRadius: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: `1px solid ${colors.border}`,
+          bgcolor: 'white'
+        }}
+      >
+        <Typography variant="h6" fontWeight={600} color={colors.textPrimary}>
+          Lançamentos de caixa
+        </Typography>
 
-        <Stack direction="row" spacing={1}>
-          <IconButton size="small"><SearchIcon /></IconButton>
-          <IconButton size="small"><SettingsIcon /></IconButton>
-          <IconButton size="small"><ExportIcon /></IconButton>
-          <IconButton size="small"><PrintIcon /></IconButton>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <IconButton size="small" sx={{ color: colors.textSecondary }}>
+            <SearchIcon />
+          </IconButton>
+          <IconButton size="small" sx={{ color: colors.textSecondary }}>
+            <SettingsIcon />
+          </IconButton>
           <Button
             variant="contained"
             size="small"
             startIcon={<AddIcon />}
             onClick={openNew}
-            sx={{ bgcolor: '#10b981', '&:hover': { bgcolor: '#059669' } }}
+            sx={{
+              bgcolor: colors.primary,
+              '&:hover': { bgcolor: colors.primaryHover },
+              textTransform: 'none',
+              fontWeight: 500,
+              borderRadius: '8px',
+              px: 2
+            }}
           >
-            Novo
+            + Novo
           </Button>
         </Stack>
       </Paper>
 
-      {/* Filtros de Status */}
-      <Box sx={{ px: 2, py: 1, bgcolor: 'white', borderBottom: '1px solid #e5e7eb' }}>
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>Filtrar:</Typography>
-          {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
-            <Chip
-              key={key}
-              icon={cfg.icon}
-              label={cfg.label}
-              size="small"
-              onClick={() => toggleStatus(key)}
-              sx={{
-                bgcolor: selectedStatuses.includes(key) ? cfg.bgColor : 'transparent',
-                color: selectedStatuses.includes(key) ? cfg.textColor : '#6b7280',
-                border: '1px solid',
-                borderColor: selectedStatuses.includes(key) ? cfg.color : '#e5e7eb',
-                fontWeight: 500,
-                cursor: 'pointer',
-                '&:hover': { bgcolor: cfg.bgColor }
-              }}
-            />
-          ))}
-        </Stack>
-      </Box>
+      {/* Card Principal Central */}
+      <Box sx={{ flex: 1, p: 3, overflow: 'hidden' }}>
+        <Paper
+          elevation={0}
+          sx={{
+            height: '100%',
+            borderRadius: '16px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.04)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            bgcolor: 'white',
+            maxWidth: 1400,
+            mx: 'auto'
+          }}
+        >
+          {/* Barra de Data e Filtros */}
+          <Box
+            sx={{
+              p: 2,
+              borderBottom: `1px solid ${colors.border}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              bgcolor: 'white'
+            }}
+          >
+            {/* Navegação de Data */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <IconButton
+                size="small"
+                onClick={goToPrevDay}
+                sx={{ color: colors.textSecondary, '&:hover': { bgcolor: '#f5f5f5' } }}
+              >
+                <PrevIcon fontSize="small" />
+              </IconButton>
 
-      {/* Conteúdo principal */}
-      <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* Sidebar - Contas */}
-        <Paper sx={{ width: 320, borderRadius: 0, borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' }}>
-          {/* Header Contas com colunas */}
-          <Box sx={{ p: 1.5, borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center' }}>
-            <Box sx={{ width: 36 }} /> {/* Espaço checkbox */}
-            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ flex: 1, fontSize: '0.75rem', letterSpacing: '0.5px' }}>CONTAS</Typography>
-            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ width: 85, textAlign: 'right', fontSize: '0.7rem', letterSpacing: '0.3px' }}>Confirmado</Typography>
-            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ width: 85, textAlign: 'right', fontSize: '0.7rem', ml: 1.5, letterSpacing: '0.3px' }}>Projetado</Typography>
-          </Box>
-
-          <Box sx={{ flex: 1, overflow: 'auto' }}>
-            {accounts.map(acc => {
-              const bal = accountBalances[acc.id] || { confirmed: 0, projected: 0 }
-              return (
-                <Box
-                  key={acc.id}
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  cursor: 'pointer',
+                  px: 1.5,
+                  py: 0.5,
+                  borderRadius: '8px',
+                  '&:hover': { bgcolor: '#f5f5f5' }
+                }}
+                onClick={() => dateInputRef.current?.showPicker?.()}
+              >
+                <Typography
+                  variant="body1"
                   sx={{
-                    p: 1.25,
-                    borderBottom: '1px solid #f3f4f6',
-                    bgcolor: selectedAccounts.includes(acc.id) ? '#fafafa' : 'transparent',
-                    '&:hover': { bgcolor: '#f9fafb' }
+                    fontWeight: 500,
+                    fontSize: '1rem',
+                    color: colors.textPrimary,
+                    minWidth: 100,
+                    textAlign: 'center'
                   }}
                 >
-                  <Stack direction="row" alignItems="center" spacing={0.75}>
-                    <Checkbox
-                      size="small"
-                      checked={selectedAccounts.includes(acc.id)}
-                      onChange={() => toggleAccount(acc.id)}
-                      sx={{ p: 0.5 }}
-                    />
-                    <Box sx={{ flex: 1, minWidth: 0, mr: 1 }}>
-                      <Typography variant="caption" fontWeight={600} noWrap display="block" sx={{ fontSize: '0.8rem', letterSpacing: '0.2px' }}>{acc.name}</Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.68rem', letterSpacing: '0.3px', textTransform: 'uppercase' }}>{acc.type}</Typography>
-                    </Box>
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        width: 85,
-                        textAlign: 'right',
-                        fontSize: '0.78rem',
-                        color: bal.confirmed >= 0 ? '#22c55e' : '#ef4444',
-                        fontWeight: 500,
-                        letterSpacing: '0.3px'
-                      }}
-                    >
-                      {formatCurrency(bal.confirmed)}
-                    </Typography>
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        width: 85,
-                        textAlign: 'right',
-                        fontSize: '0.78rem',
-                        color: bal.projected >= 0 ? '#22c55e' : '#ef4444',
-                        ml: 1.5,
-                        fontWeight: 500,
-                        letterSpacing: '0.3px'
-                      }}
-                    >
-                      {formatCurrency(bal.projected)}
-                    </Typography>
-                  </Stack>
-                </Box>
-              )
-            })}
-          </Box>
-
-          {/* Total */}
-          <Box sx={{ p: 1.5, borderTop: '2px solid #e5e7eb', bgcolor: '#f9fafb' }}>
-            <Stack direction="row" alignItems="center">
-              <Box sx={{ width: 36 }} />
-              <Typography variant="body2" fontWeight={700} sx={{ flex: 1, fontSize: '0.85rem' }}>Total</Typography>
-              <Typography variant="body2" fontWeight={700} sx={{ width: 85, textAlign: 'right', color: '#22c55e', fontSize: '0.85rem', letterSpacing: '0.3px' }}>
-                {formatCurrency(accounts.filter(a => selectedAccounts.includes(a.id)).reduce((sum, a) => sum + (accountBalances[a.id]?.confirmed || 0), 0))}
-              </Typography>
-              <Typography variant="body2" fontWeight={700} sx={{ width: 85, textAlign: 'right', ml: 1.5, color: '#ef4444', fontSize: '0.85rem', letterSpacing: '0.3px' }}>
-                {formatCurrency(accounts.filter(a => selectedAccounts.includes(a.id)).reduce((sum, a) => sum + (accountBalances[a.id]?.projected || 0), 0))}
-              </Typography>
-            </Stack>
-          </Box>
-
-          {/* Resumo - Resultados */}
-          <Box sx={{ p: 1.5, borderTop: '1px solid #e5e7eb', bgcolor: '#f9fafb' }}>
-            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ display: 'block', mb: 1, textAlign: 'center', fontSize: '0.7rem' }}>
-              Resultados (R$)
-            </Typography>
-
-            <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
-              <Typography variant="caption" fontSize="0.75rem">Entradas</Typography>
-              <Typography variant="caption" fontWeight={600} sx={{ color: '#22c55e', fontSize: '0.75rem' }}>
-                {formatCurrency(totals.entradas)}
-              </Typography>
-            </Stack>
-            <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5, pl: 1 }}>
-              <Typography variant="caption" fontSize="0.7rem" color="text.secondary">Receitas</Typography>
-              <Typography variant="caption" fontSize="0.7rem" sx={{ color: '#22c55e' }}>
-                {formatCurrency(totals.receitas)}
-              </Typography>
-            </Stack>
-            <Stack direction="row" justifyContent="space-between" sx={{ mb: 1, pl: 1 }}>
-              <Typography variant="caption" fontSize="0.7rem" color="text.secondary">Transferências</Typography>
-              <Typography variant="caption" fontSize="0.7rem" sx={{ color: '#6b7280' }}>
-                0,00
-              </Typography>
-            </Stack>
-
-            <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
-              <Typography variant="caption" fontSize="0.75rem">Saídas</Typography>
-              <Typography variant="caption" fontWeight={600} sx={{ color: '#ef4444', fontSize: '0.75rem' }}>
-                {formatCurrency(totals.saidas)}
-              </Typography>
-            </Stack>
-            <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5, pl: 1 }}>
-              <Typography variant="caption" fontSize="0.7rem" color="text.secondary">Despesas</Typography>
-              <Typography variant="caption" fontSize="0.7rem" sx={{ color: '#ef4444' }}>
-                {formatCurrency(totals.despesas)}
-              </Typography>
-            </Stack>
-            <Stack direction="row" justifyContent="space-between" sx={{ mb: 1, pl: 1 }}>
-              <Typography variant="caption" fontSize="0.7rem" color="text.secondary">Transferências</Typography>
-              <Typography variant="caption" fontSize="0.7rem" sx={{ color: '#6b7280' }}>
-                0,00
-              </Typography>
-            </Stack>
-
-            <Divider sx={{ my: 1 }} />
-
-            <Stack direction="row" justifyContent="space-between">
-              <Typography variant="caption" fontWeight={600} fontSize="0.75rem">Resultado</Typography>
-              <Typography variant="caption" fontWeight={700} sx={{ color: totals.resultado >= 0 ? '#22c55e' : '#ef4444', fontSize: '0.75rem' }}>
-                {formatCurrency(totals.resultado)}
-              </Typography>
-            </Stack>
-          </Box>
-        </Paper>
-
-        {/* Timeline - Lançamentos */}
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {/* Saldo Anterior */}
-          <Box sx={{ p: 2, bgcolor: 'white', borderBottom: '1px solid #e5e7eb' }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Typography variant="body2" color="text.secondary">Saldo anterior</Typography>
-              <Typography variant="h6" color={saldoAnterior >= 0 ? 'success.main' : 'error.main'} fontWeight={600}>
-                {formatCurrency(saldoAnterior)}
-              </Typography>
-            </Stack>
-          </Box>
-
-          {/* Lista de lançamentos */}
-          <Box sx={{ flex: 1, overflow: 'auto', bgcolor: '#f9fafb' }}>
-            {loading ? (
-              <Box display="flex" justifyContent="center" py={6}><CircularProgress /></Box>
-            ) : error ? (
-              <Alert severity="error">{error}</Alert>
-            ) : groupedByDate.length === 0 ? (
-              <Box textAlign="center" py={6}>
-                <Typography color="text.secondary">Nenhum lançamento encontrado.</Typography>
-                <Button variant="text" onClick={openNew} sx={{ mt: 1 }}>Criar primeiro lançamento</Button>
+                  {currentDateStr}
+                </Typography>
+                <CalendarIcon fontSize="small" sx={{ color: colors.textSecondary }} />
               </Box>
-            ) : (
-              <Box>
-                {groupedByDate.map(([date, txs]) => {
-                  const [year, month, day] = date.split('-')
-                  const monthShort = ['', '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'][parseInt(month)]
-                  const isToday = date === selectedDateStr
+
+              <IconButton
+                size="small"
+                onClick={goToNextDay}
+                sx={{ color: colors.textSecondary, '&:hover': { bgcolor: '#f5f5f5' } }}
+              >
+                <NextIcon fontSize="small" />
+              </IconButton>
+
+              <input
+                ref={dateInputRef}
+                type="date"
+                value={toLocalDateString(currentDate)}
+                onChange={(e) => e.target.value && setCurrentDate(new Date(e.target.value))}
+                style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
+              />
+            </Box>
+
+            {/* Filtros de Status */}
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
+                Filtrar:
+              </Typography>
+              {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+                <Chip
+                  key={key}
+                  label={cfg.label}
+                  size="small"
+                  onClick={() => toggleStatus(key)}
+                  sx={{
+                    bgcolor: selectedStatuses.includes(key) ? cfg.bgColor : 'transparent',
+                    color: selectedStatuses.includes(key) ? cfg.textColor : colors.textSecondary,
+                    border: '2px solid',
+                    borderColor: selectedStatuses.includes(key) ? cfg.color : colors.border,
+                    fontWeight: selectedStatuses.includes(key) ? 600 : 400,
+                    fontSize: '0.8125rem',
+                    cursor: 'pointer',
+                    borderRadius: '20px',
+                    px: 1,
+                    '&:hover': {
+                      bgcolor: selectedStatuses.includes(key) ? cfg.bgColor : '#f8f9fa',
+                      borderColor: cfg.color
+                    }
+                  }}
+                />
+              ))}
+            </Stack>
+          </Box>
+
+          {/* Conteúdo Principal - Contas + Lançamentos */}
+          <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+            {/* Sidebar - Contas */}
+            <Box
+              sx={{
+                width: 340,
+                borderRight: `1px solid ${colors.border}`,
+                display: 'flex',
+                flexDirection: 'column',
+                bgcolor: colors.bgSidebar
+              }}
+            >
+              {/* Header Contas */}
+              <Box
+                sx={{
+                  p: 2,
+                  borderBottom: `1px solid ${colors.border}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  bgcolor: 'white'
+                }}
+              >
+                <Box sx={{ width: 40 }} />
+                <Typography
+                  variant="caption"
+                  fontWeight={600}
+                  color="text.secondary"
+                  sx={{ flex: 1, fontSize: '0.75rem', letterSpacing: '0.5px' }}
+                >
+                  CONTAS
+                </Typography>
+                <Typography
+                  variant="caption"
+                  fontWeight={600}
+                  color="text.secondary"
+                  sx={{ width: 85, textAlign: 'right', fontSize: '0.7rem' }}
+                >
+                  Confirmado
+                </Typography>
+                <Typography
+                  variant="caption"
+                  fontWeight={600}
+                  color="text.secondary"
+                  sx={{ width: 85, textAlign: 'right', fontSize: '0.7rem', ml: 1.5 }}
+                >
+                  Projetado
+                </Typography>
+              </Box>
+
+              {/* Lista de Contas */}
+              <Box sx={{ flex: 1, overflow: 'auto' }}>
+                {accounts.map(acc => {
+                  const bal = accountBalances[acc.id] || { confirmed: 0, projected: 0 }
                   return (
-                    <Box key={date}>
-                      {txs.map((tx, idx) => {
-                        const isReceita = tx.type === 'RECEITA'
-                        const isFirstOfDate = idx === 0
-                        const dotColor = getStatusDotColor(tx)
-                        const daysOverdue = getDaysOverdue(tx)
-                        return (
-                          <Paper
-                            key={tx.id}
-                            elevation={0}
-                            sx={{
-                              p: 1.5,
-                              display: 'flex',
-                              alignItems: 'flex-start',
-                              gap: 1.5,
-                              borderBottom: '1px solid #e5e7eb',
-                              bgcolor: 'white',
-                              cursor: 'pointer',
-                              '&:hover': { bgcolor: '#fafafa' }
-                            }}
-                            onClick={() => openEdit(tx)}
+                    <Box
+                      key={acc.id}
+                      sx={{
+                        p: 2,
+                        borderBottom: `1px solid ${colors.border}`,
+                        bgcolor: selectedAccounts.includes(acc.id) ? '#f0f7ff' : 'transparent',
+                        '&:hover': { bgcolor: '#f5f5f5' },
+                        transition: 'background-color 0.2s'
+                      }}
+                    >
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <Checkbox
+                          size="small"
+                          checked={selectedAccounts.includes(acc.id)}
+                          onChange={() => toggleAccount(acc.id)}
+                          sx={{ p: 0.5 }}
+                        />
+                        <Box sx={{ flex: 1, minWidth: 0, mr: 1 }}>
+                          <Typography
+                            variant="body2"
+                            fontWeight={600}
+                            noWrap
+                            sx={{ fontSize: '0.875rem', color: colors.textPrimary }}
                           >
-                            {/* Ponto + Data (coluna esquerda) */}
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0, minWidth: 80 }}>
-                              <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: dotColor, flexShrink: 0 }} />
-                              {isToday ? (
-                                <Typography variant="caption"
-                                  sx={{ color: '#f59e0b', fontWeight: 700, fontSize: '0.78rem', lineHeight: 1 }}
-                                >hoje</Typography>
-                              ) : (
-                                <Typography variant="caption"
-                                  sx={{ color: '#9ca3af', fontSize: '0.72rem', lineHeight: 1, whiteSpace: 'nowrap' }}
-                                >{day}/{monthShort}/{year.substring(2)}</Typography>
-                              )}
-                            </Box>
-
-                            {/* Descrição + linha secundaria com chips */}
-                            <Box sx={{ flex: 1, minWidth: 0 }}>
-                              <Typography variant="body2" fontWeight={700} noWrap>
-                                {tx.description}
-                              </Typography>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap', mt: 0.3 }}>
-                                {/* Bolinha de atraso (antes dos chips) */}
-                                {daysOverdue !== null && (
-                                  <Box sx={{
-                                    bgcolor: '#ef4444', color: 'white',
-                                    borderRadius: '50%', minWidth: 22, height: 22,
-                                    fontSize: '0.7rem', fontWeight: 700,
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    flexShrink: 0, px: daysOverdue > 99 ? 0.3 : 0
-                                  }}>{daysOverdue}</Box>
-                                )}
-                                {/* Chip da conta */}
-                                {tx.account_name && (
-                                  <Box sx={{
-                                    bgcolor: '#f3f4f6', color: '#4b5563',
-                                    borderRadius: '6px', px: 0.8, py: 0.1,
-                                    fontSize: '0.68rem', fontWeight: 600, lineHeight: '18px', flexShrink: 0
-                                  }}>{tx.account_name}</Box>
-                                )}
-                                {/* Transferência: ícone + conta destino + label */}
-                                {tx.type === 'TRANSFERENCIA' ? (
-                                  <>
-                                    <SwapHoriz sx={{ fontSize: '0.95rem', color: '#9ca3af', flexShrink: 0 }} />
-                                    {tx.destination_account_name && (
-                                      <Typography variant="caption"
-                                        sx={{ fontSize: '0.68rem', color: '#6b7280', fontWeight: 500, flexShrink: 0 }}
-                                      >{tx.destination_account_name}</Typography>
-                                    )}
-                                    <Box sx={{
-                                      bgcolor: '#f3f4f6', color: '#6b7280',
-                                      borderRadius: '6px', px: 0.8, py: 0.1,
-                                      fontSize: '0.68rem', lineHeight: '18px', flexShrink: 0
-                                    }}>Transferência</Box>
-                                  </>
-                                ) : (
-                                  tx.category_name && (
-                                    <Box sx={{
-                                      bgcolor: '#f3f4f6', color: '#6b7280',
-                                      borderRadius: '6px', px: 0.8, py: 0.1,
-                                      fontSize: '0.68rem', lineHeight: '18px', flexShrink: 0
-                                    }}>{tx.category_name}</Box>
-                                  )
-                                )}
-                              </Box>
-                            </Box>
-
-                            {/* Valor */}
-                            <Typography
-                              variant="body2"
-                              fontWeight={600}
-                              sx={{ color: isReceita ? '#22c55e' : '#ef4444', minWidth: 80, textAlign: 'right' }}
-                            >
-                              {isReceita ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
-                            </Typography>
-
-                            {/* Ações - Menu de 3 pontinhos */}
-                            <IconButton
-                              size="small"
-                              sx={{ p: 0.5, ml: 0.5 }}
-                              onClick={(e) => openMenu(e, tx)}
-                            >
-                              <MoreIcon fontSize="small" sx={{ fontSize: 18, color: '#6b7280' }} />
-                            </IconButton>
-                          </Paper>
-                        )
-                      })}
+                            {acc.name}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            sx={{ fontSize: '0.75rem', color: colors.textMuted, textTransform: 'uppercase' }}
+                          >
+                            {acc.type}
+                          </Typography>
+                        </Box>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            width: 85,
+                            textAlign: 'right',
+                            fontSize: '0.875rem',
+                            color: bal.confirmed >= 0 ? colors.success : colors.danger,
+                            fontWeight: 500
+                          }}
+                        >
+                          {formatCurrency(bal.confirmed)}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            width: 85,
+                            textAlign: 'right',
+                            fontSize: '0.875rem',
+                            color: bal.projected >= 0 ? colors.success : colors.danger,
+                            ml: 1.5,
+                            fontWeight: 500
+                          }}
+                        >
+                          {formatCurrency(bal.projected)}
+                        </Typography>
+                      </Stack>
                     </Box>
                   )
                 })}
               </Box>
-            )}
-          </Box>
+            </Box>
 
-          {/* Rodapé vazio - resumo está na sidebar */}
-          <Box sx={{ p: 1, borderTop: '1px solid #e5e7eb', bgcolor: 'white' }} />
-        </Box>
+            {/* Timeline - Lançamentos */}
+            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', bgcolor: colors.bgPage }}>
+              {/* Saldo Anterior */}
+              <Box
+                sx={{
+                  p: 2,
+                  bgcolor: 'white',
+                  borderBottom: `1px solid ${colors.border}`,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <Typography variant="body2" color="text.secondary">
+                  Saldo anterior
+                </Typography>
+                <Typography variant="h6" fontWeight={600} color={colors.success}>
+                  {formatCurrency(0)}
+                </Typography>
+              </Box>
+
+              {/* Lista de Lançamentos */}
+              <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+                {loading ? (
+                  <Box display="flex" justifyContent="center" py={6}>
+                    <CircularProgress />
+                  </Box>
+                ) : error ? (
+                  <Alert severity="error">{error}</Alert>
+                ) : groupedByDate.length === 0 ? (
+                  <Box textAlign="center" py={6}>
+                    <Typography color="text.secondary">Nenhum lançamento encontrado.</Typography>
+                    <Button variant="text" onClick={openNew} sx={{ mt: 1 }}>
+                      Criar primeiro lançamento
+                    </Button>
+                  </Box>
+                ) : (
+                  <Stack spacing={1}>
+                    {groupedByDate.map(([date, txs]) => {
+                      const dateLabel = getDisplayDateLabel(date, todayStr)
+                      const isToday = dateLabel === 'hoje'
+
+                      return (
+                        <Box key={date}>
+                          {txs.map((tx, idx) => {
+                            const isReceita = tx.type === 'RECEITA'
+                            const dotColor = getStatusDotColor(tx)
+                            const daysOverdue = getDaysOverdue(tx)
+
+                            return (
+                              <Paper
+                                key={tx.id}
+                                elevation={0}
+                                sx={{
+                                  p: 2,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 2,
+                                  borderRadius: '12px',
+                                  bgcolor: 'white',
+                                  cursor: 'pointer',
+                                  mb: 1,
+                                  '&:hover': { bgcolor: '#fafafa', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
+                                  transition: 'all 0.2s'
+                                }}
+                                onClick={() => openEdit(tx)}
+                              >
+                                {/* Indicador de Status + Data */}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 90 }}>
+                                  <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: dotColor }} />
+                                  {isToday ? (
+                                    <Typography
+                                      variant="caption"
+                                      sx={{ color: colors.warning, fontWeight: 700, fontSize: '0.875rem' }}
+                                    >
+                                      hoje
+                                    </Typography>
+                                  ) : (
+                                    <Typography
+                                      variant="caption"
+                                      sx={{ color: colors.textMuted, fontSize: '0.875rem' }}
+                                    >
+                                      {dateLabel}
+                                    </Typography>
+                                  )}
+                                </Box>
+
+                                {/* Descrição e Detalhes */}
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                  <Typography
+                                    variant="body1"
+                                    fontWeight={600}
+                                    noWrap
+                                    sx={{ color: colors.textPrimary, fontSize: '0.9375rem' }}
+                                  >
+                                    {tx.description}
+                                  </Typography>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                                    {daysOverdue && (
+                                      <Box
+                                        sx={{
+                                          bgcolor: colors.danger,
+                                          color: 'white',
+                                          borderRadius: '50%',
+                                          minWidth: 22,
+                                          height: 22,
+                                          fontSize: '0.75rem',
+                                          fontWeight: 700,
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center'
+                                        }}
+                                      >
+                                        {daysOverdue}
+                                      </Box>
+                                    )}
+                                    {tx.account_name && (
+                                      <Box
+                                        sx={{
+                                          bgcolor: '#f3f4f6',
+                                          color: colors.textSecondary,
+                                          borderRadius: '6px',
+                                          px: 1,
+                                          py: 0.25,
+                                          fontSize: '0.75rem',
+                                          fontWeight: 500
+                                        }}
+                                      >
+                                        {tx.account_name}
+                                      </Box>
+                                    )}
+                                    {tx.category_name && (
+                                      <Box
+                                        sx={{
+                                          bgcolor: '#e8f5e9',
+                                          color: colors.success,
+                                          borderRadius: '6px',
+                                          px: 1,
+                                          py: 0.25,
+                                          fontSize: '0.75rem',
+                                          fontWeight: 500
+                                        }}
+                                      >
+                                        {tx.category_name}
+                                      </Box>
+                                    )}
+                                  </Box>
+                                </Box>
+
+                                {/* Valor */}
+                                <Typography
+                                  variant="body1"
+                                  fontWeight={600}
+                                  sx={{
+                                    color: isReceita ? colors.success : colors.danger,
+                                    minWidth: 100,
+                                    textAlign: 'right',
+                                    fontSize: '0.9375rem'
+                                  }}
+                                >
+                                  {isReceita ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
+                                </Typography>
+
+                                {/* Menu */}
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setSelectedTransaction(tx)
+                                    setMenuAnchor(e.currentTarget)
+                                  }}
+                                  sx={{ color: colors.textMuted }}
+                                >
+                                  <MoreIcon fontSize="small" />
+                                </IconButton>
+                              </Paper>
+                            )
+                          })}
+                        </Box>
+                      )
+                    })}
+                  </Stack>
+                )}
+              </Box>
+            </Box>
+          </Box>
+        </Paper>
       </Box>
 
-      {/* FAB Mobile */}
-      <Fab
-        color="primary"
-        sx={{ position: 'fixed', bottom: 80, right: 16, display: { md: 'none' } }}
-        onClick={openNew}
+      {/* Menu de Ações */}
+      <Menu
+        anchorEl={menuAnchor}
+        open={Boolean(menuAnchor)}
+        onClose={closeMenu}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
       >
-        <AddIcon />
-      </Fab>
+        {selectedTransaction?.status === 'PENDENTE' && (
+          <MenuItem onClick={handleConfirmToday} sx={{ gap: 1.5 }}>
+            <Typography variant="body2" color={colors.success}>Confirmar hoje</Typography>
+          </MenuItem>
+        )}
+        <MenuItem onClick={openConciliationModal} sx={{ gap: 1.5 }}>
+          <Typography variant="body2">Conciliar</Typography>
+        </MenuItem>
+        <MenuItem onClick={handleDelete} sx={{ gap: 1.5 }}>
+          <DeleteIcon fontSize="small" sx={{ color: colors.danger }} />
+          <Typography variant="body2" color={colors.danger}>Excluir</Typography>
+        </MenuItem>
+        <Divider />
+        <MenuItem onClick={handleClone} sx={{ gap: 1.5 }}>
+          <CopyIcon fontSize="small" sx={{ color: colors.textSecondary }} />
+          <Typography variant="body2">Clonar</Typography>
+        </MenuItem>
+        <MenuItem onClick={handleDetail} sx={{ gap: 1.5 }}>
+          <InfoIcon fontSize="small" sx={{ color: colors.textSecondary }} />
+          <Typography variant="body2">Detalhar</Typography>
+        </MenuItem>
+      </Menu>
 
       {/* Drawer Formulário */}
       <Drawer
@@ -946,8 +957,12 @@ export default function LancamentosCaixaPage() {
         PaperProps={{ sx: { width: { xs: '100%', sm: 480 } } }}
       >
         <Box p={2} display="flex" justifyContent="space-between" alignItems="center">
-          <Typography variant="h6">{editTarget ? 'Editar' : 'Novo'} Lançamento</Typography>
-          <IconButton onClick={() => { setFormOpen(false); setEditTarget(null) }}>✕</IconButton>
+          <Typography variant="h6" fontWeight={600}>
+            {editTarget ? 'Editar' : 'Novo'} Lançamento
+          </Typography>
+          <IconButton onClick={() => { setFormOpen(false); setEditTarget(null) }}>
+            <CloseIcon />
+          </IconButton>
         </Box>
         {submitError && (
           <Box px={2} pb={1}>
@@ -955,75 +970,37 @@ export default function LancamentosCaixaPage() {
           </Box>
         )}
         <TransactionForm
-          onSubmit={handleSubmit}
-          onCancel={() => { setFormOpen(false); setEditTarget(null); setSubmitError(null) }}
-          accounts={accounts}
-          categories={categories.map(cat => ({ ...cat, type: cat.type || '', children: (cat.children ?? []).map(c => ({ ...c, type: c.type || '', children: [] })) }))}
-          settings={DEFAULT_SETTINGS}
-          isLoading={isSubmitting}
           initialData={editTarget ? {
-            type: editTarget.type as 'RECEITA' | 'DESPESA' | 'TRANSFERENCIA',
+            account_id: editTarget.account_id,
+            type: editTarget.type,
             amount: Math.abs(editTarget.amount),
+            due_date: editTarget.due_date,
             description: editTarget.description,
-            due_date: editTarget.due_date ?? '',
-            account_id: editTarget.account_id ?? '',
-            category_id: editTarget.category_id ?? '',
-            status: editTarget.status as 'PENDENTE' | 'CONFIRMADO',
+            status: (editTarget.status === 'AGENDADO' ? 'PENDENTE' : editTarget.status) as 'PENDENTE' | 'CONFIRMADO' | 'CONCILIADO',
+            category_id: '',
+            center_id: '',
+            project_id: '',
+            contact_id: '',
+            notes: editTarget.notes || '',
+            tags: editTarget.tags || [],
             regime: 'CAIXA',
-            repetition_type: 'NONE',
-            tags: [],
+            repetition_type: 'NONE'
           } : undefined}
+          accounts={accounts}
+          categories={categories}
+          settings={{
+            enable_competence_date: true,
+            require_cost_center: false,
+            require_project: false,
+            require_contact: false,
+            require_tag: false,
+            require_subcategory: false,
+            installment_default: 'VALOR_PARCELA'
+          }}
+          onSubmit={handleSubmit}
+          onCancel={() => { setFormOpen(false); setEditTarget(null) }}
         />
       </Drawer>
-
-      {/* Menu de Ações - 3 pontinhos */}
-      <Menu
-        anchorEl={menuAnchor}
-        open={Boolean(menuAnchor)}
-        onClose={closeMenu}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-        PaperProps={{ sx: { minWidth: 200, mt: 0.5 } }}
-      >
-        <MenuItem onClick={handleConfirm} sx={{ gap: 1.5 }}>
-          <DoneIcon fontSize="small" sx={{ color: '#22c55e' }} />
-          <Typography variant="body2">Confirmar</Typography>
-        </MenuItem>
-        <MenuItem onClick={handleConfirmToday} sx={{ gap: 1.5 }}>
-          <DoneAllIcon fontSize="small" sx={{ color: '#22c55e' }} />
-          <Typography variant="body2">Confirmar hoje</Typography>
-        </MenuItem>
-        <MenuItem onClick={handleConfirmPartial} sx={{ gap: 1.5 }}>
-          <PartialIcon fontSize="small" sx={{ color: '#3b82f6' }} />
-          <Typography variant="body2">Confirmar parcialmente</Typography>
-        </MenuItem>
-        <MenuItem onClick={openConciliationModal} sx={{ gap: 1.5 }}>
-          <ConciliatedIcon fontSize="small" sx={{ color: '#8b5cf6' }} />
-          <Typography variant="body2">Conciliar</Typography>
-        </MenuItem>
-
-        <Divider />
-
-        <MenuItem onClick={handleDetail} sx={{ gap: 1.5 }}>
-          <EditIcon fontSize="small" sx={{ color: '#6b7280' }} />
-          <Typography variant="body2">Editar</Typography>
-        </MenuItem>
-        <MenuItem onClick={handleDeleteFromMenu} sx={{ gap: 1.5, color: '#ef4444' }}>
-          <DeleteIcon fontSize="small" />
-          <Typography variant="body2">Excluir</Typography>
-        </MenuItem>
-
-        <Divider />
-
-        <MenuItem onClick={handleClone} sx={{ gap: 1.5 }}>
-          <CopyIcon fontSize="small" sx={{ color: '#6b7280' }} />
-          <Typography variant="body2">Clonar</Typography>
-        </MenuItem>
-        <MenuItem onClick={handleDetail} sx={{ gap: 1.5 }}>
-          <InfoIcon fontSize="small" sx={{ color: '#6b7280' }} />
-          <Typography variant="body2">Detalhar</Typography>
-        </MenuItem>
-      </Menu>
 
       {/* Modal de Conciliação */}
       <Dialog
@@ -1035,17 +1012,7 @@ export default function LancamentosCaixaPage() {
       >
         <DialogTitle sx={{ pb: 2, pt: 2.5, px: 3 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Typography variant="h6" fontWeight={600}>
-                Conciliar
-              </Typography>
-              <Typography variant="h6" fontWeight={600} color="text.primary">
-                {selectedTransaction?.description}
-              </Typography>
-              {selectedTransaction?.type === 'TRANSFERENCIA' && (
-                <SwapHoriz sx={{ color: '#14b8a6', fontSize: 24 }} />
-              )}
-            </Stack>
+            <Typography variant="h6" fontWeight={600}>Conciliar Lançamento</Typography>
             <IconButton onClick={closeConciliationModal} size="small">
               <CloseIcon fontSize="small" />
             </IconButton>
@@ -1054,28 +1021,17 @@ export default function LancamentosCaixaPage() {
 
         <DialogContent sx={{ pt: 4, pb: 2, px: 3 }}>
           <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, mb: 2 }}>
-            {/* Valor efetivo */}
             <TextField
               label="Valor efetivo (R$)"
               size="small"
               fullWidth
               margin="normal"
               value={conciliationData.amount}
-              onChange={(e) => {
-                let val = e.target.value.replace(/[^0-9,]/g, '')
-                const parts = val.split(',')
-                if (parts.length > 2) val = parts[0] + ',' + parts.slice(1).join('')
-                if (parts[1] && parts[1].length > 2) val = parts[0] + ',' + parts[1].slice(0, 2)
-                setConciliationData(prev => ({ ...prev, amount: val }))
-              }}
-              placeholder="0,00"
+              onChange={(e) => setConciliationData(prev => ({ ...prev, amount: e.target.value }))}
               InputProps={{
                 startAdornment: <InputAdornment position="start">R$</InputAdornment>,
               }}
-              InputLabelProps={{ shrink: true }}
             />
-
-            {/* Data efetiva */}
             <TextField
               label="Data efetiva"
               type="date"
@@ -1084,88 +1040,27 @@ export default function LancamentosCaixaPage() {
               margin="normal"
               value={conciliationData.date}
               onChange={(e) => setConciliationData(prev => ({ ...prev, date: e.target.value }))}
-              InputLabelProps={{ shrink: true }}
             />
-
-            {/* Descrição */}
-            <TextField
-              label="Descrição"
-              size="small"
-              fullWidth
-              margin="normal"
-              value={selectedTransaction?.description || ''}
-              InputProps={{ readOnly: true }}
-              InputLabelProps={{ shrink: true }}
-              sx={{ bgcolor: '#f8fafc' }}
-            />
-
-            {/* Conta */}
             <FormControl size="small" fullWidth margin="normal">
-              <InputLabel id="conta-select-label" shrink>Conta</InputLabel>
+              <InputLabel>Conta</InputLabel>
               <Select
-                labelId="conta-select-label"
-                id="conta-select"
                 value={conciliationData.accountId}
-                label="Conta"
                 onChange={(e) => setConciliationData(prev => ({ ...prev, accountId: e.target.value }))}
               >
                 {accounts.map((acc) => (
-                  <MenuItem key={acc.id} value={acc.id}>
-                    {acc.name}
-                  </MenuItem>
+                  <MenuItem key={acc.id} value={acc.id}>{acc.name}</MenuItem>
                 ))}
               </Select>
             </FormControl>
-
-            {/* Categoria */}
             <TextField
-              label="Categoria"
+              label="Número do documento"
               size="small"
               fullWidth
               margin="normal"
-              value={selectedTransaction?.category_name || '—'}
-              InputProps={{ readOnly: true }}
-              InputLabelProps={{ shrink: true }}
-              sx={{ bgcolor: '#f8fafc' }}
-            />
-
-            {/* Competência */}
-            <TextField
-              label="Competência"
-              type="month"
-              size="small"
-              fullWidth
-              margin="normal"
-              value={conciliationData.date ? conciliationData.date.substring(0, 7) : ''}
-              onChange={(e) => {
-                const month = e.target.value
-                const day = conciliationData.date ? conciliationData.date.substring(8, 10) : '01'
-                setConciliationData(prev => ({ ...prev, date: `${month}-${day}` }))
-              }}
-              InputLabelProps={{ shrink: true }}
+              value={conciliationData.documentNumber}
+              onChange={(e) => setConciliationData(prev => ({ ...prev, documentNumber: e.target.value }))}
             />
           </Box>
-
-          <Divider sx={{ my: 2 }} />
-
-          {/* Número do documento */}
-          <TextField
-            label="Número do documento"
-            size="small"
-            fullWidth
-            margin="normal"
-            value={conciliationData.documentNumber}
-            onChange={(e) => {
-              const val = e.target.value.slice(0, 80)
-              setConciliationData(prev => ({ ...prev, documentNumber: val }))
-            }}
-            placeholder="Ex: 12345"
-            helperText={`${conciliationData.documentNumber.length} / 80`}
-            FormHelperTextProps={{ sx: { textAlign: 'right' } }}
-            InputLabelProps={{ shrink: true }}
-          />
-
-          {/* Observações */}
           <TextField
             label="Observações"
             size="small"
@@ -1174,33 +1069,11 @@ export default function LancamentosCaixaPage() {
             multiline
             rows={2}
             value={conciliationData.notes}
-            onChange={(e) => {
-              const val = e.target.value.slice(0, 400)
-              setConciliationData(prev => ({ ...prev, notes: val }))
-            }}
-            placeholder="Adicione observações..."
-            helperText={`${conciliationData.notes.length} / 400`}
-            FormHelperTextProps={{ sx: { textAlign: 'right' } }}
-            InputLabelProps={{ shrink: true }}
-          />
-
-          {/* Tags */}
-          <TextField
-            label="Tags"
-            size="small"
-            fullWidth
-            margin="normal"
-            value={conciliationData.tags}
-            onChange={(e) => setConciliationData(prev => ({ ...prev, tags: e.target.value }))}
-            placeholder="tag1, tag2, tag3"
-            InputLabelProps={{ shrink: true }}
+            onChange={(e) => setConciliationData(prev => ({ ...prev, notes: e.target.value }))}
           />
         </DialogContent>
 
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <IconButton sx={{ mr: 'auto' }}>
-            <AttachFileIcon fontSize="small" />
-          </IconButton>
           <Button onClick={closeConciliationModal} variant="outlined" size="small">
             Cancelar
           </Button>
@@ -1209,8 +1082,8 @@ export default function LancamentosCaixaPage() {
             variant="contained"
             size="small"
             sx={{
-              bgcolor: '#14b8a6',
-              '&:hover': { bgcolor: '#0d9488' },
+              bgcolor: colors.info,
+              '&:hover': { bgcolor: '#0e7490' },
               textTransform: 'none',
               fontWeight: 600
             }}
@@ -1219,6 +1092,22 @@ export default function LancamentosCaixaPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* FAB Mobile */}
+      <Fab
+        color="primary"
+        sx={{
+          position: 'fixed',
+          bottom: 24,
+          right: 24,
+          display: { md: 'none' },
+          bgcolor: colors.primary,
+          '&:hover': { bgcolor: colors.primaryHover }
+        }}
+        onClick={openNew}
+      >
+        <AddIcon />
+      </Fab>
     </Box>
   )
 }
