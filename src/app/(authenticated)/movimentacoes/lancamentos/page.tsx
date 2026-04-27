@@ -279,6 +279,7 @@ export default function LancamentosCaixaPage() {
       .reduce((sum, t) => {
         if (t.type === 'RECEITA') return sum + Math.abs(t.amount)
         if (t.type === 'DESPESA') return sum - Math.abs(t.amount)
+        if (t.type === 'TRANSFERENCIA') return sum - Math.abs(t.amount) // Transferência é saída da conta
         return sum
       }, 0)
 
@@ -301,6 +302,7 @@ export default function LancamentosCaixaPage() {
         .reduce((sum, t) => {
           if (t.type === 'RECEITA') return sum + Math.abs(t.amount)
           if (t.type === 'DESPESA') return sum - Math.abs(t.amount)
+          if (t.type === 'TRANSFERENCIA') return sum - Math.abs(t.amount) // Transferência é saída da conta
           return sum
         }, initial)
 
@@ -308,6 +310,7 @@ export default function LancamentosCaixaPage() {
         .reduce((sum, t) => {
           if (t.type === 'RECEITA') return sum + Math.abs(t.amount)
           if (t.type === 'DESPESA') return sum - Math.abs(t.amount)
+          if (t.type === 'TRANSFERENCIA') return sum - Math.abs(t.amount) // Transferência é saída da conta
           return sum
         }, initial)
 
