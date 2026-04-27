@@ -921,7 +921,7 @@ export default function LancamentosCaixaPage() {
                                     fontSize: '0.9375rem'
                                   }}
                                 >
-                                  {isReceita ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
+                                  {tx.amount > 0 ? '+' : tx.amount < 0 ? '-' : ''}{formatCurrency(Math.abs(tx.amount))}
                                 </Typography>
 
                                 {/* Menu */}
