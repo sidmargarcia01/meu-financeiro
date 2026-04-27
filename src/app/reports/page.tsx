@@ -232,8 +232,12 @@ export default function ReportsPage() {
                         {linha.percentual !== undefined && (
                           <span className="text-xs text-gray-400">{linha.percentual.toFixed(1)}%</span>
                         )}
-                        <span className={`text-sm font-medium ${linha.tipo === 'receita' ? 'text-green-600' : linha.tipo === 'despesa' ? 'text-red-600' : linha.valor >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                          {formatCurrency(linha.valor)}
+                        <span className={`text-sm font-medium ${linha.valor === 0 ? 'text-gray-500' :
+                            linha.tipo === 'receita' ? 'text-green-600' :
+                              linha.tipo === 'despesa' ? 'text-red-600' :
+                                linha.valor > 0 ? 'text-green-700' : 'text-red-700'
+                          }`}>
+                          {linha.valor === 0 ? formatCurrency(0) : formatCurrency(Math.abs(linha.valor))}
                         </span>
                       </div>
                     </div>
