@@ -161,6 +161,7 @@ export default function LancamentosCaixaPage() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null)
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
+  const [submitting, setSubmitting] = useState(false)
   const [conciliationOpen, setConciliationOpen] = useState(false)
   const [conciliationData, setConciliationData] = useState({
     amount: '',
@@ -407,6 +408,8 @@ export default function LancamentosCaixaPage() {
   }
 
   const handleSubmit = async (formData: TransactionFormData) => {
+    if (submitting) return
+    setSubmitting(true)
     try {
       const url = editTarget ? `/api/transactions/${editTarget.id}` : '/api/transactions'
       const method = editTarget ? 'PUT' : 'POST'
@@ -468,6 +471,8 @@ export default function LancamentosCaixaPage() {
       fetchTransactions()
     } catch {
       setSubmitError('Erro ao salvar lançamento.')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -1073,6 +1078,7 @@ export default function LancamentosCaixaPage() {
             require_subcategory: false,
             installment_default: 'VALOR_PARCELA'
           }}
+          isLoading={submitting}
           onSubmit={handleSubmit}
           onCancel={() => { setFormOpen(false); setEditTarget(null) }}
         />
