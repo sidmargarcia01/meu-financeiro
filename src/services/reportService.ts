@@ -239,12 +239,47 @@ export class ReportService {
       impostosLucro = sumGroup('IMPOSTOS_LUCRO')
       distribuicaoLucros = sumGroup('DISTRIBUICAO_LUCROS')
     } else {
-      // Fallback: usar totais quando não há dre_group definido
+      // Fallback: classificar despesas por palavras-chave quando não há dre_group
+      const despesasCategorias = categorias.filter(c => c.tipo === 'DESPESA')
+
+      // Palavras-chave para despesas variáveis (CV)
+      const variaveisKeywords = [
+        'energia', 'água', 'agua', 'material', 'matéria', 'materia', 'insumo',
+        'frete', 'comissão', 'comissao', 'imposto', 'tributo', 'taxa', 'cartão',
+        'cartao', 'combustível', 'combustivel', 'manutenção', 'manutencao',
+        'serviço', 'servico', 'pintura', 'funilaria', 'elétrica', 'eletrica',
+        'mecânica', 'mecanica', 'ar condicionado', 'ar-condicionado'
+      ]
+
+      // Palavras-chave para custos operacionais (CPV/CSV)
+      const custosKeywords = [
+        'mercadoria', 'produto', 'revenda', 'produção', 'producao',
+        'matéria prima', 'materia prima', 'embalagem', 'insumo produção',
+        'custo', 'acabamento', 'montagem'
+      ]
+
+      let totalVariaveis = 0
+      let totalCustos = 0
+      let totalFixas = 0
+
+      despesasCategorias.forEach(c => {
+        const nome = c.nome.toLowerCase()
+        const valor = Math.abs(c.total)
+
+        if (custosKeywords.some(k => nome.includes(k))) {
+          totalCustos += valor
+        } else if (variaveisKeywords.some(k => nome.includes(k))) {
+          totalVariaveis += valor
+        } else {
+          totalFixas += valor
+        }
+      })
+
       receitasOperacionais = totalReceitas
       impostosFaturamento = 0
-      custosOperacionais = 0
-      despesasVariaveis = 0
-      despesasFixas = Math.abs(totalDespesas)
+      custosOperacionais = totalCustos
+      despesasVariaveis = totalVariaveis
+      despesasFixas = totalFixas
       receitasNaoOperacionais = 0
       despesasNaoOperacionais = 0
       impostosLucro = 0
