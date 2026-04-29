@@ -20,6 +20,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 import {
   AppBar, Toolbar, IconButton, Badge, Menu, MenuItem,
   Box, Typography, Divider, Avatar, Tooltip,
@@ -58,8 +59,14 @@ export function Header({ userName, userEmail, onMenuClick }: HeaderProps) {
 
   const handleLogout = async () => {
     setProfileAnchor(null)
-    await fetch('/api/auth/logout', { method: 'POST' })
-    router.push('/login')
+    // Encerra sessão no servidor
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => null)
+    // Encerra sessão no cliente Supabase
+    await supabase.auth.signOut().catch(() => null)
+    // Limpa o cookie manualmente (middleware usa este cookie para verificar autenticação)
+    document.cookie = 'sb-access-token=; path=/; max-age=0; SameSite=Lax'
+    // Hard redirect garante que o middleware não veja o cookie antigo em cache
+    window.location.href = '/login'
   }
 
   return (
