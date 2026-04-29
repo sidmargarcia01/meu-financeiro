@@ -57,15 +57,16 @@ export function Header({ userName, userEmail, onMenuClick }: HeaderProps) {
   const totalAlertas = alertsData?.total ?? 0
   const temAlertas = totalAlertas > 0
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     setProfileAnchor(null)
-    // Encerra sessão no servidor
-    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => null)
-    // Encerra sessão no cliente Supabase
-    await supabase.auth.signOut().catch(() => null)
-    // Limpa o cookie manualmente (middleware usa este cookie para verificar autenticação)
+    // Limpa o cookie imediatamente (middleware usa este cookie para verificar autenticação)
     document.cookie = 'sb-access-token=; path=/; max-age=0; SameSite=Lax'
-    // Hard redirect garante que o middleware não veja o cookie antigo em cache
+    // Dispara limpeza em background — NÃO await para evitar que onAuthStateChange
+    // acione router.push('/login') ao mesmo tempo que o hard redirect abaixo,
+    // o que causava dupla navegação e tela escura/travada
+    fetch('/api/auth/logout', { method: 'POST' }).catch(() => null)
+    supabase.auth.signOut().catch(() => null)
+    // Hard redirect imediato — destrói a árvore React antes de qualquer re-render
     window.location.href = '/login'
   }
 
