@@ -293,11 +293,8 @@ export class TransactionRepository {
       }
     })
 
-    // Impacto robusto: usa type + Math.abs para neutralizar inconsistências no DB
-    const impact = (t: any): number => {
-      const abs = Math.abs(Number(t.amount) || 0)
-      return t.type === 'RECEITA' ? abs : -abs
-    }
+    // Impacto: usa valor direto do banco (receitas positivas, despesas negativas)
+    const impact = (t: any): number => Number(t.amount) || 0
 
     // Projetado = todas as transações
     transactions.forEach((transaction: any) => {
@@ -461,8 +458,8 @@ export class TransactionRepository {
     if (!data || data.length === 0) return 0
 
     return data.reduce((sum, transaction) => {
-      const amount = Number(transaction.amount)
-      return transaction.type === 'RECEITA' ? sum + amount : sum - amount
+      // Soma direta: receitas são positivas, despesas são negativas no banco
+      return sum + Number(transaction.amount)
     }, 0)
   }
 
