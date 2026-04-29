@@ -310,9 +310,9 @@ export class ReportService {
     for (const tx of (transactions || [])) {
       const acc = tx.accounts as any
       const cat = tx.categories as any
-      const entrada = tx.type === 'RECEITA' ? tx.amount : 0
-      const saida = tx.type === 'DESPESA' ? tx.amount : 0
-      saldo += entrada - saida
+      const entrada = tx.type === 'RECEITA' ? Math.abs(tx.amount) : 0
+      const saida = tx.type === 'DESPESA' ? Math.abs(tx.amount) : 0
+      saldo += (tx.type === 'RECEITA' ? tx.amount : tx.type === 'DESPESA' ? tx.amount : 0)
 
       linhas.push({
         data: tx.due_date,
