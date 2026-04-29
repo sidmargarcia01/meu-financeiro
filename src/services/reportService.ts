@@ -206,8 +206,9 @@ export class ReportService {
     const resultado = totalReceitas - totalDespesas
 
     // ── DRE Estruturado (9 grupos gerenciais) ────────────────────────────────
+    // Soma valores absolutos para garantir que despesas sejam positivas
     const sumGroup = (g: string) =>
-      categorias.filter(c => c.dreGroup === g).reduce((s, c) => s + c.total, 0)
+      categorias.filter(c => c.dreGroup === g).reduce((s, c) => s + Math.abs(c.total), 0)
     const pctRL = (v: number, rl: number) => rl !== 0 ? (v / rl) * 100 : null
 
     // Verificar se há categorias com dre_group definido
