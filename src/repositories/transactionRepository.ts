@@ -632,7 +632,8 @@ export class TransactionRepository {
       ; (data || []).forEach((item: any) => {
         const categoryId = item.categories.id
         const categoryName = item.categories.name
-        const amount = Number(item.amount)
+        // Usar Math.abs para garantir que despesas (negativas no DB) sejam somadas corretamente
+        const amount = Math.abs(Number(item.amount))
 
         if (categoryMap.has(categoryId)) {
           const existing = categoryMap.get(categoryId)!
@@ -674,7 +675,7 @@ export class TransactionRepository {
 
     const despesas = (data || [])
       .filter(t => t.type === 'DESPESA')
-      .reduce((sum, t) => sum + Number(t.amount), 0)
+      .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
 
     return {
       receitas,
