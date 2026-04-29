@@ -411,13 +411,57 @@ export default function LancamentosCaixaPage() {
       const url = editTarget ? `/api/transactions/${editTarget.id}` : '/api/transactions'
       const method = editTarget ? 'PUT' : 'POST'
 
+      // Transforma snake_case do formulário para camelCase da API
+      const payload: Record<string, unknown> = {
+        description: formData.description,
+        amount: formData.amount,
+        type: formData.type,
+        dueDate: formData.due_date,
+        accountId: formData.account_id || undefined,
+        status: formData.status || 'PENDENTE',
+        regime: formData.regime || 'CAIXA',
+        isRecurring: formData.repetition_type !== 'NONE',
+        tags: (formData.tags || []).filter(Boolean),
+      }
+
+      if (formData.category_id) payload.categoryId = formData.category_id
+      if (formData.center_id) payload.centerId = formData.center_id
+      if (formData.project_id) payload.projectId = formData.project_id
+      if (formData.contact_id) payload.contactId = formData.contact_id
+      if (formData.competence_date) payload.competenceDate = formData.competence_date
+      if (formData.notes) payload.notes = formData.notes
+
+      // Transferência: enviar conta destino em transferData
+      if (formData.type === 'TRANSFERENCIA' && formData.destination_account_id) {
+        payload.transferData = { destinationAccountId: formData.destination_account_id }
+      }
+
+      // Recorrência parcelada
+      if (formData.repetition_type === 'PARCELADO' && formData.installments) {
+        payload.recurrenceData = {
+          type: 'PARCELADA',
+          totalInstallments: formData.installments,
+          installmentAmount: formData.installment_amount,
+          firstDueDate: formData.due_date,
+        }
+      } else if (formData.repetition_type === 'FIXO') {
+        payload.recurrenceData = {
+          type: 'FIXA',
+          frequency: 'MENSAL',
+          months: formData.fixed_months,
+        }
+      }
+
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       })
 
-      if (!response.ok) throw new Error()
+      if (!response.ok) {
+        const err = await response.json().catch(() => null)
+        throw new Error(err?.error || 'Erro ao salvar')
+      }
 
       setFormOpen(false)
       setEditTarget(null)

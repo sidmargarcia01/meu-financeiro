@@ -177,18 +177,21 @@ export class ReportService {
         categoriaMap.set(catId, { id: catId, nome: catNome, tipo, dreGroup, total: 0, subcategorias: new Map() })
       }
 
+      // Receita: valor positivo; Despesa: valor absoluto (ignorar sinal do BD)
+      const txValue = tipo === 'RECEITA' ? tx.amount : Math.abs(tx.amount)
+
       const catEntry = categoriaMap.get(catId)!
-      catEntry.total += tx.amount
+      catEntry.total += txValue
 
       if (cat.parent_id) {
         if (!catEntry.subcategorias.has(cat.id)) {
           catEntry.subcategorias.set(cat.id, { id: cat.id, nome: cat.name, total: 0 })
         }
-        catEntry.subcategorias.get(cat.id)!.total += tx.amount
+        catEntry.subcategorias.get(cat.id)!.total += txValue
       }
 
-      if (tipo === 'RECEITA') totalReceitas += tx.amount
-      else totalDespesas += tx.amount
+      if (tipo === 'RECEITA') totalReceitas += txValue
+      else totalDespesas += txValue
     }
 
     const categorias = Array.from(categoriaMap.values()).map(c => ({
@@ -241,7 +244,7 @@ export class ReportService {
       impostosFaturamento = 0
       custosOperacionais = 0
       despesasVariaveis = 0
-      despesasFixas = totalDespesas
+      despesasFixas = Math.abs(totalDespesas)
       receitasNaoOperacionais = 0
       despesasNaoOperacionais = 0
       impostosLucro = 0
