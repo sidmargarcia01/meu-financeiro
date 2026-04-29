@@ -194,7 +194,7 @@ export default function DrePage() {
                             : 'text.primary',
                     }}
                   >
-                    {formatCurrency(linha.valor)}
+                    {linha.valor < 0 ? '-' : ''}{formatCurrency(Math.abs(linha.valor))}
                   </TableCell>
                   <TableCell align="right" sx={{ color: 'text.secondary', fontSize: '0.8rem' }}>
                     {linha.pct}
