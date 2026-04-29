@@ -13,9 +13,19 @@ export const createTransactionSchema = z.object({
   description: z.string().min(1, 'Descrição é obrigatória').max(255),
   amount: z.number().positive('Valor deve ser positivo'),
   type: z.enum(['RECEITA', 'DESPESA', 'TRANSFERENCIA']),
-  dueDate: z.string().datetime('Data de vencimento inválida'),
-  paymentDate: z.string().datetime().optional(),
-  competenceDate: z.string().datetime().optional(),
+  // Aceita formato ISO date (YYYY-MM-DD) ou datetime completo
+  dueDate: z.union([
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data deve estar no formato YYYY-MM-DD'),
+    z.string().datetime('Data de vencimento inválida')
+  ]),
+  paymentDate: z.union([
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    z.string().datetime()
+  ]).optional(),
+  competenceDate: z.union([
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    z.string().datetime()
+  ]).optional(),
   regime: z.enum(['CAIXA', 'COMPETENCIA']).default('CAIXA'),
   accountId: z.string().uuid('ID da conta inválido').optional(),
   categoryId: z.string().uuid('ID da categoria inválido').optional(),
