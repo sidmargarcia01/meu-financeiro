@@ -140,6 +140,18 @@ export class ReportService {
   ): Promise<DRERelatorio> {
     const dateField = regime === 'COMPETENCIA' ? 'competence_date' : 'due_date'
 
+    // Pré-carrega categorias pai para obter dre_group correto via subcategorias
+    const { data: parentCats } = await supabase
+      .from('categories')
+      .select('id, name, dre_group')
+      .eq('user_id', userId)
+      .is('parent_id', null)
+
+    const parentCatMap = new Map<string, { name: string; dreGroup: string | null }>()
+      ; (parentCats || []).forEach((pc: any) => {
+        parentCatMap.set(pc.id, { name: pc.name, dreGroup: pc.dre_group ?? null })
+      })
+
     const { data: transactions, error } = await supabase
       .from('transactions')
       .select(`
@@ -169,16 +181,25 @@ export class ReportService {
       if (!cat) continue
 
       const catId = cat.parent_id || cat.id
-      const catNome = cat.parent_id ? cat.name : cat.name
       const tipo: 'RECEITA' | 'DESPESA' = tx.type as any
 
       if (!categoriaMap.has(catId)) {
-        const dreGroup = cat.parent_id ? null : (cat.dre_group ?? null)
+        // Para subcategorias: busca nome e dre_group do PAI via parentCatMap
+        let catNome: string
+        let dreGroup: string | null
+        if (cat.parent_id) {
+          const parentInfo = parentCatMap.get(cat.parent_id)
+          catNome = parentInfo?.name || cat.name
+          dreGroup = parentInfo?.dreGroup ?? null
+        } else {
+          catNome = cat.name
+          dreGroup = cat.dre_group ?? null
+        }
         categoriaMap.set(catId, { id: catId, nome: catNome, tipo, dreGroup, total: 0, subcategorias: new Map() })
       }
 
-      // Receita: valor positivo; Despesa: valor absoluto (ignorar sinal do BD)
-      const txValue = tipo === 'RECEITA' ? tx.amount : Math.abs(tx.amount)
+      // Sempre usar Math.abs para neutralizar sinal do BD
+      const txValue = Math.abs(Number(tx.amount) || 0)
 
       const catEntry = categoriaMap.get(catId)!
       catEntry.total += txValue
@@ -209,13 +230,17 @@ export class ReportService {
     const resultado = totalReceitas - totalDespesas
 
     // ── DRE Estruturado (9 grupos gerenciais) ────────────────────────────────
-    // Soma valores absolutos para garantir que despesas sejam positivas
     const sumGroup = (g: string) =>
       categorias.filter(c => c.dreGroup === g).reduce((s, c) => s + Math.abs(c.total), 0)
     const pctRL = (v: number, rl: number) => rl !== 0 ? (v / rl) * 100 : null
 
-    // Verificar se há categorias com dre_group definido
-    const hasDreGroup = categorias.some(c => c.dreGroup !== null && c.dreGroup !== undefined)
+    // Verificar separadamente para RECEITA e DESPESA (evita falso positivo)
+    const hasReceitaDreGroup = categorias.some(c =>
+      c.tipo === 'RECEITA' && c.dreGroup !== null && c.dreGroup !== undefined
+    )
+    const hasDespesaDreGroup = categorias.some(c =>
+      c.tipo === 'DESPESA' && c.dreGroup !== null && c.dreGroup !== undefined
+    )
 
     let receitasOperacionais: number
     let impostosFaturamento: number
@@ -227,60 +252,74 @@ export class ReportService {
     let impostosLucro: number
     let distribuicaoLucros: number
 
-    if (hasDreGroup) {
-      // Usar classificação por dre_group quando disponível
+    // ── Receitas ─────────────────────────────────────────────────────────────
+    if (hasReceitaDreGroup) {
       receitasOperacionais = sumGroup('RECEITAS_OPERACIONAIS')
       impostosFaturamento = sumGroup('IMPOSTOS_FATURAMENTO')
+      receitasNaoOperacionais = sumGroup('RECEITAS_NAO_OPERACIONAIS')
+    } else {
+      receitasOperacionais = totalReceitas
+      impostosFaturamento = 0
+      receitasNaoOperacionais = 0
+    }
+
+    // ── Despesas ─────────────────────────────────────────────────────────────
+    if (hasDespesaDreGroup) {
+      // Usar classificação por dre_group configurada no banco
       custosOperacionais = sumGroup('CUSTOS_OPERACIONAIS')
       despesasVariaveis = sumGroup('DESPESAS_VARIAVEIS')
       despesasFixas = sumGroup('DESPESAS_FIXAS')
-      receitasNaoOperacionais = sumGroup('RECEITAS_NAO_OPERACIONAIS')
       despesasNaoOperacionais = sumGroup('DESPESAS_NAO_OPERACIONAIS')
       impostosLucro = sumGroup('IMPOSTOS_LUCRO')
       distribuicaoLucros = sumGroup('DISTRIBUICAO_LUCROS')
     } else {
-      // Fallback: classificar despesas por palavras-chave quando não há dre_group
+      // Fallback por palavras-chave — default é VARIÁVEL (operacional)
       const despesasCategorias = categorias.filter(c => c.tipo === 'DESPESA')
 
-      // Palavras-chave para despesas variáveis (CV)
-      const variaveisKeywords = [
-        'energia', 'água', 'agua', 'material', 'matéria', 'materia', 'insumo',
-        'frete', 'comissão', 'comissao', 'imposto', 'tributo', 'taxa', 'cartão',
-        'cartao', 'combustível', 'combustivel', 'manutenção', 'manutencao',
-        'serviço', 'servico', 'pintura', 'funilaria', 'elétrica', 'eletrica',
-        'mecânica', 'mecanica', 'ar condicionado', 'ar-condicionado'
-      ]
-
-      // Palavras-chave para custos operacionais (CPV/CSV)
+      // Custos Operacionais (CPV/CSV): produção, mercadoria, matéria-prima
       const custosKeywords = [
-        'mercadoria', 'produto', 'revenda', 'produção', 'producao',
-        'matéria prima', 'materia prima', 'embalagem', 'insumo produção',
-        'custo', 'acabamento', 'montagem'
+        'mercadoria', 'produto para revenda', 'revenda', 'produção', 'producao',
+        'matéria-prima', 'materia-prima', 'matéria prima', 'materia prima',
+        'embalagem', 'custo de produção', 'cpv', 'csv'
       ]
 
-      let totalVariaveis = 0
+      // Despesas Fixas: estruturais, não variam com volume
+      const fixasKeywords = [
+        'aluguel', 'salário', 'salario', 'salarios', 'folha', 'folha de pagamento',
+        'pró-labore', 'pro-labore', 'prolabore', 'inss', 'fgts', 'férias', 'ferias',
+        '13º', '13o', 'contabilidade', 'contador', 'financiamento', 'amortização',
+        'amortizacao', 'depreciação', 'depreciacao', 'juros', 'empréstimo',
+        'emprestimo', 'leasing', 'debenture', 'seguro', 'plano de saúde',
+        'plano de saude', 'benefício', 'beneficio', 'transporte de funcionário',
+        'vale transporte', 'vale alimentação', 'vale refeição', 'licença', 'licenca',
+        'anuidade', 'sindico', 'síndico'
+      ]
+
       let totalCustos = 0
       let totalFixas = 0
+      let totalVariaveis = 0
 
       despesasCategorias.forEach(c => {
         const nome = c.nome.toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos para comparação
         const valor = Math.abs(c.total)
 
-        if (custosKeywords.some(k => nome.includes(k))) {
+        // Normalizar também as keywords para comparação sem acento
+        const normalizar = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+
+        if (custosKeywords.some(k => nome.includes(normalizar(k)))) {
           totalCustos += valor
-        } else if (variaveisKeywords.some(k => nome.includes(k))) {
-          totalVariaveis += valor
-        } else {
+        } else if (fixasKeywords.some(k => nome.includes(normalizar(k)))) {
           totalFixas += valor
+        } else {
+          // DEFAULT: despesa variável (operacional — água, energia, serviços, etc.)
+          totalVariaveis += valor
         }
       })
 
-      receitasOperacionais = totalReceitas
-      impostosFaturamento = 0
       custosOperacionais = totalCustos
       despesasVariaveis = totalVariaveis
       despesasFixas = totalFixas
-      receitasNaoOperacionais = 0
       despesasNaoOperacionais = 0
       impostosLucro = 0
       distribuicaoLucros = 0
