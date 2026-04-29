@@ -205,39 +205,22 @@ export default function LancamentosCaixaPage() {
     try {
       const selectedDate = toLocalDateString(currentDate)
 
-      const confirmedParams = new URLSearchParams()
-      confirmedParams.set('limit', '2000')
-      confirmedParams.set('endDate', selectedDate)
-      if (searchTerm) confirmedParams.set('search', searchTerm)
+      // Busca única sem filtro de status para evitar duplicação entre listas
+      const params = new URLSearchParams()
+      params.set('limit', '2000')
+      params.set('endDate', selectedDate)
+      if (searchTerm) params.set('search', searchTerm)
 
-      const pendingParams = new URLSearchParams()
-      pendingParams.set('status', 'PENDENTE')
-      pendingParams.set('limit', '2000')
-      pendingParams.set('endDate', selectedDate)
-      if (searchTerm) pendingParams.set('search', searchTerm)
+      const res = await fetch(`/api/transactions?${params}`)
+      if (!res.ok) throw new Error()
 
-      const scheduledParams = new URLSearchParams()
-      scheduledParams.set('status', 'AGENDADO')
-      scheduledParams.set('limit', '2000')
-      scheduledParams.set('endDate', selectedDate)
-      if (searchTerm) scheduledParams.set('search', searchTerm)
+      const data = await res.json()
+      const allTxs: Transaction[] = Array.isArray(data) ? data : (data.data ?? [])
 
-      const [res1, res2, res3] = await Promise.all([
-        fetch(`/api/transactions?${confirmedParams}`),
-        fetch(`/api/transactions?${pendingParams}`),
-        fetch(`/api/transactions?${scheduledParams}`)
-      ])
-
-      if (!res1.ok || !res2.ok || !res3.ok) throw new Error()
-
-      const [data1, data2, data3] = await Promise.all([res1.json(), res2.json(), res3.json()])
-      const txs1: Transaction[] = Array.isArray(data1) ? data1 : (data1.data ?? [])
-      const txs2: Transaction[] = Array.isArray(data2) ? data2 : (data2.data ?? [])
-      const txs3: Transaction[] = Array.isArray(data3) ? data3 : (data3.data ?? [])
-
-      const seen = new Set(txs1.map(t => t.id))
-      txs2.forEach(t => seen.add(t.id))
-      setTransactions([...txs1, ...txs2, ...txs3.filter(t => !seen.has(t.id))])
+      // Deduplicação por ID (garante unicidade mesmo em edge cases)
+      const dedupMap = new Map<string, Transaction>()
+      allTxs.forEach(t => { if (!dedupMap.has(t.id)) dedupMap.set(t.id, t) })
+      setTransactions(Array.from(dedupMap.values()))
     } catch {
       setError('Erro ao carregar lançamentos.')
     } finally {
