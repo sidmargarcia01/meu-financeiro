@@ -381,11 +381,25 @@ export default function LancamentosCaixaPage() {
   const closeConciliationModal = () => {
     setConciliationOpen(false)
     setSelectedTransaction(null)
+    setSubmitError(null)
   }
 
   const handleSubmitConciliation = async () => {
     if (!selectedTransaction) return
-    // Implementação da conciliação
+    try {
+      const res = await fetch(
+        `/api/transactions/${selectedTransaction.id}?action=reconcile`,
+        { method: 'PATCH' }
+      )
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        setSubmitError(data?.error || 'Erro ao conciliar lançamento.')
+        return
+      }
+    } catch {
+      setSubmitError('Erro ao conciliar lançamento.')
+      return
+    }
     closeConciliationModal()
     fetchTransactions()
   }
@@ -394,8 +408,10 @@ export default function LancamentosCaixaPage() {
     if (submitting) return
     setSubmitting(true)
     try {
-      const url = editTarget ? `/api/transactions/${editTarget.id}` : '/api/transactions'
-      const method = editTarget ? 'PUT' : 'POST'
+      // Se editTarget.id for vazio (clone), tratar como novo lançamento (POST)
+      const isEdit = editTarget && editTarget.id
+      const url = isEdit ? `/api/transactions/${editTarget.id}` : '/api/transactions'
+      const method = isEdit ? 'PUT' : 'POST'
 
       // Transforma snake_case do formulário para camelCase da API
       const payload: Record<string, unknown> = {
@@ -1084,7 +1100,12 @@ export default function LancamentosCaixaPage() {
           </Stack>
         </DialogTitle>
 
-        <DialogContent sx={{ pt: 4, pb: 2, px: 3 }}>
+        <DialogContent sx={{ pt: 2, pb: 2, px: 3 }}>
+          {submitError && (
+            <Alert severity="error" onClose={() => setSubmitError(null)} sx={{ mb: 2 }}>
+              {submitError}
+            </Alert>
+          )}
           <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, mb: 2 }}>
             <TextField
               label="Valor efetivo (R$)"
