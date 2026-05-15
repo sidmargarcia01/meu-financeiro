@@ -181,11 +181,15 @@ export class AccountRepository {
       const transactions = account.transactions || []
       const initialBalance = Number(account.initial_balance) || 0
 
-      // Impacto de uma transação no saldo (RECEITA=+, qualquer outra=-),
-      // sempre usa valor absoluto para neutralizar inconsistências no DB
+      // Impacto de uma transação no saldo (RECEITA=+, DESPESA=-, TRANSFERENCIA=0),
+      // sempre usa valor absoluto para neutralizar inconsistências no DB.
+      // TRANSFERENCIA e ignorada aqui porque ja e contabilizada via
+      // receita/despesa nas contas origem/destino no fluxo de caixa.
       const impact = (t: any): number => {
         const abs = Math.abs(Number(t.amount) || 0)
-        return t.type === 'RECEITA' ? abs : -abs
+        if (t.type === 'RECEITA') return abs
+        if (t.type === 'DESPESA') return -abs
+        return 0
       }
 
       // Projetado = saldo inicial + TODAS as transações (pendentes, confirmadas, conciliadas)
