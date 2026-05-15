@@ -32,11 +32,12 @@ const ACCOUNT_TYPES = [
 
 interface Account {
   id: string; name: string; type: string; bank?: string
-  initialBalance: number; confirmedBalance?: number; projectedBalance?: number
+  initialBalance: number; initialBalanceDate?: string
+  confirmedBalance?: number; projectedBalance?: number
   currency: string; isActive: boolean
 }
 
-const EMPTY = { name: '', type: 'CORRENTE', bank: '', currency: 'BRL', initialBalance: 0 }
+const EMPTY = { name: '', type: 'CORRENTE', bank: '', currency: 'BRL', initialBalance: 0, initialBalanceDate: '' }
 
 export default function ContasPage() {
   const [items, setItems] = useState<Account[]>([])
@@ -60,7 +61,7 @@ export default function ContasPage() {
 
   const openNew = () => { setForm(EMPTY); setEditId(null); setOpen(true) }
   const openEdit = (a: Account) => {
-    setForm({ name: a.name, type: a.type, bank: a.bank ?? '', currency: a.currency, initialBalance: a.initialBalance ?? 0 })
+    setForm({ name: a.name, type: a.type, bank: a.bank ?? '', currency: a.currency, initialBalance: a.initialBalance ?? 0, initialBalanceDate: a.initialBalanceDate ?? '' })
     setEditId(a.id); setOpen(true)
   }
 
@@ -70,7 +71,7 @@ export default function ContasPage() {
     try {
       const method = editId ? 'PUT' : 'POST'
       const url = editId ? `/api/accounts/${editId}` : '/api/accounts'
-      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, initialBalance: Number(form.initialBalance) }) })
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, initialBalance: Number(form.initialBalance), initialBalanceDate: form.initialBalanceDate || undefined }) })
       if (res.ok) { setOpen(false); load() }
     } finally { setSaving(false) }
   }
@@ -149,6 +150,9 @@ export default function ContasPage() {
             <TextField label="Saldo Inicial" type="number" inputProps={{ step: '0.01' }} value={form.initialBalance}
               onChange={e => setForm(f => ({ ...f, initialBalance: parseFloat(e.target.value) || 0 }))} fullWidth size="small"
               helperText="Valor de abertura da conta (ex: saldo atual do banco)" />
+            <TextField label="Data do Saldo Inicial" type="date" value={form.initialBalanceDate}
+              onChange={e => setForm(f => ({ ...f, initialBalanceDate: e.target.value }))} fullWidth size="small"
+              InputLabelProps={{ shrink: true }} />
           </Stack>
         </DialogContent>
         <DialogActions>
