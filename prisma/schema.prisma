@@ -84,6 +84,7 @@ model Account {
   name              String
   type              String    // 'CORRENTE' | 'POUPANCA' | 'INVESTIMENTO' | 'CARTAO' | 'CARTEIRA'
   initialBalance    Decimal   @default(0) @map("initial_balance") @db.Decimal(15, 2)
+  initialBalanceDate DateTime? @map("initial_balance_date") @db.Date
   currency          String    @default("BRL")
   icon              String?
   isActive          Boolean   @default(true) @map("is_active")

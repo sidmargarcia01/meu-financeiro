@@ -26,6 +26,7 @@ interface Account {
   currency: string
   isActive: boolean
   initialBalance: number
+  initialBalanceDate?: string
   icon?: string
   currentBalance?: number
   projectedBalance?: number
@@ -58,7 +59,7 @@ const ACCOUNT_TYPE_COLORS: Record<Account['type'], string> = {
 
 const emptyForm = {
   name: '', type: 'CORRENTE' as Account['type'],
-  initialBalance: 0, currency: 'BRL', icon: '',
+  initialBalance: 0, initialBalanceDate: '', currency: 'BRL', icon: '',
 }
 
 export default function AccountsPage() {
@@ -103,6 +104,7 @@ export default function AccountsPage() {
       name: account.name,
       type: account.type,
       initialBalance: account.initialBalance,
+      initialBalanceDate: account.initialBalanceDate || '',
       currency: account.currency,
       icon: account.icon || '',
     })
@@ -120,7 +122,7 @@ export default function AccountsPage() {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, initialBalance: Number(form.initialBalance) }),
+        body: JSON.stringify({ ...form, initialBalance: Number(form.initialBalance), initialBalanceDate: form.initialBalanceDate || undefined }),
       })
       if (!res.ok) {
         const data = await res.json()
@@ -323,6 +325,16 @@ export default function AccountsPage() {
                 <input
                   type="number" step="0.01"
                   value={form.initialBalance} onChange={e => setForm(p => ({ ...p, initialBalance: parseFloat(e.target.value) || 0 }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Data do saldo inicial</label>
+                <input
+                  type="date"
+                  value={form.initialBalanceDate}
+                  onChange={e => setForm(p => ({ ...p, initialBalanceDate: e.target.value }))}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>

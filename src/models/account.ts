@@ -13,6 +13,7 @@ export const createAccountSchema = z.object({
   name: z.string().min(1, 'Nome da conta é obrigatório').max(100),
   type: z.enum(['CORRENTE', 'POUPANCA', 'INVESTIMENTO', 'CARTAO', 'CARTEIRA']),
   initialBalance: z.number().default(0),
+  initialBalanceDate: z.string().optional(),
   currency: z.string().length(3).default('BRL'),
   icon: z.string().optional(),
   bankConnectionId: z.string().optional(),
@@ -46,6 +47,7 @@ export interface Account {
   name: string
   type: 'CORRENTE' | 'POUPANCA' | 'INVESTIMENTO' | 'CARTAO' | 'CARTEIRA'
   initialBalance: number
+  initialBalanceDate?: Date
   currency: string
   icon?: string
   isActive: boolean

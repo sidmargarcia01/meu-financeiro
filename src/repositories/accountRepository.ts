@@ -21,6 +21,7 @@ export class AccountRepository {
     name: string
     type: 'CORRENTE' | 'POUPANCA' | 'INVESTIMENTO' | 'CARTAO' | 'CARTEIRA'
     initialBalance?: number
+    initialBalanceDate?: string | null
     currency?: string
     icon?: string
     bankConnectionId?: string
@@ -32,6 +33,7 @@ export class AccountRepository {
         name: data.name,
         type: data.type,
         initial_balance: data.initialBalance || 0,
+        initial_balance_date: data.initialBalanceDate || null,
         currency: data.currency || 'BRL',
         icon: data.icon,
         bank_connection_id: data.bankConnectionId,
@@ -48,6 +50,7 @@ export class AccountRepository {
       name: account.name,
       type: account.type,
       initialBalance: Number(account.initial_balance),
+      initialBalanceDate: account.initial_balance_date ? new Date(account.initial_balance_date) : undefined,
       currency: account.currency,
       icon: account.icon,
       isActive: account.is_active,
@@ -73,6 +76,7 @@ export class AccountRepository {
       name: account.name,
       type: account.type,
       initialBalance: Number(account.initial_balance),
+      initialBalanceDate: account.initial_balance_date ? new Date(account.initial_balance_date) : undefined,
       currency: account.currency,
       icon: account.icon,
       isActive: account.is_active,
@@ -103,6 +107,7 @@ export class AccountRepository {
       name: account.name,
       type: account.type,
       initialBalance: Number(account.initial_balance),
+      initialBalanceDate: account.initial_balance_date ? new Date(account.initial_balance_date) : undefined,
       currency: account.currency,
       icon: account.icon,
       isActive: account.is_active,
@@ -142,6 +147,7 @@ export class AccountRepository {
       name: account.name,
       type: account.type,
       initialBalance: Number(account.initial_balance),
+      initialBalanceDate: account.initial_balance_date ? new Date(account.initial_balance_date) : undefined,
       currency: account.currency,
       icon: account.icon,
       isActive: account.is_active,
@@ -220,6 +226,7 @@ export class AccountRepository {
       name?: string
       type?: 'CORRENTE' | 'POUPANCA' | 'INVESTIMENTO' | 'CARTAO' | 'CARTEIRA'
       initialBalance?: number
+      initialBalanceDate?: string | null
       currency?: string
       icon?: string
       isActive?: boolean
@@ -237,6 +244,9 @@ export class AccountRepository {
     if (data.initialBalance !== undefined) {
       updatePayload.initial_balance = data.initialBalance
     }
+    if (data.initialBalanceDate !== undefined) {
+      updatePayload.initial_balance_date = data.initialBalanceDate || null
+    }
     const { data: account, error } = await supabase
       .from('accounts')
       .update(updatePayload)
@@ -253,6 +263,7 @@ export class AccountRepository {
       name: account.name,
       type: account.type,
       initialBalance: Number(account.initial_balance),
+      initialBalanceDate: account.initial_balance_date ? new Date(account.initial_balance_date) : undefined,
       currency: account.currency,
       icon: account.icon,
       isActive: account.is_active,
@@ -417,6 +428,7 @@ export class AccountRepository {
       name: account.name,
       type: account.type,
       initialBalance: Number(account.initial_balance),
+      initialBalanceDate: account.initial_balance_date ? new Date(account.initial_balance_date) : undefined,
       currency: account.currency,
       icon: account.icon,
       isActive: account.is_active,
@@ -478,6 +490,7 @@ export class AccountRepository {
       name: account.name,
       type: account.type,
       initialBalance: Number(account.initial_balance),
+      initialBalanceDate: account.initial_balance_date ? new Date(account.initial_balance_date) : undefined,
       currency: account.currency,
       icon: account.icon,
       isActive: account.is_active,

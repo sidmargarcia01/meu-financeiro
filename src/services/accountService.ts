@@ -41,6 +41,7 @@ export class AccountService {
       name: data.name,
       type: data.type,
       initialBalance: data.initialBalance ?? 0,
+      initialBalanceDate: data.initialBalanceDate,
       currency: data.currency || 'BRL',
       icon: data.icon,
       bankConnectionId: data.bankConnectionId,
@@ -77,7 +78,10 @@ export class AccountService {
       throw new Error('Nome da conta é obrigatório')
     }
 
-    return this.accountRepository.update(accountId, userId, data)
+    return this.accountRepository.update(accountId, userId, {
+      ...data,
+      initialBalanceDate: data.initialBalanceDate,
+    })
   }
 
   async delete(userId: string, accountId: string) {
