@@ -122,7 +122,7 @@ export default function ContasPage() {
                   <TableCell><Typography variant="body2" fontWeight={500}>{a.name}</Typography></TableCell>
                   <TableCell><Chip label={typeLabel(a.type)} size="small" variant="outlined" /></TableCell>
                   <TableCell><Typography variant="body2" color="text.secondary">{a.bank ?? '—'}</Typography></TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600, color: (a.confirmedBalance ?? a.initialBalance ?? 0) < 0 ? 'error.main' : 'inherit' }}>{formatCurrency(a.confirmedBalance ?? a.initialBalance ?? 0)}</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600, color: (a.projectedBalance ?? a.initialBalance ?? 0) < 0 ? 'error.main' : 'inherit' }}>{formatCurrency(a.projectedBalance ?? a.initialBalance ?? 0)}</TableCell>
                   <TableCell><Chip label={a.isActive ? 'Ativa' : 'Inativa'} color={a.isActive ? 'success' : 'default'} size="small" /></TableCell>
                   <TableCell align="right">
                     <Tooltip title="Editar"><IconButton size="small" onClick={() => openEdit(a)}><EditIcon fontSize="small" /></IconButton></Tooltip>
