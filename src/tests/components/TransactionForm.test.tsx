@@ -148,8 +148,7 @@ describe('TransactionForm', () => {
       await flushPromises()
     })
     expect(mockProps.onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({ amount: 150, description: 'Supermercado' }),
-      expect.anything()
+      expect.objectContaining({ amount: 150, description: 'Supermercado' })
     )
   })
 })

@@ -12,19 +12,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/middlewares/auth'
 import { AccountService } from '@/services/accountService'
 
-const accountService = new AccountService()
-
 // GET /api/accounts/balance?date=YYYY-MM-DD&accounts=id1,id2,id3
 // Retorna saldo acumulado até D-1 (incluindo initialBalance + transações CONFIRMADO/CONCILIADO)
 export async function GET(request: NextRequest) {
   return withAuth(request, async (req, user) => {
+    const accountService = new AccountService()
     try {
-      const { searchParams } = new URL(req.url)
-      
+      const { searchParams } = req.nextUrl
+
       // Parse e validação dos parâmetros
       const date = searchParams.get('date')
       const accountsParam = searchParams.get('accounts')
-      
+
       // Validação: date é obrigatório
       if (!date) {
         return NextResponse.json(
@@ -32,7 +31,7 @@ export async function GET(request: NextRequest) {
           { status: 400 }
         )
       }
-      
+
       // Validação: formato da data
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
         return NextResponse.json(
@@ -40,7 +39,7 @@ export async function GET(request: NextRequest) {
           { status: 400 }
         )
       }
-      
+
       // Validação: accounts é obrigatório
       if (!accountsParam || accountsParam.trim() === '') {
         return NextResponse.json(
@@ -48,36 +47,37 @@ export async function GET(request: NextRequest) {
           { status: 400 }
         )
       }
-      
+
       // Parse da lista de contas
       const accountIds = accountsParam.split(',').filter(id => id.trim() !== '')
-      
+
       if (accountIds.length === 0) {
         return NextResponse.json(
           { error: 'Pelo menos uma conta deve ser informada' },
           { status: 400 }
         )
       }
-      
+
       // Chamar service para calcular saldos
       const result = await accountService.getBalancesUntilDate(
         user.id,
         accountIds,
         date
       )
-      
+
       return NextResponse.json(result)
-      
+
     } catch (error) {
       console.error('Erro ao calcular saldos:', error)
-      
+
       // Erros de validação do service retornam 400
       if (error instanceof Error) {
         const errorMessage = error.message.toLowerCase()
         if (
           errorMessage.includes('formato') ||
-          errorMessage.includes('conta') ||
-          errorMessage.includes('data')
+          errorMessage.includes('conta inválida') ||
+          errorMessage.includes('data inválida') ||
+          errorMessage.includes('parâmetro')
         ) {
           return NextResponse.json(
             { error: error.message },
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
           )
         }
       }
-      
+
       // Erros internos retornam 500 com mensagem genérica (segurança)
       return NextResponse.json(
         { error: 'Erro interno ao calcular saldos' },

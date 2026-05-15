@@ -76,7 +76,7 @@ describe('TransactionService', () => {
   beforeEach(() => {
     jest.resetAllMocks()
     transactionService = new TransactionService(mockTransactionRepository as any, mockUserRepository as any, mockRecurrenceRepository as any, mockAccountRepository as any)
-    
+
     // Mock do usuário
     mockUserRepository.findById.mockResolvedValue(mockUser)
     mockUserRepository.countTransactionsThisMonth.mockResolvedValue(50)
@@ -89,10 +89,10 @@ describe('TransactionService', () => {
       storageLimitMb: 50,
       features: {}
     })
-    
+
     // Mock do exists para retornar true nos testes de update/delete
     mockTransactionRepository.exists.mockResolvedValue(true)
-    
+
     // Mock padrão para create
     mockTransactionRepository.create.mockResolvedValue({
       id: 'transaction-123',
@@ -105,7 +105,7 @@ describe('TransactionService', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     })
-    
+
     // Mock padrão para getBalancesByAccount
     mockTransactionRepository.getBalancesByAccount.mockResolvedValue([
       {
@@ -121,10 +121,10 @@ describe('TransactionService', () => {
         projectedBalance: 5000,
       }
     ])
-    
+
     // Mock para countByUserMonth
     mockTransactionRepository.countByUserMonth.mockResolvedValue(50)
-    
+
     // Mock para RecurrenceRepository
     mockRecurrenceRepository.create.mockResolvedValue({
       id: 'recurrence-123',
@@ -168,7 +168,7 @@ describe('TransactionService', () => {
       expect(mockTransactionRepository.create).toHaveBeenCalledWith({
         userId: mockUserId,
         description: transactionData.description,
-        amount: transactionData.amount,
+        amount: -transactionData.amount,
         type: transactionData.type,
         dueDate: new Date(transactionData.dueDate),
         paymentDate: transactionData.paymentDate ? new Date(transactionData.paymentDate) : undefined,
@@ -440,7 +440,11 @@ describe('TransactionService', () => {
 
       expect(result).toEqual(mockTransaction)
       expect(mockTransactionRepository.findById).toHaveBeenCalledWith(transactionId, mockUserId)
-      expect(mockTransactionRepository.update).toHaveBeenCalledWith(transactionId, mockUserId, updateData)
+      expect(mockTransactionRepository.update).toHaveBeenCalledWith(
+        transactionId,
+        mockUserId,
+        expect.objectContaining({ description: updateData.description, amount: -updateData.amount! })
+      )
     })
 
     it('deve rejeitar atualização de transação inexistente', async () => {

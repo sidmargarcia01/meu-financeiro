@@ -170,7 +170,7 @@ export default function CategoriasPage() {
         setLoading(true); setError(null)
         try {
             const res = await fetch('/api/categories')
-            if (!res.ok) throw new Error('Erro ao buscar categorias')
+            if (!res.ok) throw new Error('Erro ao carregar categorias')
             const data: Category[] = await res.json()
             setCategories(data)
 
@@ -302,7 +302,10 @@ export default function CategoriasPage() {
             {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>{success}</Alert>}
 
             {loading ? (
-                <Box display="flex" justifyContent="center" py={8}><CircularProgress /></Box>
+                <Box display="flex" justifyContent="center" alignItems="center" gap={2} py={8}>
+                    <CircularProgress />
+                    <Typography color="text.secondary">Carregando...</Typography>
+                </Box>
             ) : (
                 <Paper>
                     <Table size="small">
@@ -321,7 +324,7 @@ export default function CategoriasPage() {
                                         <Stack spacing={2} alignItems="center">
                                             <CircularProgress size={24} sx={{ mb: 1 }} />
                                             <Typography color="text.secondary">
-                                                Carregando categorias padrão...
+                                                Nenhuma categoria cadastrada
                                             </Typography>
                                             <Typography variant="caption" color="text.disabled">
                                                 9 grupos DRE + 46 subcategorias
@@ -347,6 +350,7 @@ export default function CategoriasPage() {
                 <DialogContent>
                     <Stack spacing={2} mt={1}>
                         <TextField label="Nome" size="small" fullWidth autoFocus
+                            placeholder="Nome da categoria"
                             value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
 
                         {!form.parent_id && (

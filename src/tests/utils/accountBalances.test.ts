@@ -133,11 +133,11 @@ describe('Cálculo de Confirmado/Projetado por conta', () => {
       expect(balances['acc-inter'].confirmed).toBeCloseTo(3535.53, 2)
     })
 
-    it('Projetado = Confirmado (sem pendentes até 24/04)', () => {
+    it('Projetado = Confirmado - pendente de 01/04 (inclui PENDENTE anterior)', () => {
       const balances = calculateAccountBalances(mockTransactions, mockAccounts, selectedDate)
 
-      // Como não há pendentes até 24/04, projetado = confirmado
-      expect(balances['acc-inter'].projected).toBeCloseTo(3535.53, 2)
+      // Projetado inclui o PENDENTE de 01/04 (-22.33): 3535.53 - 22.33 = 3513.20
+      expect(balances['acc-inter'].projected).toBeCloseTo(3513.2, 2)
     })
   })
 

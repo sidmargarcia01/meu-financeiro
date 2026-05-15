@@ -12,28 +12,51 @@ import { NextRequest } from 'next/server'
 import { GET } from '@/app/api/accounts/balance/route'
 import { AccountService } from '@/services/accountService'
 
-// Mock do AccountService
+jest.mock('next/server', () => ({
+  NextRequest: class MockNextRequest {
+    url: string
+    nextUrl: URL
+    cookies: { get: () => undefined }
+    constructor(url: string) {
+      this.url = url
+      this.nextUrl = new URL(url)
+      this.cookies = { get: () => undefined }
+    }
+  },
+  NextResponse: {
+    json: (body: any, init?: any) => ({
+      status: init?.status ?? 200,
+      json: async () => body,
+    }),
+    redirect: jest.fn(),
+  },
+}))
+
+jest.mock('@/middlewares/auth', () => ({
+  withAuth: (request: any, handler: any) =>
+    handler(request, { id: 'test-user-id', email: 'test@test.com' }),
+}))
+
 jest.mock('@/services/accountService')
 
-const mockAccountService = {
-  getBalancesUntilDate: jest.fn()
-} as any
-
-// Substituir instância do service
-(AccountService as jest.Mock).mockImplementation(() => mockAccountService)
-
 describe('GET /api/accounts/balance - Saldo Anterior (Fase 3)', () => {
+  let mockGetBalancesUntilDate: jest.Mock
+
   beforeEach(() => {
     jest.clearAllMocks()
+    mockGetBalancesUntilDate = jest.fn()
+      ; (AccountService as jest.Mock).mockImplementation(() => ({
+        getBalancesUntilDate: mockGetBalancesUntilDate,
+      }))
   })
 
   describe('Cenário 1 – Uma conta, receitas e despesas antes de D', () => {
     it('deve retornar saldo correto até D-1 (incluindo initialBalance)', async () => {
       const date = '2026-04-25'
       const accounts = 'acc-1'
-      
+
       // Mock do service retornando saldo calculado
-      mockAccountService.getBalancesUntilDate.mockResolvedValue({
+      mockGetBalancesUntilDate.mockResolvedValue({
         date,
         balances: [
           { account_id: 'acc-1', balance_until_previous_day: 130 }  // 100 + 50 - 20
@@ -53,9 +76,9 @@ describe('GET /api/accounts/balance - Saldo Anterior (Fase 3)', () => {
       expect(data.balances).toHaveLength(1)
       expect(data.balances[0].balance_until_previous_day).toBe(130)
       expect(data.total_balance).toBe(130)
-      
+
       // Verificar que o service foi chamado corretamente
-      expect(mockAccountService.getBalancesUntilDate).toHaveBeenCalledWith(
+      expect(mockGetBalancesUntilDate).toHaveBeenCalledWith(
         expect.any(String),  // userId
         ['acc-1'],
         date
@@ -67,8 +90,8 @@ describe('GET /api/accounts/balance - Saldo Anterior (Fase 3)', () => {
     it('deve retornar saldo de cada conta e total correto', async () => {
       const date = '2026-04-25'
       const accounts = 'acc-1,acc-2'
-      
-      mockAccountService.getBalancesUntilDate.mockResolvedValue({
+
+      mockGetBalancesUntilDate.mockResolvedValue({
         date,
         balances: [
           { account_id: 'acc-1', balance_until_previous_day: 500 },
@@ -87,7 +110,7 @@ describe('GET /api/accounts/balance - Saldo Anterior (Fase 3)', () => {
       expect(response.status).toBe(200)
       expect(data.balances).toHaveLength(2)
       expect(data.total_balance).toBe(800)
-      expect(mockAccountService.getBalancesUntilDate).toHaveBeenCalledWith(
+      expect(mockGetBalancesUntilDate).toHaveBeenCalledWith(
         expect.any(String),
         ['acc-1', 'acc-2'],
         date
@@ -99,8 +122,8 @@ describe('GET /api/accounts/balance - Saldo Anterior (Fase 3)', () => {
     it('deve excluir transações com due_date == D do cálculo', async () => {
       // O service deve garantir que < D, não <= D
       const date = '2026-04-25'
-      
-      mockAccountService.getBalancesUntilDate.mockResolvedValue({
+
+      mockGetBalancesUntilDate.mockResolvedValue({
         date,
         balances: [{ account_id: 'acc-1', balance_until_previous_day: 100 }],
         total_balance: 100
@@ -115,7 +138,7 @@ describe('GET /api/accounts/balance - Saldo Anterior (Fase 3)', () => {
 
       expect(response.status).toBe(200)
       // O service deve ser chamado com a data D, e ele calcula < D internamente
-      expect(mockAccountService.getBalancesUntilDate).toHaveBeenCalledWith(
+      expect(mockGetBalancesUntilDate).toHaveBeenCalledWith(
         expect.any(String),
         ['acc-1'],
         date
@@ -126,8 +149,8 @@ describe('GET /api/accounts/balance - Saldo Anterior (Fase 3)', () => {
   describe('Cenário 4 – Transações futuras não entram', () => {
     it('deve excluir transações com due_date > D', async () => {
       const date = '2026-04-25'
-      
-      mockAccountService.getBalancesUntilDate.mockResolvedValue({
+
+      mockGetBalancesUntilDate.mockResolvedValue({
         date,
         balances: [{ account_id: 'acc-1', balance_until_previous_day: 100 }],
         total_balance: 100
@@ -145,9 +168,9 @@ describe('GET /api/accounts/balance - Saldo Anterior (Fase 3)', () => {
   describe('Cenário 5 – Status não confirmado', () => {
     it('deve ignorar PENDENTE e AGENDADO no cálculo', async () => {
       const date = '2026-04-25'
-      
+
       // Apenas CONFIRMADO/CONCILIADO entram
-      mockAccountService.getBalancesUntilDate.mockResolvedValue({
+      mockGetBalancesUntilDate.mockResolvedValue({
         date,
         balances: [{ account_id: 'acc-1', balance_until_previous_day: 150 }],
         total_balance: 150
@@ -217,7 +240,7 @@ describe('GET /api/accounts/balance - Saldo Anterior (Fase 3)', () => {
 
   describe('Segurança – Erros do servidor', () => {
     it('deve retornar 500 com mensagem genérica em erro interno', async () => {
-      mockAccountService.getBalancesUntilDate.mockRejectedValue(
+      mockGetBalancesUntilDate.mockRejectedValue(
         new Error('Database connection failed')
       )
 

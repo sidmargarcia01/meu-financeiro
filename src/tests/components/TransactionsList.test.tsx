@@ -44,19 +44,19 @@ describe('TransactionsList - Fase 4 (UX: Atrasados/Dia/Futuros)', () => {
         <TransactionsList
           transactions={transactions}
           selectedDateStr={selectedDateStr}
-          onEdit={() => {}}
-          onDelete={() => {}}
+          onEdit={() => { }}
+          onDelete={() => { }}
         />
       )
 
       // Deve mostrar seção de atrasados
       expect(screen.getByText(/Atrasados até/i)).toBeInTheDocument()
       expect(screen.getByText('25/04/2026')).toBeInTheDocument()
-      
+
       // Deve listar as transações atrasadas
       expect(screen.getByText('Conta luz abril')).toBeInTheDocument()
       expect(screen.getByText('Internet abril')).toBeInTheDocument()
-      
+
       // Não deve ter seção do dia atual (ou deve estar vazia)
       const currentDaySection = screen.queryByText(/Lançamentos do dia/i)
       expect(currentDaySection).not.toBeInTheDocument()
@@ -71,8 +71,8 @@ describe('TransactionsList - Fase 4 (UX: Atrasados/Dia/Futuros)', () => {
         <TransactionsList
           transactions={transactions}
           selectedDateStr={selectedDateStr}
-          onEdit={() => {}}
-          onDelete={() => {}}
+          onEdit={() => { }}
+          onDelete={() => { }}
         />
       )
 
@@ -93,8 +93,8 @@ describe('TransactionsList - Fase 4 (UX: Atrasados/Dia/Futuros)', () => {
         <TransactionsList
           transactions={transactions}
           selectedDateStr={selectedDateStr}
-          onEdit={() => {}}
-          onDelete={() => {}}
+          onEdit={() => { }}
+          onDelete={() => { }}
         />
       )
 
@@ -103,8 +103,8 @@ describe('TransactionsList - Fase 4 (UX: Atrasados/Dia/Futuros)', () => {
       expect(screen.getByText('Conta luz abril')).toBeInTheDocument()
       expect(screen.getByText('Internet abril')).toBeInTheDocument()
 
-      // Seção do dia atual
-      expect(screen.getByText(/25\/04\/2026/i)).toBeInTheDocument()
+      // Seção do dia atual (a data aparece tanto no header quanto nos itens inline)
+      expect(screen.getAllByText(/25\/04\/2026/i).length).toBeGreaterThan(0)
       expect(screen.getByText('Almoço cliente')).toBeInTheDocument()
       expect(screen.getByText('Uber')).toBeInTheDocument()
     })
@@ -119,8 +119,8 @@ describe('TransactionsList - Fase 4 (UX: Atrasados/Dia/Futuros)', () => {
         <TransactionsList
           transactions={transactions}
           selectedDateStr={selectedDateStr}
-          onEdit={() => {}}
-          onDelete={() => {}}
+          onEdit={() => { }}
+          onDelete={() => { }}
         />
       )
 
@@ -142,8 +142,8 @@ describe('TransactionsList - Fase 4 (UX: Atrasados/Dia/Futuros)', () => {
         <TransactionsList
           transactions={transactions}
           selectedDateStr={selectedDateStr}
-          onEdit={() => {}}
-          onDelete={() => {}}
+          onEdit={() => { }}
+          onDelete={() => { }}
         />
       )
 
@@ -162,13 +162,13 @@ describe('TransactionsList - Fase 4 (UX: Atrasados/Dia/Futuros)', () => {
         <TransactionsList
           transactions={transactions}
           selectedDateStr={selectedDateStr}
-          onEdit={() => {}}
-          onDelete={() => {}}
+          onEdit={() => { }}
+          onDelete={() => { }}
         />
       )
 
-      expect(screen.getByText('30/04/2026')).toBeInTheDocument()
-      expect(screen.getByText('05/05/2026')).toBeInTheDocument()
+      expect(screen.getByText(/30\/04\/2026/)).toBeInTheDocument()
+      expect(screen.getByText(/05\/05\/2026/)).toBeInTheDocument()
     })
   })
 
@@ -178,8 +178,8 @@ describe('TransactionsList - Fase 4 (UX: Atrasados/Dia/Futuros)', () => {
         <TransactionsList
           transactions={[]}
           selectedDateStr={selectedDateStr}
-          onEdit={() => {}}
-          onDelete={() => {}}
+          onEdit={() => { }}
+          onDelete={() => { }}
         />
       )
 
@@ -191,8 +191,8 @@ describe('TransactionsList - Fase 4 (UX: Atrasados/Dia/Futuros)', () => {
         <TransactionsList
           transactions={[]}
           selectedDateStr={selectedDateStr}
-          onEdit={() => {}}
-          onDelete={() => {}}
+          onEdit={() => { }}
+          onDelete={() => { }}
         />
       )
 
@@ -210,12 +210,12 @@ describe('TransactionsList - Fase 4 (UX: Atrasados/Dia/Futuros)', () => {
         <TransactionsList
           transactions={transactions}
           selectedDateStr={selectedDateStr}
-          onEdit={() => {}}
-          onDelete={() => {}}
+          onEdit={() => { }}
+          onDelete={() => { }}
         />
       )
 
-      expect(screen.getByText('01/04/2026')).toBeInTheDocument()
+      expect(screen.getByText(/01\/04\/2026/)).toBeInTheDocument()
     })
   })
 })

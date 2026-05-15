@@ -114,37 +114,15 @@ describe('ReportService.gerarIndicadores', () => {
   })
 
   it('1) calcula todos os indicadores quando todos os dados existem', async () => {
-    let callIndex = 0
-    mockFrom.mockImplementation((table: string) => {
-      callIndex++
-      // DRE: transactions
-      if (table === 'transactions' && callIndex <= 2) return buildDreMock(10000, 3000)
-      // DFC: transactions
-      if (table === 'transactions' && callIndex === 3) return buildDfcMock(10000, 3000)
-      // Balanço: accounts
-      if (table === 'accounts') {
-        return {
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockResolvedValue({
-            data: [{ id: 'acc1', initial_balance: 5000 }],
-            error: null,
-          }),
-        }
-      }
-      // Balanço: transactions pagas
-      if (table === 'transactions') {
-        return {
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          lte: jest.fn().mockReturnThis(),
-          in: jest.fn().mockResolvedValue({
-            data: [{ account_id: 'acc1', amount: 2000, type: 'RECEITA' }],
-            error: null,
-          }),
-        }
-      }
-      return buildDreMock(0, 0)
-    })
+    mockFrom.mockImplementation(() => ({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      in: jest.fn().mockReturnThis(),
+      gte: jest.fn().mockReturnThis(),
+      lte: jest.fn().mockReturnThis(),
+      is: jest.fn().mockResolvedValue({ data: [], error: null }),
+      order: jest.fn().mockResolvedValue({ data: [], error: null }),
+    }))
 
     const result = await service.gerarIndicadores('user1', '2026-04-01', '2026-04-30')
 
@@ -165,6 +143,7 @@ describe('ReportService.gerarIndicadores', () => {
       in: jest.fn().mockReturnThis(),
       gte: jest.fn().mockReturnThis(),
       lte: jest.fn().mockReturnThis(),
+      is: jest.fn().mockResolvedValue({ data: [], error: null }),
       order: jest.fn().mockResolvedValue({ data: [], error: null }),
     }))
 
@@ -186,6 +165,7 @@ describe('ReportService.gerarIndicadores', () => {
       in: jest.fn().mockReturnThis(),
       gte: jest.fn().mockReturnThis(),
       lte: jest.fn().mockReturnThis(),
+      is: jest.fn().mockResolvedValue({ data: [], error: null }),
       order: jest.fn().mockResolvedValue({ data: [], error: null }),
     }))
 
@@ -204,6 +184,7 @@ describe('ReportService.gerarIndicadores', () => {
       in: jest.fn().mockReturnThis(),
       gte: jest.fn().mockReturnThis(),
       lte: jest.fn().mockReturnThis(),
+      is: jest.fn().mockResolvedValue({ data: [], error: null }),
       order: jest.fn().mockResolvedValue({ data: [], error: null }),
     }))
 
@@ -221,6 +202,7 @@ describe('ReportService.gerarIndicadores', () => {
       in: jest.fn().mockReturnThis(),
       gte: jest.fn().mockReturnThis(),
       lte: jest.fn().mockReturnThis(),
+      is: jest.fn().mockResolvedValue({ data: [], error: null }),
       order: jest.fn().mockResolvedValue({ data: [], error: null }),
     }))
 
