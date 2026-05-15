@@ -51,8 +51,29 @@ export default function ContasPage() {
   const load = useCallback(async () => {
     setLoading(true); setError(null)
     try {
-      const data = await fetch('/api/accounts?balances=true').then(r => r.json())
-      setItems(Array.isArray(data) ? data : [])
+      // 1. Lista de contas (sem saldos)
+      const accounts = await fetch('/api/accounts').then(r => r.json())
+      const list: Account[] = Array.isArray(accounts) ? accounts : []
+
+      if (list.length > 0) {
+        // 2. Buscar saldos atuais via /api/accounts/balance (data=amanha => saldo ate hoje)
+        const ids = list.map((a: Account) => a.id).join(',')
+        const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1)
+        const dateStr = tomorrow.toISOString().split('T')[0]
+        const balanceRes = await fetch(`/api/accounts/balance?date=${dateStr}&accounts=${ids}`)
+        if (balanceRes.ok) {
+          const balanceData = await balanceRes.json()
+          const balances = new Map<string, number>()
+            ; (balanceData.balances || []).forEach((b: any) => {
+              balances.set(b.account_id, b.balance_until_previous_day)
+            })
+          list.forEach((a: Account) => {
+            a.projectedBalance = balances.get(a.id) ?? a.initialBalance ?? 0
+          })
+        }
+      }
+
+      setItems(list)
     } catch { setError('Erro ao carregar contas.') }
     finally { setLoading(false) }
   }, [])
