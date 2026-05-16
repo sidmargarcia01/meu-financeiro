@@ -48,27 +48,41 @@ const STATUS_CFG = {
 function getDefaultDates() {
   const now = new Date()
   const inicio = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
-  const fim    = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10)
+  const fim = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10)
   return { inicio, fim }
 }
 
 export default function PagasPage() {
   const { inicio: defInicio, fim: defFim } = getDefaultDates()
-  const [transactions, setTransactions]   = useState<Transaction[]>([])
-  const [loading, setLoading]             = useState(true)
-  const [error, setError]                 = useState<string | null>(null)
-  const [filterType, setFilterType]       = useState('')
-  const [searchTerm, setSearchTerm]       = useState('')
-  const [inicio, setInicio]               = useState(defInicio)
-  const [fim, setFim]                     = useState(defFim)
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [filterType, setFilterType] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterDate, setFilterDate] = useState('')
+  const [filterMonth, setFilterMonth] = useState('')
 
   const fetchTransactions = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const params = new URLSearchParams({ limit: '100', startDate: inicio, endDate: fim })
-      if (filterType)   params.set('type', filterType)
-      if (searchTerm)   params.set('search', searchTerm)
+      const params = new URLSearchParams({ limit: '100' })
+      if (filterType) params.set('type', filterType)
+      if (searchTerm) params.set('search', searchTerm)
+      if (filterDate) {
+        params.set('startDate', filterDate)
+        params.set('endDate', filterDate)
+      }
+      if (filterMonth) {
+        const [year, month] = filterMonth.split('-')
+        const lastDay = new Date(Number(year), Number(month), 0).getDate()
+        params.set('startDate', `${filterMonth}-01`)
+        params.set('endDate', `${filterMonth}-${String(lastDay).padStart(2, '0')}`)
+      }
+      if (!filterDate && !filterMonth) {
+        params.set('startDate', defInicio)
+        params.set('endDate', defFim)
+      }
 
       // Buscar CONFIRMADO e CONCILIADO em paralelo
       const [resConf, resCon] = await Promise.all([
@@ -76,21 +90,21 @@ export default function PagasPage() {
         fetch(`/api/transactions?${params}&status=CONCILIADO`).then(r => r.json()),
       ])
       const conf = Array.isArray(resConf) ? resConf : (resConf.data ?? [])
-      const con  = Array.isArray(resCon)  ? resCon  : (resCon.data ?? [])
-      const all  = [...conf, ...con].sort((a, b) => new Date(b.due_date).getTime() - new Date(a.due_date).getTime())
+      const con = Array.isArray(resCon) ? resCon : (resCon.data ?? [])
+      const all = [...conf, ...con].sort((a, b) => new Date(b.due_date).getTime() - new Date(a.due_date).getTime())
       setTransactions(all)
     } catch {
       setError('Erro ao carregar transações pagas.')
     } finally {
       setLoading(false)
     }
-  }, [filterType, searchTerm, inicio, fim])
+  }, [filterType, searchTerm, filterDate, filterMonth])
 
   useEffect(() => { fetchTransactions() }, [fetchTransactions])
 
   const totalReceitas = transactions.filter(t => t.type === 'RECEITA').reduce((s, t) => s + t.amount, 0)
   const totalDespesas = transactions.filter(t => t.type === 'DESPESA').reduce((s, t) => s + t.amount, 0)
-  const saldo         = totalReceitas - totalDespesas
+  const saldo = totalReceitas - totalDespesas
 
   return (
     <Box sx={{ p: 3 }}>
@@ -104,9 +118,9 @@ export default function PagasPage() {
       {/* Resumo */}
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mb={3}>
         {[
-          { label: 'Receitas',  value: totalReceitas, color: 'success.main' },
-          { label: 'Despesas',  value: totalDespesas, color: 'error.main' },
-          { label: 'Saldo',     value: saldo,         color: saldo >= 0 ? 'success.main' : 'error.main' },
+          { label: 'Receitas', value: totalReceitas, color: 'success.main' },
+          { label: 'Despesas', value: totalDespesas, color: 'error.main' },
+          { label: 'Saldo', value: saldo, color: saldo >= 0 ? 'success.main' : 'error.main' },
         ].map(c => (
           <Card key={c.label} sx={{ flex: 1 }}>
             <CardContent>
@@ -123,10 +137,24 @@ export default function PagasPage() {
           size="small" placeholder="Buscar..." value={searchTerm}
           onChange={e => setSearchTerm(e.target.value)} sx={{ minWidth: 200 }}
         />
-        <TextField label="De" type="date" size="small" value={inicio}
-          onChange={e => setInicio(e.target.value)} InputLabelProps={{ shrink: true }} />
-        <TextField label="Até" type="date" size="small" value={fim}
-          onChange={e => setFim(e.target.value)} InputLabelProps={{ shrink: true }} />
+        <TextField
+          label="Data específica"
+          type="date"
+          size="small"
+          value={filterDate}
+          onChange={e => setFilterDate(e.target.value)}
+          sx={{ minWidth: 160 }}
+          InputLabelProps={{ shrink: true }}
+        />
+        <TextField
+          label="Mês"
+          type="month"
+          size="small"
+          value={filterMonth}
+          onChange={e => setFilterMonth(e.target.value)}
+          sx={{ minWidth: 160 }}
+          InputLabelProps={{ shrink: true }}
+        />
         <FormControl size="small" sx={{ minWidth: 140 }}>
           <InputLabel>Tipo</InputLabel>
           <Select value={filterType} onChange={e => setFilterType(e.target.value)} label="Tipo">
