@@ -46,11 +46,13 @@ function isOverdue(due_date: string) {
 
 export default function APagarPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [loading, setLoading]           = useState(true)
-  const [error, setError]               = useState<string | null>(null)
-  const [confirming, setConfirming]     = useState<string | null>(null)
-  const [filterType, setFilterType]     = useState('')
-  const [searchTerm, setSearchTerm]     = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState<string | null>(null)
+  const [filterType, setFilterType] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterDate, setFilterDate] = useState('')
+  const [filterMonth, setFilterMonth] = useState('')
 
   const fetchTransactions = useCallback(async () => {
     setLoading(true)
@@ -59,6 +61,16 @@ export default function APagarPage() {
       const params = new URLSearchParams({ status: 'PENDENTE', limit: '100' })
       if (filterType) params.set('type', filterType)
       if (searchTerm) params.set('search', searchTerm)
+      if (filterDate) {
+        params.set('startDate', filterDate)
+        params.set('endDate', filterDate)
+      }
+      if (filterMonth) {
+        const [year, month] = filterMonth.split('-')
+        const lastDay = new Date(Number(year), Number(month), 0).getDate()
+        params.set('startDate', `${filterMonth}-01`)
+        params.set('endDate', `${filterMonth}-${String(lastDay).padStart(2, '0')}`)
+      }
       const res = await fetch(`/api/transactions?${params}`)
       if (!res.ok) throw new Error()
       const data = await res.json()
@@ -68,7 +80,7 @@ export default function APagarPage() {
     } finally {
       setLoading(false)
     }
-  }, [filterType, searchTerm])
+  }, [filterType, searchTerm, filterDate, filterMonth])
 
   useEffect(() => { fetchTransactions() }, [fetchTransactions])
 
@@ -86,8 +98,8 @@ export default function APagarPage() {
     }
   }
 
-  const totalPagar    = transactions.filter(t => t.type === 'DESPESA').reduce((s, t) => s + t.amount, 0)
-  const totalReceber  = transactions.filter(t => t.type === 'RECEITA').reduce((s, t) => s + t.amount, 0)
+  const totalPagar = transactions.filter(t => t.type === 'DESPESA').reduce((s, t) => s + t.amount, 0)
+  const totalReceber = transactions.filter(t => t.type === 'RECEITA').reduce((s, t) => s + t.amount, 0)
   const totalVencidas = transactions.filter(t => isOverdue(t.due_date)).length
 
   return (
@@ -103,8 +115,8 @@ export default function APagarPage() {
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mb={3}>
         {[
           { label: 'A Receber', value: totalReceber, color: 'success.main', icon: <IncomeIcon /> },
-          { label: 'A Pagar',   value: totalPagar,   color: 'error.main',   icon: <ExpenseIcon /> },
-          { label: 'Vencidas',  value: totalVencidas, color: 'warning.main', icon: <OverdueIcon />, isCount: true },
+          { label: 'A Pagar', value: totalPagar, color: 'error.main', icon: <ExpenseIcon /> },
+          { label: 'Vencidas', value: totalVencidas, color: 'warning.main', icon: <OverdueIcon />, isCount: true },
         ].map(card => (
           <Paper key={card.label} sx={{ flex: 1, p: 2 }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center">
@@ -134,6 +146,24 @@ export default function APagarPage() {
             <MenuItem value="DESPESA">A Pagar</MenuItem>
           </Select>
         </FormControl>
+        <TextField
+          label="Data específica"
+          type="date"
+          size="small"
+          value={filterDate}
+          onChange={e => setFilterDate(e.target.value)}
+          sx={{ minWidth: 160 }}
+          InputLabelProps={{ shrink: true }}
+        />
+        <TextField
+          label="Mês"
+          type="month"
+          size="small"
+          value={filterMonth}
+          onChange={e => setFilterMonth(e.target.value)}
+          sx={{ minWidth: 160 }}
+          InputLabelProps={{ shrink: true }}
+        />
       </Stack>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
