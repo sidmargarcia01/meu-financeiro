@@ -261,7 +261,10 @@ export class TransactionService {
     }
 
     if (data?.amount !== undefined && !isNaN(data.amount)) {
-      updateData.amount = data.amount
+      // Aplicar sinal correto: DESPESA = negativo, demais = positivo
+      updateData.amount = transaction.type === 'DESPESA'
+        ? -Math.abs(data.amount)
+        : Math.abs(data.amount)
     }
     if (data?.accountId) {
       updateData.accountId = data.accountId
