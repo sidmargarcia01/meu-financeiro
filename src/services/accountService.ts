@@ -274,11 +274,14 @@ export class AccountService {
         status: undefined  // Não filtrar por status aqui, filtramos depois
       })
 
-      // Filtrar só CONFIRMADO/CONCILIADO e due_date < date (não <=)
-      const relevantTransactions = transactions.filter(t =>
-        t.due_date < date &&
-        (t.status === 'CONFIRMADO' || t.status === 'CONCILIADO')
-      )
+      // Filtrar só CONFIRMADO/CONCILIADO e data efetiva < date
+      // Para CONCILIADO usar payment_date, para CONFIRMADO usar due_date
+      const relevantTransactions = transactions.filter(t => {
+        const effectiveDate = t.status === 'CONCILIADO' && t.payment_date
+          ? t.payment_date
+          : t.due_date
+        return effectiveDate < date && (t.status === 'CONFIRMADO' || t.status === 'CONCILIADO')
+      })
 
       // Calcular saldo
       const transactionSum = relevantTransactions.reduce((sum, t) => {

@@ -87,7 +87,13 @@ export async function PATCH(
       }
 
       if (action === 'reconcile') {
-        const transaction = await transactionService.reconcileTransaction(user.id, id)
+        const body = await req.json().catch(() => ({}))
+        const transaction = await transactionService.reconcileTransaction(user.id, id, {
+          paymentDate: body.paymentDate,
+          amount: body.amount !== undefined ? Number(body.amount) : undefined,
+          accountId: body.accountId,
+          notes: body.notes,
+        })
         return NextResponse.json(transaction)
       }
 

@@ -230,7 +230,16 @@ export class TransactionService {
     })
   }
 
-  async reconcileTransaction(userId: string, transactionId: string) {
+  async reconcileTransaction(
+    userId: string,
+    transactionId: string,
+    data?: {
+      paymentDate?: string
+      amount?: number
+      accountId?: string
+      notes?: string
+    }
+  ) {
     // Verificar se transação existe
     const transaction = await this.transactionRepository.findById(transactionId, userId)
     if (!transaction) {
@@ -250,11 +259,23 @@ export class TransactionService {
       }
     }
 
-    // Conciliar transação
-    return this.transactionRepository.update(transactionId, userId, {
+    // Preparar dados de atualização
+    const updateData: any = {
       status: 'CONCILIADO',
-      paymentDate: transaction.paymentDate || new Date().toISOString()
-    } as any)
+      paymentDate: data?.paymentDate || transaction.paymentDate || new Date().toISOString(),
+    }
+
+    if (data?.amount !== undefined && !isNaN(data.amount)) {
+      updateData.amount = data.amount
+    }
+    if (data?.accountId) {
+      updateData.accountId = data.accountId
+    }
+    if (data?.notes !== undefined) {
+      updateData.notes = data.notes
+    }
+
+    return this.transactionRepository.update(transactionId, userId, updateData)
   }
 
   async getTransaction(userId: string, transactionId: string) {

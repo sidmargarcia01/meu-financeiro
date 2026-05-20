@@ -387,9 +387,21 @@ export default function LancamentosCaixaPage() {
   const handleSubmitConciliation = async () => {
     if (!selectedTransaction) return
     try {
+      const amountStr = conciliationData.amount.replace(/\./g, '').replace(',', '.')
+      const amount = parseFloat(amountStr) || selectedTransaction.amount
+
       const res = await fetch(
         `/api/transactions/${selectedTransaction.id}?action=reconcile`,
-        { method: 'PATCH' }
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            paymentDate: conciliationData.date || undefined,
+            amount: amount !== selectedTransaction.amount ? amount : undefined,
+            accountId: conciliationData.accountId || undefined,
+            notes: conciliationData.notes || undefined,
+          }),
+        }
       )
       if (!res.ok) {
         const data = await res.json().catch(() => null)
