@@ -87,7 +87,13 @@ export async function PATCH(
       }
 
       if (action === 'reconcile') {
-        const body = await req.json().catch(() => ({}))
+        let body: any = {}
+        try {
+          body = await req.json()
+        } catch (parseErr) {
+          console.error('[PATCH reconcile] Falha ao parsear body:', parseErr)
+        }
+        console.log('[PATCH reconcile] body:', JSON.stringify(body))
         const transaction = await transactionService.reconcileTransaction(user.id, id, {
           paymentDate: body.paymentDate,
           amount: body.amount !== undefined ? Number(body.amount) : undefined,
@@ -99,10 +105,11 @@ export async function PATCH(
 
       return NextResponse.json({ error: 'Ação inválida. Use ?action=confirm ou ?action=reconcile' }, { status: 400 })
     } catch (error: any) {
+      console.error('[PATCH /api/transactions/[id]]', error)
       if (error.message?.includes('não encontrada')) {
         return NextResponse.json({ error: error.message }, { status: 404 })
       }
-      return NextResponse.json({ error: 'Erro ao processar ação' }, { status: 500 })
+      return NextResponse.json({ error: error.message || 'Erro ao processar ação' }, { status: 500 })
     }
   })
 }
