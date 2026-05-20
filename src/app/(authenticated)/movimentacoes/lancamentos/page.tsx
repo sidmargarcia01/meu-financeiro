@@ -137,6 +137,7 @@ interface Transaction {
   status: 'PENDENTE' | 'AGENDADO' | 'CONFIRMADO' | 'CONCILIADO'
   amount: number
   due_date: string
+  payment_date?: string
   description: string
   document_number?: string
   notes?: string
@@ -362,9 +363,12 @@ export default function LancamentosCaixaPage() {
     const formattedAmount = selectedTransaction.amount
       ? Math.abs(selectedTransaction.amount).toFixed(2).replace('.', ',')
       : '0,00'
-    const dateToUse = selectedTransaction.competence_date
-      || selectedTransaction.due_date
-      || toLocalDateString(new Date())
+    // Se ja conciliado, usar payment_date como data efetiva; senao, usar competence_date ou due_date
+    const dateToUse = selectedTransaction.status === 'CONCILIADO' && selectedTransaction.payment_date
+      ? selectedTransaction.payment_date
+      : (selectedTransaction.competence_date
+        || selectedTransaction.due_date
+        || toLocalDateString(new Date()))
 
     setConciliationData({
       amount: formattedAmount,
@@ -390,10 +394,11 @@ export default function LancamentosCaixaPage() {
       const amountStr = conciliationData.amount.replace(/\./g, '').replace(',', '.')
       const amount = parseFloat(amountStr) || selectedTransaction.amount
 
-      const res = await fetch(
-        `/api/transactions/${selectedTransaction.id}?action=reconcile`,
-        {
-          method: 'PATCH',
+      const isAlreadyReconciled = selectedTransaction.status === 'CONCILIADO'
+
+      if (isAlreadyReconciled) {
+        const res = await fetch(`/api/transactions/${selectedTransaction.id}`, {
+          method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             paymentDate: conciliationData.date || undefined,
@@ -401,15 +406,34 @@ export default function LancamentosCaixaPage() {
             accountId: conciliationData.accountId || undefined,
             notes: conciliationData.notes || undefined,
           }),
+        })
+        if (!res.ok) {
+          const data = await res.json().catch(() => null)
+          setSubmitError(data?.error || 'Erro ao salvar conciliação.')
+          return
         }
-      )
-      if (!res.ok) {
-        const data = await res.json().catch(() => null)
-        setSubmitError(data?.error || 'Erro ao conciliar lançamento.')
-        return
+      } else {
+        const res = await fetch(
+          `/api/transactions/${selectedTransaction.id}?action=reconcile`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              paymentDate: conciliationData.date || undefined,
+              amount: amount !== selectedTransaction.amount ? amount : undefined,
+              accountId: conciliationData.accountId || undefined,
+              notes: conciliationData.notes || undefined,
+            }),
+          }
+        )
+        if (!res.ok) {
+          const data = await res.json().catch(() => null)
+          setSubmitError(data?.error || 'Erro ao conciliar lançamento.')
+          return
+        }
       }
     } catch {
-      setSubmitError('Erro ao conciliar lançamento.')
+      setSubmitError('Erro ao processar conciliação.')
       return
     }
     closeConciliationModal()
@@ -1024,7 +1048,9 @@ export default function LancamentosCaixaPage() {
           </MenuItem>
         )}
         <MenuItem onClick={openConciliationModal} sx={{ gap: 1.5 }}>
-          <Typography variant="body2">Conciliar</Typography>
+          <Typography variant="body2">
+            {selectedTransaction?.status === 'CONCILIADO' ? 'Editar conciliação' : 'Conciliar'}
+          </Typography>
         </MenuItem>
         <MenuItem onClick={handleDelete} sx={{ gap: 1.5 }}>
           <DeleteIcon fontSize="small" sx={{ color: colors.danger }} />
@@ -1105,7 +1131,9 @@ export default function LancamentosCaixaPage() {
       >
         <DialogTitle sx={{ pb: 2, pt: 2.5, px: 3 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Typography variant="h6" fontWeight={600}>Conciliar Lançamento</Typography>
+            <Typography variant="h6" fontWeight={600}>
+              {selectedTransaction?.status === 'CONCILIADO' ? 'Editar Conciliação' : 'Conciliar Lançamento'}
+            </Typography>
             <IconButton onClick={closeConciliationModal} size="small">
               <CloseIcon fontSize="small" />
             </IconButton>
@@ -1186,7 +1214,7 @@ export default function LancamentosCaixaPage() {
               fontWeight: 600
             }}
           >
-            Conciliar
+            {selectedTransaction?.status === 'CONCILIADO' ? 'Salvar' : 'Conciliar'}
           </Button>
         </DialogActions>
       </Dialog>
