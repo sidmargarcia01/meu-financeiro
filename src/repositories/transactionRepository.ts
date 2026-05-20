@@ -195,21 +195,18 @@ export class TransactionRepository {
       .eq('user_id', userId)
       .order('due_date', { ascending: false })
 
-    // Para transações CONCILIADO, usar payment_date como data efetiva.
-    // Para demais status, usar due_date normalmente.
-    if (filters?.startDate && filters?.endDate) {
+    // Filtro por due_date (padrão para todos os status).
+    // Para CONCILIADO com payment_date diferente do due_date, adicionamos um
+    // OR simples: inclui também CONCILIADO onde payment_date está no range.
+    if (filters?.startDate) {
+      query = query.gte('due_date', filters.startDate)
+    }
+    if (filters?.endDate) {
+      // OR: due_date <= endDate  OU  (CONCILIADO E payment_date <= endDate)
+      // Isso garante que transações CONCILIADO com payment_date < due_date
+      // apareçam no dia correto sem quebrar o carregamento das demais.
       query = query.or(
-        `and(status.neq.CONCILIADO,due_date.gte.${filters.startDate},due_date.lte.${filters.endDate}),` +
-        `and(status.eq.CONCILIADO,payment_date.gte.${filters.startDate},payment_date.lte.${filters.endDate})`
-      )
-    } else if (filters?.startDate) {
-      query = query.or(
-        `and(status.neq.CONCILIADO,due_date.gte.${filters.startDate}),` +
-        `and(status.eq.CONCILIADO,payment_date.gte.${filters.startDate})`
-      )
-    } else if (filters?.endDate) {
-      query = query.or(
-        `and(status.neq.CONCILIADO,due_date.lte.${filters.endDate}),` +
+        `due_date.lte.${filters.endDate},` +
         `and(status.eq.CONCILIADO,payment_date.lte.${filters.endDate})`
       )
     }
