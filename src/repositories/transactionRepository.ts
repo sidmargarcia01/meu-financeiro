@@ -195,20 +195,11 @@ export class TransactionRepository {
       .eq('user_id', userId)
       .order('due_date', { ascending: false })
 
-    // Filtro por due_date (padrão para todos os status).
-    // Para CONCILIADO com payment_date diferente do due_date, adicionamos um
-    // OR simples: inclui também CONCILIADO onde payment_date está no range.
     if (filters?.startDate) {
       query = query.gte('due_date', filters.startDate)
     }
     if (filters?.endDate) {
-      // OR: due_date <= endDate  OU  (CONCILIADO E payment_date <= endDate)
-      // Isso garante que transações CONCILIADO com payment_date < due_date
-      // apareçam no dia correto sem quebrar o carregamento das demais.
-      query = query.or(
-        `due_date.lte.${filters.endDate},` +
-        `and(status.eq.CONCILIADO,payment_date.lte.${filters.endDate})`
-      )
+      query = query.lte('due_date', filters.endDate)
     }
     if (filters?.accountId) {
       query = query.eq('account_id', filters.accountId)

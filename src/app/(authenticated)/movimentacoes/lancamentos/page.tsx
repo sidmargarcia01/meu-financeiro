@@ -205,11 +205,15 @@ export default function LancamentosCaixaPage() {
     setError(null)
     try {
       const selectedDate = toLocalDateString(currentDate)
+      const today = toLocalDateString(new Date())
 
-      // Busca única sem filtro de status para evitar duplicação entre listas
+      // endDate = max(selectedDate, today): garante que transações CONCILIADO
+      // com due_date > selectedDate mas payment_date <= selectedDate sejam incluídas.
+      const endDate = selectedDate > today ? selectedDate : today
+
       const params = new URLSearchParams()
       params.set('limit', '2000')
-      params.set('endDate', selectedDate)
+      params.set('endDate', endDate)
       if (searchTerm) params.set('search', searchTerm)
 
       const res = await fetch(`/api/transactions?${params}`)
