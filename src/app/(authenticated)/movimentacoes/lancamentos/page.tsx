@@ -256,11 +256,12 @@ export default function LancamentosCaixaPage() {
 
     // Soma das transações confirmadas/conciliadas até o dia anterior
     const transactionsSum = transactions
-      .filter(t =>
-        selectedAccounts.includes(t.account_id) &&
-        t.due_date <= previousDateStr &&
-        ['CONFIRMADO', 'CONCILIADO'].includes(t.status)
-      )
+      .filter(t => {
+        const effDate = t.status === 'CONCILIADO' && t.payment_date ? t.payment_date : t.due_date
+        return selectedAccounts.includes(t.account_id) &&
+          effDate <= previousDateStr &&
+          ['CONFIRMADO', 'CONCILIADO'].includes(t.status)
+      })
       .reduce((sum, t) => {
         if (t.type === 'RECEITA') return sum + Math.abs(t.amount)
         if (t.type === 'DESPESA') return sum - Math.abs(t.amount)
@@ -277,10 +278,10 @@ export default function LancamentosCaixaPage() {
 
     accounts.forEach(acc => {
       const initial = acc.initialBalance || 0
-      const txsUntilDate = transactions.filter(t =>
-        t.due_date <= selectedDateStr &&
-        t.account_id === acc.id
-      )
+      const txsUntilDate = transactions.filter(t => {
+        const effDate = t.status === 'CONCILIADO' && t.payment_date ? t.payment_date : t.due_date
+        return effDate <= selectedDateStr && t.account_id === acc.id
+      })
 
       const confirmed = txsUntilDate
         .filter(t => ['CONFIRMADO', 'CONCILIADO'].includes(t.status))

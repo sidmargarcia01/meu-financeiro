@@ -18,6 +18,7 @@ interface TestTransaction {
   status: 'PENDENTE' | 'AGENDADO' | 'CONFIRMADO' | 'CONCILIADO' | string
   amount: number
   due_date: string
+  payment_date?: string
 }
 
 describe('filterTransactionsForList', () => {
@@ -166,6 +167,42 @@ describe('filterTransactionsForList', () => {
       // D=today, então mostra pendentes em aberto + lançamentos de hoje
       expect(result.some(tx => tx.id === 'tx-01')).toBe(true)
       expect(result.some(tx => tx.id === 'tx-25')).toBe(true)
+    })
+  })
+
+  describe('CONCILIADO com payment_date diferente de due_date', () => {
+    const todayStr = '2026-05-20'
+
+    const txs: TestTransaction[] = [
+      // Conciliada com due_date=20 mas pagamento efetivo no dia 19
+      {
+        id: 'tx-conciliado',
+        type: 'DESPESA',
+        status: 'CONCILIADO',
+        amount: 5034.67,
+        due_date: '2026-05-20',
+        payment_date: '2026-05-19',
+      },
+      // Pendente no dia 20
+      {
+        id: 'tx-pendente',
+        type: 'DESPESA',
+        status: 'PENDENTE',
+        amount: 100,
+        due_date: '2026-05-20',
+      },
+    ]
+
+    it('deve aparecer no dia 19 (payment_date), NÃO no dia 20', () => {
+      const result19 = filterTransactionsForList(txs, '2026-05-19', todayStr)
+      expect(result19.some(tx => tx.id === 'tx-conciliado')).toBe(true)
+    })
+
+    it('NÃO deve aparecer no dia 20 (due_date) pois payment_date=19', () => {
+      const result20 = filterTransactionsForList(txs, '2026-05-20', todayStr)
+      expect(result20.some(tx => tx.id === 'tx-conciliado')).toBe(false)
+      // Mas o pendente do dia 20 deve aparecer
+      expect(result20.some(tx => tx.id === 'tx-pendente')).toBe(true)
     })
   })
 })

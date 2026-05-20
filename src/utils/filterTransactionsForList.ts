@@ -21,6 +21,12 @@ interface TransactionMinimal {
   id: string
   status: 'PENDENTE' | 'AGENDADO' | 'CONFIRMADO' | 'CONCILIADO' | string
   due_date: string
+  payment_date?: string
+}
+
+/** Para CONCILIADO, usa payment_date como data efetiva; caso contrário usa due_date */
+function effectiveDate(tx: TransactionMinimal): string {
+  return tx.status === 'CONCILIADO' && tx.payment_date ? tx.payment_date : tx.due_date
 }
 
 /**
@@ -38,15 +44,15 @@ export function filterTransactionsForList<T extends TransactionMinimal>(
   const isAfterToday = selectedDateStr > todayStr
 
   if (isBeforeToday || isAfterToday) {
-    // D < hoje OU D > hoje: mostrar apenas lançamentos do dia D
-    return transactions.filter(tx => tx.due_date === selectedDateStr)
+    // D < hoje OU D > hoje: mostrar apenas lançamentos do dia D (data efetiva)
+    return transactions.filter(tx => effectiveDate(tx) === selectedDateStr)
   }
 
   if (isToday) {
     // D === hoje: mostrar pendentes em aberto (due_date <= hoje) + transações do dia
     return transactions.filter(tx => {
       const isPendingOpen = tx.status === 'PENDENTE' && tx.due_date <= todayStr
-      const isTodayTransaction = tx.due_date === selectedDateStr
+      const isTodayTransaction = effectiveDate(tx) === selectedDateStr
       return isPendingOpen || isTodayTransaction
     })
   }
