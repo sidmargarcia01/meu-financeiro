@@ -629,20 +629,28 @@ describe('TransactionService', () => {
       expect(result.paymentDate).toBeDefined()
     })
 
-    it('deve rejeitar conciliação de transação já conciliada', async () => {
+    it('deve permitir re-conciliar transação já conciliada (atualiza dados)', async () => {
       const transactionId = 'transaction-123'
       const mockTransaction = {
         id: transactionId,
         userId: mockUserId,
         status: 'CONCILIADO',
+        paymentDate: '2026-05-19',
         recurrenceId: null
       }
 
       mockTransactionRepository.findById.mockResolvedValue(mockTransaction)
+      mockTransactionRepository.update.mockResolvedValue({
+        ...mockTransaction,
+        paymentDate: '2026-05-20'
+      })
 
-      await expect(
-        transactionService.reconcileTransaction(mockUserId, transactionId)
-      ).rejects.toThrow('Transação já está conciliada')
+      const result = await transactionService.reconcileTransaction(
+        mockUserId, transactionId, { paymentDate: '2026-05-20' }
+      )
+
+      expect(result.status).toBe('CONCILIADO')
+      expect(result.paymentDate).toBe('2026-05-20')
     })
 
     it('deve rejeitar conciliação de transação recorrente ativa', async () => {

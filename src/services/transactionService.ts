@@ -246,11 +246,6 @@ export class TransactionService {
       throw new Error('Transação não encontrada')
     }
 
-    // Verificar se já está conciliada
-    if (transaction.status === 'CONCILIADO') {
-      throw new Error('Transação já está conciliada')
-    }
-
     // Verificar se é uma transação recorrente
     if (transaction.recurrenceId) {
       const recurrence = await this.recurrenceRepository.findById(transaction.recurrenceId, userId)
