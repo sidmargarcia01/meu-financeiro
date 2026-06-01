@@ -58,6 +58,10 @@ function getMonthRange(d: Date) {
   return { start: new Date(d.getFullYear(), d.getMonth(), 1), end: new Date(d.getFullYear(), d.getMonth() + 1, 0) }
 }
 function fmtCurrency(v: number) { return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) }
+function fmtSaldo(v: number) {
+  const sinal = v < 0 ? '- ' : ''
+  return `${sinal}${fmtCurrency(Math.abs(v))}`
+}
 
 interface Transaction {
   id: string; type: 'RECEITA' | 'DESPESA' | 'TRANSFERENCIA'
@@ -342,7 +346,7 @@ export default function RelatoriosPage() {
               <Box>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1 }}>{c.label}</Typography>
                 <Typography variant="body2" fontWeight={700} sx={{ color: c.color }}>
-                  {c.label === 'Saldo' && c.value < 0 ? `- ${fmtCurrency(Math.abs(c.value))}` : fmtCurrency(Math.abs(c.value))}
+                  {c.label === 'Saldo' ? fmtSaldo(c.value) : fmtCurrency(Math.abs(c.value))}
                 </Typography>
               </Box>
             </Box>
