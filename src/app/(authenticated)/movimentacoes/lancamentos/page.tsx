@@ -671,7 +671,11 @@ export default function LancamentosCaixaPage() {
                 ref={dateInputRef}
                 type="date"
                 value={toLocalDateString(currentDate)}
-                onChange={(e) => e.target.value && setCurrentDate(new Date(e.target.value))}
+                onChange={(e) => {
+                  if (!e.target.value) return
+                  const [y, m, d] = e.target.value.split('-').map(Number)
+                  setCurrentDate(new Date(y, m - 1, d))
+                }}
                 style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
               />
             </Box>
