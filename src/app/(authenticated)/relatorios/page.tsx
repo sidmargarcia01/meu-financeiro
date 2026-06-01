@@ -11,7 +11,7 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import {
   Box, Paper, Typography, IconButton, CircularProgress,
-  Alert, ToggleButton, ToggleButtonGroup, Tooltip, Divider, Chip
+  Alert, ToggleButton, ToggleButtonGroup, Tooltip, Divider, Chip, Drawer
 } from '@mui/material'
 import {
   ChevronLeft as PrevIcon, ChevronRight as NextIcon,
@@ -19,9 +19,11 @@ import {
   ViewDay as ViewDayIcon, DateRange as DateRangeIcon,
   CalendarMonth as CalendarMonthIcon,
   TrendingUp as TrendingUpIcon, TrendingDown as TrendingDownIcon,
-  AccountBalance as BalanceIcon
+  AccountBalance as BalanceIcon, Edit as EditIcon
 } from '@mui/icons-material'
 import { PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
+import { TransactionForm } from '@/components/transactions/TransactionForm'
+import type { TransactionFormData, Account, Category } from '@/components/transactions/TransactionForm'
 
 const CAT_COLORS = [
   '#6366f1','#f59e0b','#10b981','#ef4444','#3b82f6',
@@ -33,6 +35,16 @@ const CAT_COLORS = [
 const clrs = {
   primary: '#6366f1', receita: '#10b981', despesa: '#ef4444',
   border: '#e5e7eb', textPrimary: '#111827', textSecondary: '#6b7280', bgPage: '#f9fafb'
+}
+
+const DEFAULT_SETTINGS = {
+  enable_competence_date: true,
+  require_cost_center: false,
+  require_project: false,
+  require_contact: false,
+  require_tag: false,
+  require_subcategory: false,
+  installment_default: 'VALOR_PARCELA' as const
 }
 
 function toLocalDateString(date: Date): string {
@@ -50,7 +62,8 @@ function fmtCurrency(v: number) { return v.toLocaleString('pt-BR', { style: 'cur
 interface Transaction {
   id: string; type: 'RECEITA' | 'DESPESA' | 'TRANSFERENCIA'
   amount: number; description: string; due_date: string
-  category_name?: string; account_name?: string; status: string
+  category_name?: string; account_name?: string; account_id?: string
+  status: string; notes?: string; tags?: string[]
 }
 interface CatData { name: string; value: number; pct: number; color: string; transactions: Transaction[] }
 
@@ -142,11 +155,24 @@ export default function RelatoriosPage() {
   const [currentDate, setCurrentDate] = useState<Date>(new Date())
   const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('month')
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<{ cat: CatData; type: 'RECEITA' | 'DESPESA' } | null>(null)
   const [activeIdx, setActiveIdx] = useState<{ chart: 'r' | 'd'; idx: number } | null>(null)
+  const [formOpen, setFormOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState<Transaction | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const dateInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    fetch('/api/accounts?balances=true').then(r => r.json()).then(d => setAccounts(Array.isArray(d) ? d : [])).catch(() => {})
+    fetch('/api/categories').then(r => r.json()).then(d => {
+      setCategories(Array.isArray(d) ? d.map((c: Category) => ({ ...c, children: c.children || [] })) : [])
+    }).catch(() => {})
+  }, [])
 
   const periodRange = useMemo(() => {
     if (viewMode === 'week') return getWeekRange(currentDate)
@@ -201,6 +227,48 @@ export default function RelatoriosPage() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
+  const openEdit = (tx: Transaction) => { setEditTarget(tx); setSubmitError(null); setFormOpen(true) }
+  const closeForm = () => { setFormOpen(false); setEditTarget(null); setSubmitError(null) }
+
+  const handleSubmit = async (formData: TransactionFormData) => {
+    if (submitting || !editTarget) return
+    setSubmitting(true)
+    try {
+      const payload: Record<string, unknown> = {
+        description: formData.description,
+        amount: formData.amount,
+        type: formData.type,
+        dueDate: formData.due_date,
+        accountId: formData.account_id || undefined,
+        status: formData.status || 'PENDENTE',
+        regime: formData.regime || 'CAIXA',
+        isRecurring: formData.repetition_type !== 'NONE',
+        tags: (formData.tags || []).filter(Boolean),
+      }
+      if (formData.category_id) payload.categoryId = formData.category_id
+      if (formData.center_id) payload.centerId = formData.center_id
+      if (formData.project_id) payload.projectId = formData.project_id
+      if (formData.contact_id) payload.contactId = formData.contact_id
+      if (formData.notes) payload.notes = formData.notes
+
+      const response = await fetch(`/api/transactions/${editTarget.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      if (!response.ok) {
+        const err = await response.json().catch(() => null)
+        throw new Error(err?.error || 'Erro ao salvar')
+      }
+      closeForm()
+      fetchData()
+    } catch (e: any) {
+      setSubmitError(e?.message || 'Erro ao salvar lancamento.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const buildData = useCallback((type: 'RECEITA' | 'DESPESA'): CatData[] => {
     const map = new Map<string, { value: number; txs: Transaction[] }>()
     transactions.filter(t => t.type === type).forEach(t => {
@@ -249,7 +317,7 @@ export default function RelatoriosPage() {
           </Box>
           <IconButton size="small" onClick={goToNext} sx={{ color: clrs.textSecondary, '&:hover': { bgcolor: '#f5f5f5' } }}><NextIcon fontSize="small" /></IconButton>
           <input ref={dateInputRef} type={viewMode === 'month' ? 'month' : 'date'}
-            value={viewMode === 'month' ? `${currentDate.getFullYear()}-${String(currentDate.getMonth()+1).padStart(2,'0')}` : toLocalDateString(currentDate)}
+            value={viewMode === 'month' ? `${currentDate.getFullYear()}-${String(currentDate.getMonth()+1).padStart(2,'00')}` : toLocalDateString(currentDate)}
             onChange={e => {
               if (!e.target.value) return
               if (viewMode === 'month') { const [y,m] = e.target.value.split('-').map(Number); setCurrentDate(new Date(y,m-1,1)) }
@@ -310,9 +378,19 @@ export default function RelatoriosPage() {
                 </Box>
                 <Box sx={{ overflow: 'auto', flex: 1 }}>
                   {selected.cat.transactions.map(tx => (
-                    <Box key={tx.id} sx={{ px: 2, py: 1.25, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${clrs.border}`, '&:hover': { bgcolor: '#f9fafb' }, transition: 'background 0.15s' }}>
+                    <Box key={tx.id}
+                      onClick={() => openEdit(tx)}
+                      sx={{
+                        px: 2, py: 1.25, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        borderBottom: `1px solid ${clrs.border}`, cursor: 'pointer', transition: 'background 0.15s',
+                        '&:hover': { bgcolor: '#f0f4ff' },
+                        '&:hover .edit-hint': { opacity: 1 }
+                      }}>
                       <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography variant="body2" fontWeight={500} noWrap>{tx.description}</Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Typography variant="body2" fontWeight={500} noWrap>{tx.description}</Typography>
+                          <EditIcon className="edit-hint" sx={{ fontSize: 13, color: clrs.primary, opacity: 0, transition: 'opacity 0.15s', flexShrink: 0 }} />
+                        </Box>
                         <Typography variant="caption" color="text.secondary">
                           {new Date(tx.due_date + 'T12:00:00').toLocaleDateString('pt-BR')}
                           {tx.account_name ? ` · ${tx.account_name}` : ''}
@@ -332,6 +410,43 @@ export default function RelatoriosPage() {
           </Box>
         )}
       </Box>
+
+      <Drawer anchor="right" open={formOpen} onClose={closeForm}
+        PaperProps={{ sx: { width: { xs: '100%', sm: 480 } } }}>
+        <Box p={2} display="flex" justifyContent="space-between" alignItems="center">
+          <Typography variant="h6" fontWeight={600}>Editar Lancamento</Typography>
+          <IconButton onClick={closeForm}><CloseIcon /></IconButton>
+        </Box>
+        {submitError && (
+          <Box px={2} pb={1}>
+            <Alert severity="error" onClose={() => setSubmitError(null)}>{submitError}</Alert>
+          </Box>
+        )}
+        <TransactionForm
+          initialData={editTarget ? {
+            account_id: editTarget.account_id ?? '',
+            type: editTarget.type as 'RECEITA' | 'DESPESA',
+            amount: Math.abs(editTarget.amount),
+            due_date: editTarget.due_date,
+            description: editTarget.description,
+            status: (editTarget.status === 'AGENDADO' ? 'PENDENTE' : editTarget.status) as 'PENDENTE' | 'CONFIRMADO' | 'CONCILIADO',
+            category_id: '',
+            center_id: '',
+            project_id: '',
+            contact_id: '',
+            notes: editTarget.notes || '',
+            tags: editTarget.tags || [],
+            regime: 'CAIXA',
+            repetition_type: 'NONE'
+          } : undefined}
+          accounts={accounts}
+          categories={categories}
+          settings={DEFAULT_SETTINGS}
+          isLoading={submitting}
+          onSubmit={handleSubmit}
+          onCancel={closeForm}
+        />
+      </Drawer>
     </Box>
   )
 }
