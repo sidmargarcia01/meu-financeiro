@@ -259,9 +259,18 @@ export class ReportService {
     let impostosLucro: number
     let distribuicaoLucros: number
 
+    // Soma de itens sem dreGroup (null) — fallback p/ totais do path estruturado
+    const semDreGroupReceita = categorias
+      .filter(c => c.tipo === 'RECEITA' && !c.dreGroup)
+      .reduce((s, c) => s + Math.abs(c.total), 0)
+    const semDreGroupDespesa = categorias
+      .filter(c => c.tipo === 'DESPESA' && !c.dreGroup)
+      .reduce((s, c) => s + Math.abs(c.total), 0)
+
     // ── Receitas ─────────────────────────────────────────────────────────────
     if (hasReceitaDreGroup) {
-      receitasOperacionais = sumGroup('RECEITAS_OPERACIONAIS')
+      // Itens sem dreGroup vão para receitas operacionais (melhor estimativa)
+      receitasOperacionais = sumGroup('RECEITAS_OPERACIONAIS') + semDreGroupReceita
       impostosFaturamento = sumGroup('IMPOSTOS_FATURAMENTO')
       receitasNaoOperacionais = sumGroup('RECEITAS_NAO_OPERACIONAIS')
     } else {
@@ -273,8 +282,9 @@ export class ReportService {
     // ── Despesas ─────────────────────────────────────────────────────────────
     if (hasDespesaDreGroup) {
       // Usar classificação por dre_group configurada no banco
+      // Itens sem dreGroup vão para despesas variáveis (melhor estimativa)
       custosOperacionais = sumGroup('CUSTOS_OPERACIONAIS')
-      despesasVariaveis = sumGroup('DESPESAS_VARIAVEIS')
+      despesasVariaveis = sumGroup('DESPESAS_VARIAVEIS') + semDreGroupDespesa
       despesasFixas = sumGroup('DESPESAS_FIXAS')
       despesasNaoOperacionais = sumGroup('DESPESAS_NAO_OPERACIONAIS')
       impostosLucro = sumGroup('IMPOSTOS_LUCRO')
