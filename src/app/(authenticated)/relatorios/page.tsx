@@ -26,10 +26,10 @@ import { TransactionForm } from '@/components/transactions/TransactionForm'
 import type { TransactionFormData, Account, Category } from '@/components/transactions/TransactionForm'
 
 const CAT_COLORS = [
-  '#6366f1','#f59e0b','#10b981','#ef4444','#3b82f6',
-  '#8b5cf6','#ec4899','#14b8a6','#f97316','#84cc16',
-  '#06b6d4','#a78bfa','#fb923c','#4ade80','#f472b6',
-  '#38bdf8','#fbbf24','#34d399','#fb7185','#818cf8'
+  '#6366f1', '#f59e0b', '#10b981', '#ef4444', '#3b82f6',
+  '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#84cc16',
+  '#06b6d4', '#a78bfa', '#fb923c', '#4ade80', '#f472b6',
+  '#38bdf8', '#fbbf24', '#34d399', '#fb7185', '#818cf8'
 ]
 
 const clrs = {
@@ -48,14 +48,14 @@ const DEFAULT_SETTINGS = {
 }
 
 function toLocalDateString(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 function getWeekRange(d: Date) {
   const day = d.getDay(); const diff = day === 0 ? -6 : 1 - day
-  return { start: new Date(d.getFullYear(), d.getMonth(), d.getDate()+diff), end: new Date(d.getFullYear(), d.getMonth(), d.getDate()+diff+6) }
+  return { start: new Date(d.getFullYear(), d.getMonth(), d.getDate() + diff), end: new Date(d.getFullYear(), d.getMonth(), d.getDate() + diff + 6) }
 }
 function getMonthRange(d: Date) {
-  return { start: new Date(d.getFullYear(), d.getMonth(), 1), end: new Date(d.getFullYear(), d.getMonth()+1, 0) }
+  return { start: new Date(d.getFullYear(), d.getMonth(), 1), end: new Date(d.getFullYear(), d.getMonth() + 1, 0) }
 }
 function fmtCurrency(v: number) { return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) }
 
@@ -122,8 +122,10 @@ function ChartCard({ title, color, data, total, activeIdx, selectedName, onEnter
                   stroke={selectedName === e.name ? '#1a1a2e' : 'white'}
                   strokeWidth={selectedName === e.name ? 3 : 1.5}
                   opacity={activeIdx !== null && activeIdx !== i ? 0.5 : 1}
-                  style={{ transition: 'opacity 0.2s, transform 0.2s', transformOrigin: 'center',
-                    transform: activeIdx === i ? 'scale(1.05)' : 'scale(1)' }} />
+                  style={{
+                    transition: 'opacity 0.2s, transform 0.2s', transformOrigin: 'center',
+                    transform: activeIdx === i ? 'scale(1.05)' : 'scale(1)'
+                  }} />
               ))}
             </Pie>
             <RTooltip content={<CustomTooltip />} />
@@ -168,10 +170,10 @@ export default function RelatoriosPage() {
   const dateInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    fetch('/api/accounts?balances=true').then(r => r.json()).then(d => setAccounts(Array.isArray(d) ? d : [])).catch(() => {})
+    fetch('/api/accounts?balances=true').then(r => r.json()).then(d => setAccounts(Array.isArray(d) ? d : [])).catch(() => { })
     fetch('/api/categories').then(r => r.json()).then(d => {
       setCategories(Array.isArray(d) ? d.map((c: Category) => ({ ...c, children: c.children || [] })) : [])
-    }).catch(() => {})
+    }).catch(() => { })
   }, [])
 
   const periodRange = useMemo(() => {
@@ -181,12 +183,12 @@ export default function RelatoriosPage() {
   }, [viewMode, currentDate])
 
   const startStr = useMemo(() => toLocalDateString(periodRange.start), [periodRange])
-  const endStr   = useMemo(() => toLocalDateString(periodRange.end),   [periodRange])
+  const endStr = useMemo(() => toLocalDateString(periodRange.end), [periodRange])
 
   const periodLabel = useMemo(() => {
     if (viewMode === 'day') return currentDate.toLocaleDateString('pt-BR')
     if (viewMode === 'week') {
-      const fmt = (d: Date) => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`
+      const fmt = (d: Date) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
       return `${fmt(periodRange.start)} - ${fmt(periodRange.end)}/${periodRange.end.getFullYear()}`
     }
     return currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
@@ -317,19 +319,19 @@ export default function RelatoriosPage() {
           </Box>
           <IconButton size="small" onClick={goToNext} sx={{ color: clrs.textSecondary, '&:hover': { bgcolor: '#f5f5f5' } }}><NextIcon fontSize="small" /></IconButton>
           <input ref={dateInputRef} type={viewMode === 'month' ? 'month' : 'date'}
-            value={viewMode === 'month' ? `${currentDate.getFullYear()}-${String(currentDate.getMonth()+1).padStart(2,'00')}` : toLocalDateString(currentDate)}
+            value={viewMode === 'month' ? `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '00')}` : toLocalDateString(currentDate)}
             onChange={e => {
               if (!e.target.value) return
-              if (viewMode === 'month') { const [y,m] = e.target.value.split('-').map(Number); setCurrentDate(new Date(y,m-1,1)) }
-              else { const [y,m,d] = e.target.value.split('-').map(Number); setCurrentDate(new Date(y,m-1,d)) }
+              if (viewMode === 'month') { const [y, m] = e.target.value.split('-').map(Number); setCurrentDate(new Date(y, m - 1, 1)) }
+              else { const [y, m, d] = e.target.value.split('-').map(Number); setCurrentDate(new Date(y, m - 1, d)) }
             }} style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} />
         </Box>
 
         <Box sx={{ display: 'flex', gap: 1.5, ml: 'auto', flexWrap: 'wrap' }}>
           {([
-            { label: 'Receitas', value: totalR, color: clrs.receita,  icon: 'up' },
-            { label: 'Despesas', value: totalD, color: clrs.despesa,  icon: 'down' },
-            { label: 'Saldo',    value: saldo,  color: saldo >= 0 ? clrs.receita : clrs.despesa, icon: 'bal' }
+            { label: 'Receitas', value: totalR, color: clrs.receita, icon: 'up' },
+            { label: 'Despesas', value: totalD, color: clrs.despesa, icon: 'down' },
+            { label: 'Saldo', value: saldo, color: saldo >= 0 ? clrs.receita : clrs.despesa, icon: 'bal' }
           ] as const).map(c => (
             <Box key={c.label} sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1.5, py: 0.75, borderRadius: '10px', border: `1px solid ${c.color}33`, bgcolor: `${c.color}0d` }}>
               <Box sx={{ color: c.color }}>
@@ -339,7 +341,9 @@ export default function RelatoriosPage() {
               </Box>
               <Box>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1 }}>{c.label}</Typography>
-                <Typography variant="body2" fontWeight={700} sx={{ color: c.color }}>{fmtCurrency(Math.abs(c.value))}</Typography>
+                <Typography variant="body2" fontWeight={700} sx={{ color: c.color }}>
+                  {c.label === 'Saldo' && c.value < 0 ? `- ${fmtCurrency(Math.abs(c.value))}` : fmtCurrency(Math.abs(c.value))}
+                </Typography>
               </Box>
             </Box>
           ))}
