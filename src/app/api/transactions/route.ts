@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/middlewares/auth'
 import { withValidation } from '@/middlewares/validation'
 import { TransactionService } from '@/services/transactionService'
-import { createTransactionSchema, updateTransactionSchema, transactionFiltersSchema } from '@/models/transaction'
+import { createTransactionInputSchema, updateTransactionSchema, transactionFiltersSchema } from '@/models/transaction'
 
 const transactionService = new TransactionService()
 
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
   return withAuth(request, async (req, user) => {
     try {
       const { searchParams } = new URL(req.url)
-      
+
       // Parse filtros
       const filters = {
         accountId: searchParams.get('accountId') || undefined,
@@ -31,17 +31,17 @@ export async function GET(request: NextRequest) {
         search: searchParams.get('search') || undefined,
         tags: searchParams.get('tags')?.split(',').filter(Boolean) || undefined,
       }
-      
+
       // Parse paginação
       const page = parseInt(searchParams.get('page') || '1')
       const limit = parseInt(searchParams.get('limit') || '20')
-      
+
       const result = await transactionService.listTransactions(
         user.id,
         filters,
         { page, limit }
       )
-      
+
       return NextResponse.json(result)
     } catch (error) {
       console.error('Erro ao listar transações:', error)
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
 // POST /api/transactions - Criar transação
 export async function POST(request: NextRequest) {
   return withAuth(request, async (req, user) => {
-    return withValidation(req, createTransactionSchema, async (req, data) => {
+    return withValidation(req, createTransactionInputSchema, async (req, data) => {
       try {
         const transaction = await transactionService.createTransaction(user.id, {
           ...data,
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           )
         }
-        
+
         return NextResponse.json(
           { error: 'Erro ao criar transação' },
           { status: 500 }

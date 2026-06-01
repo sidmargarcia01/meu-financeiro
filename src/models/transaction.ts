@@ -41,6 +41,17 @@ export const createTransactionSchema = z.object({
   transferData: z.any().optional(),
 })
 
+// Schema de criação com validação condicional: categoria obrigatória para RECEITA e DESPESA
+export const createTransactionInputSchema = createTransactionSchema.superRefine((data, ctx) => {
+  if (data.type !== 'TRANSFERENCIA' && !data.categoryId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Categoria é obrigatória para receitas e despesas',
+      path: ['categoryId'],
+    })
+  }
+})
+
 // Schema para atualização de transação
 export const updateTransactionSchema = createTransactionSchema.partial()
 

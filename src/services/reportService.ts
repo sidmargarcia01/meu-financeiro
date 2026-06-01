@@ -138,7 +138,10 @@ export class ReportService {
     fim: string,
     regime: 'CAIXA' | 'COMPETENCIA' = 'CAIXA'
   ): Promise<DRERelatorio> {
-    const dateField = regime === 'COMPETENCIA' ? 'competence_date' : 'due_date'
+    const dateField = regime === 'COMPETENCIA' ? 'competence_date' : 'payment_date'
+    const statusFilter = regime === 'CAIXA'
+      ? ['CONFIRMADO', 'CONCILIADO']
+      : ['PENDENTE', 'CONFIRMADO', 'CONCILIADO']
 
     // Pré-carrega categorias pai para obter dre_group correto via subcategorias
     const { data: parentCats } = await supabase
@@ -161,6 +164,7 @@ export class ReportService {
       `)
       .eq('user_id', userId)
       .in('type', ['RECEITA', 'DESPESA'])
+      .in('status', statusFilter)
       .gte(dateField, inicio)
       .lte(dateField, fim)
       .order(dateField)
@@ -178,16 +182,19 @@ export class ReportService {
 
     for (const tx of (transactions || [])) {
       const cat = tx.categories as any
-      if (!cat) continue
-
-      const catId = cat.parent_id || cat.id
       const tipo: 'RECEITA' | 'DESPESA' = tx.type as any
 
+      // Fallback: transações sem categoria aparecem em "Sem Categoria" (não são silenciadas)
+      const catId = cat ? (cat.parent_id || cat.id) : `sem-categoria-${tipo}`
+
       if (!categoriaMap.has(catId)) {
-        // Para subcategorias: busca nome e dre_group do PAI via parentCatMap
         let catNome: string
         let dreGroup: string | null
-        if (cat.parent_id) {
+        if (!cat) {
+          catNome = 'Sem Categoria'
+          dreGroup = null
+        } else if (cat.parent_id) {
+          // Para subcategorias: busca nome e dre_group do PAI via parentCatMap
           const parentInfo = parentCatMap.get(cat.parent_id)
           catNome = parentInfo?.name || cat.name
           dreGroup = parentInfo?.dreGroup ?? null
@@ -204,7 +211,7 @@ export class ReportService {
       const catEntry = categoriaMap.get(catId)!
       catEntry.total += txValue
 
-      if (cat.parent_id) {
+      if (cat?.parent_id) {
         if (!catEntry.subcategorias.has(cat.id)) {
           catEntry.subcategorias.set(cat.id, { id: cat.id, nome: cat.name, total: 0 })
         }
@@ -372,9 +379,10 @@ export class ReportService {
         categories(name)
       `)
       .eq('user_id', userId)
-      .gte('due_date', inicio)
-      .lte('due_date', fim)
-      .order('due_date')
+      .in('status', ['CONFIRMADO', 'CONCILIADO'])
+      .gte('payment_date', inicio)
+      .lte('payment_date', fim)
+      .order('payment_date')
 
     if (error) throw error
 
@@ -389,7 +397,7 @@ export class ReportService {
       saldo += (tx.type === 'RECEITA' ? tx.amount : tx.type === 'DESPESA' ? tx.amount : 0)
 
       linhas.push({
-        data: tx.due_date,
+        data: tx.payment_date ?? tx.due_date,
         descricao: tx.description,
         entrada,
         saida,
@@ -437,7 +445,7 @@ export class ReportService {
         .from('transactions')
         .select('account_id, amount, type')
         .eq('user_id', userId)
-        .eq('status', 'PAGO')
+        .in('status', ['CONFIRMADO', 'CONCILIADO'])
         .lte('payment_date', data)
         .in('account_id', accountIds)
 
@@ -463,7 +471,7 @@ export class ReportService {
       .eq('status', 'PENDENTE')
       .lte('due_date', data)
 
-    const passivoCirculante = (pendentes || []).reduce((s, t) => s + Number(t.amount), 0)
+    const passivoCirculante = (pendentes || []).reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
     const passivoNaoCirculante = 0
     const passivoTotal = passivoCirculante + passivoNaoCirculante
     const patrimonioLiquido = ativoCirculante - passivoTotal
@@ -558,8 +566,8 @@ export class ReportService {
       {
         key: 'participacao_capital_terceiros',
         label: 'Participação Capital de Terceiros',
-        value: ratio(passivoTotal, patrimonioLiquido),
-        unit: 'ratio',
+        value: pct(passivoTotal, passivoTotal + patrimonioLiquido),
+        unit: '%',
       },
     ]
 
