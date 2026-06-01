@@ -714,12 +714,18 @@ export class TransactionService {
       throw new Error('É necessário informar totalAmount para VALOR_TOTAL ou installmentAmount para VALOR_PARCELA')
     }
 
+    // Sinal correto do valor: DESPESA = negativo
+    const signedValue = data.type === 'DESPESA' ? -Math.abs(installmentValue) : Math.abs(installmentValue)
+
+    // Parse da data em fuso local (evita off-by-1-day do new Date('YYYY-MM-DD') UTC)
+    const datePart = data.dueDate.split('T')[0]
+    const [baseYear, baseMonth, baseDay] = datePart.split('-').map(Number)
+
     // Gerar parcelas
     const transactions = []
-    const baseDate = new Date(data.dueDate)
 
     for (let i = 0; i < data.installments; i++) {
-      const dueDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + i, baseDate.getDate())
+      const dueDate = new Date(baseYear, baseMonth - 1 + i, baseDay)
 
       transactions.push({
         userId: data.userId,
@@ -730,7 +736,7 @@ export class TransactionService {
         projectId: data.projectId,
         contactId: data.contactId,
         description: `${data.description} - Parcela ${i + 1}/${data.installments}`,
-        amount: installmentValue,
+        amount: signedValue,
         type: data.type,
         dueDate,
         regime: data.regime || 'CAIXA',

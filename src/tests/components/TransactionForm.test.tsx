@@ -83,18 +83,13 @@ describe('TransactionForm', () => {
     })
   })
 
-  it('deve exibir campo Valor da Parcela quando installment_default for VALOR_PARCELA e tipo Parcelado', async () => {
-    render(
-      <TransactionForm
-        {...mockProps}
-        settings={{ ...mockProps.settings, installment_default: 'VALOR_PARCELA' }}
-      />
-    )
+  it('deve exibir campo calculado (read-only) de Valor por Parcela ao selecionar Parcelado', async () => {
+    render(<TransactionForm {...mockProps} />)
     const repeticao = screen.getByLabelText(/repetição/i)
     fireEvent.mouseDown(repeticao)
     fireEvent.click(screen.getByText(/parcelado/i))
     await waitFor(() => {
-      expect(screen.getByLabelText(/valor da parcela/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/valor por parcela/i)).toBeInTheDocument()
     })
   })
 

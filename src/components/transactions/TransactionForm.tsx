@@ -142,6 +142,13 @@ export function TransactionForm({
   const transactionType = watch('type')
   const repetitionType = watch('repetition_type')
   const centerIdValue = watch('center_id')
+  const installmentsValue = watch('installments')
+  const amountValue = watch('amount')
+
+  // Preview do valor por parcela (calculado)
+  const installmentPreview = (amountValue && installmentsValue && installmentsValue >= 2)
+    ? (amountValue / installmentsValue).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : ''
 
   const filteredCategories = categories.filter(c => {
     if (transactionType === 'RECEITA') return c.type === 'RECEITA'
@@ -151,7 +158,6 @@ export function TransactionForm({
 
   // Estado para valor formatado em moeda brasileira
   const [amountFormatted, setAmountFormatted] = useState('')
-  const [installmentAmountFormatted, setInstallmentAmountFormatted] = useState('')
 
   // Máscara BRL: converte dígitos em valor com vírgula decimal automática
   // Ex: digitar "13200" → "132,00" | "1320000" → "13.200,00"
@@ -186,18 +192,14 @@ export function TransactionForm({
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Função de submit: converte valores formatados e aplica status de ação se houver
+  // Função de submit: converte valor formatado e aplica status de ação se houver
   const handleFormSubmit = (data: TransactionFormData) => {
     const numericValue = parseCurrencyToNumber(amountFormatted)
-    const installmentValue = installmentAmountFormatted
-      ? parseCurrencyToNumber(installmentAmountFormatted)
-      : undefined
     const finalStatus = statusOverrideRef.current ?? data.status ?? 'PENDENTE'
     statusOverrideRef.current = null
     onSubmit({
       ...data,
       amount: numericValue,
-      installment_amount: installmentValue,
       status: finalStatus as TransactionFormData['status']
     })
   }
@@ -454,33 +456,15 @@ export function TransactionForm({
             )}
           />
 
-          {settings.installment_default === 'VALOR_PARCELA' ? (
-            <Controller
-              name="installment_amount"
-              control={control}
-              render={({ field }) => (
-                <TextField
-                  label="Valor da Parcela *"
-                  value={installmentAmountFormatted}
-                  onChange={(e) => {
-                    const formatted = formatAsCurrency(e.target.value)
-                    setInstallmentAmountFormatted(formatted)
-                    field.onChange(parseCurrencyToNumber(formatted))
-                  }}
-                  placeholder="0,00"
-                  InputProps={{
-                    startAdornment: <InputAdornment position="start">R$</InputAdornment>,
-                  }}
-                />
-              )}
-            />
-          ) : (
-            <TextField
-              disabled
-              label="Valor por Parcela (calculado)"
-              helperText="Calculado automaticamente ao salvar"
-            />
-          )}
+          <TextField
+            disabled
+            label="Valor por Parcela (calculado)"
+            value={installmentPreview}
+            InputProps={{
+              startAdornment: <InputAdornment position="start">R$</InputAdornment>,
+            }}
+            helperText="Calculado automaticamente"
+          />
         </Box>
       )}
 

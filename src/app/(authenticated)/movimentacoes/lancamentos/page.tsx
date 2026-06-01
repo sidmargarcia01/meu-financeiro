@@ -489,8 +489,8 @@ export default function LancamentosCaixaPage() {
       setFormOpen(false)
       setEditTarget(null)
       fetchTransactions()
-    } catch {
-      setSubmitError('Erro ao salvar lançamento.')
+    } catch (e: any) {
+      setSubmitError(e?.message || 'Erro ao salvar lançamento.')
     } finally {
       setSubmitting(false)
     }
