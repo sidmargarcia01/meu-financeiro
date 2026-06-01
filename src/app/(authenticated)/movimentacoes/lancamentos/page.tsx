@@ -36,7 +36,9 @@ import {
   InputLabel,
   Select,
   Tooltip,
-  InputAdornment
+  InputAdornment,
+  ToggleButton,
+  ToggleButtonGroup
 } from '@mui/material'
 import {
   ChevronLeft as PrevIcon,
@@ -51,7 +53,10 @@ import {
   MoreVert as MoreIcon,
   Close as CloseIcon,
   SwapHoriz,
-  AttachFile as AttachFileIcon
+  AttachFile as AttachFileIcon,
+  ViewDay as ViewDayIcon,
+  DateRange as DateRangeIcon,
+  CalendarMonth as CalendarMonthIcon
 } from '@mui/icons-material'
 import { TransactionForm } from '@/components/transactions/TransactionForm'
 import type { TransactionFormData } from '@/components/transactions/TransactionForm'
@@ -113,6 +118,22 @@ const getDaysOverdue = (tx: { status: string; due_date: string }): number | null
   return diff > 0 ? diff : null
 }
 
+// Helper: retorna início (Segunda) e fim (Domingo) da semana que contém a data
+function getWeekRange(date: Date): { start: Date; end: Date } {
+  const day = date.getDay() // 0=Dom…6=Sab
+  const diffToMonday = day === 0 ? -6 : 1 - day
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate() + diffToMonday)
+  const end = new Date(date.getFullYear(), date.getMonth(), date.getDate() + diffToMonday + 6)
+  return { start, end }
+}
+
+// Helper: retorna primeiro e último dia do mês da data
+function getMonthRange(date: Date): { start: Date; end: Date } {
+  const start = new Date(date.getFullYear(), date.getMonth(), 1)
+  const end = new Date(date.getFullYear(), date.getMonth() + 1, 0)
+  return { start, end }
+}
+
 // Tipos
 interface Account {
   id: string
@@ -149,6 +170,7 @@ interface Transaction {
 export default function LancamentosCaixaPage() {
   // Estados
   const [currentDate, setCurrentDate] = useState<Date>(new Date())
+  const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day')
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -178,6 +200,26 @@ export default function LancamentosCaixaPage() {
   const selectedDateStr = useMemo(() => toLocalDateString(currentDate), [currentDate])
   const todayStr = useMemo(() => toLocalDateString(new Date()), [])
 
+  // Período baseado no modo de visualização
+  const periodRange = useMemo(() => {
+    if (viewMode === 'week') return getWeekRange(currentDate)
+    if (viewMode === 'month') return getMonthRange(currentDate)
+    return { start: currentDate, end: currentDate }
+  }, [viewMode, currentDate])
+
+  const periodStartStr = useMemo(() => toLocalDateString(periodRange.start), [periodRange])
+  const periodEndStr = useMemo(() => toLocalDateString(periodRange.end), [periodRange])
+
+  const periodLabel = useMemo(() => {
+    if (viewMode === 'day') return currentDateStr
+    if (viewMode === 'week') {
+      const { start, end } = periodRange
+      const fmt = (d: Date) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
+      return `${fmt(start)} – ${fmt(end)}/${end.getFullYear()}`
+    }
+    return currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+  }, [viewMode, currentDate, currentDateStr, periodRange])
+
   // Buscar dados
   useEffect(() => {
     fetch('/api/accounts?balances=true')
@@ -204,17 +246,19 @@ export default function LancamentosCaixaPage() {
     setLoading(true)
     setError(null)
     try {
-      const selectedDate = toLocalDateString(currentDate)
-      const today = toLocalDateString(new Date())
-
-      // endDate = max(selectedDate, today): garante que transações CONCILIADO
-      // com due_date > selectedDate mas payment_date <= selectedDate sejam incluídas.
-      const endDate = selectedDate > today ? selectedDate : today
-
       const params = new URLSearchParams()
       params.set('limit', '2000')
-      params.set('endDate', endDate)
       if (searchTerm) params.set('search', searchTerm)
+
+      if (viewMode === 'day') {
+        const selectedDate = toLocalDateString(currentDate)
+        const today = toLocalDateString(new Date())
+        params.set('endDate', selectedDate > today ? selectedDate : today)
+      } else {
+        const range = viewMode === 'week' ? getWeekRange(currentDate) : getMonthRange(currentDate)
+        params.set('startDate', toLocalDateString(range.start))
+        params.set('endDate', toLocalDateString(range.end))
+      }
 
       const res = await fetch(`/api/transactions?${params}`)
       if (!res.ok) throw new Error()
@@ -231,7 +275,7 @@ export default function LancamentosCaixaPage() {
     } finally {
       setLoading(false)
     }
-  }, [searchTerm, currentDate])
+  }, [searchTerm, currentDate, viewMode])
 
   useEffect(() => { fetchTransactions() }, [fetchTransactions])
 
@@ -246,8 +290,18 @@ export default function LancamentosCaixaPage() {
 
   // Lista de transações com regra de negócio
   const listTransactions = useMemo(() => {
-    return filterTransactionsForList(filteredTransactions, selectedDateStr, todayStr)
-  }, [filteredTransactions, selectedDateStr, todayStr])
+    if (viewMode === 'day') {
+      return filterTransactionsForList(filteredTransactions, selectedDateStr, todayStr)
+    }
+    // Semana/Mês: mostra todos os lançamentos do período
+    const range = viewMode === 'week' ? getWeekRange(currentDate) : getMonthRange(currentDate)
+    const startStr = toLocalDateString(range.start)
+    const endStr = toLocalDateString(range.end)
+    return filteredTransactions.filter(tx => {
+      const effDate = tx.status === 'CONCILIADO' && tx.payment_date ? tx.payment_date : tx.due_date
+      return effDate >= startStr && effDate <= endStr
+    })
+  }, [viewMode, filteredTransactions, selectedDateStr, todayStr, currentDate])
 
   // Calcular saldo anterior (até o dia anterior à data selecionada)
   const previousBalance = useMemo(() => {
@@ -337,11 +391,23 @@ export default function LancamentosCaixaPage() {
   }
 
   // Navegação de data
-  const goToPrevDay = () => {
-    setCurrentDate(prev => { const nd = new Date(prev); nd.setDate(nd.getDate() - 1); return nd })
+  const goToPrev = () => {
+    setCurrentDate(prev => {
+      const nd = new Date(prev)
+      if (viewMode === 'day') nd.setDate(nd.getDate() - 1)
+      else if (viewMode === 'week') nd.setDate(nd.getDate() - 7)
+      else { nd.setDate(1); nd.setMonth(nd.getMonth() - 1) }
+      return nd
+    })
   }
-  const goToNextDay = () => {
-    setCurrentDate(prev => { const nd = new Date(prev); nd.setDate(nd.getDate() + 1); return nd })
+  const goToNext = () => {
+    setCurrentDate(prev => {
+      const nd = new Date(prev)
+      if (viewMode === 'day') nd.setDate(nd.getDate() + 1)
+      else if (viewMode === 'week') nd.setDate(nd.getDate() + 7)
+      else { nd.setDate(1); nd.setMonth(nd.getMonth() + 1) }
+      return nd
+    })
   }
   const dateInputRef = useRef<HTMLInputElement>(null)
 
@@ -621,11 +687,37 @@ export default function LancamentosCaixaPage() {
               bgcolor: 'white'
             }}
           >
-            {/* Navegação de Data */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {/* Navegação de Data + Toggle Modo */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              {/* Toggle Diário / Semanal / Mensal */}
+              <ToggleButtonGroup
+                value={viewMode}
+                exclusive
+                onChange={(_, val) => { if (val) setViewMode(val) }}
+                size="small"
+                sx={{
+                  '& .MuiToggleButton-root': {
+                    px: 1, py: 0.4, border: `1px solid ${colors.border}`,
+                    fontSize: '0.7rem', fontWeight: 600, color: colors.textSecondary,
+                    '&.Mui-selected': { bgcolor: colors.primary, color: 'white', borderColor: colors.primary }
+                  }
+                }}
+              >
+                <Tooltip title="Diário">
+                  <ToggleButton value="day"><ViewDayIcon sx={{ fontSize: 16 }} /></ToggleButton>
+                </Tooltip>
+                <Tooltip title="Semanal">
+                  <ToggleButton value="week"><DateRangeIcon sx={{ fontSize: 16 }} /></ToggleButton>
+                </Tooltip>
+                <Tooltip title="Mensal">
+                  <ToggleButton value="month"><CalendarMonthIcon sx={{ fontSize: 16 }} /></ToggleButton>
+                </Tooltip>
+              </ToggleButtonGroup>
+
+              {/* Setas de navegação + Label do período */}
               <IconButton
                 size="small"
-                onClick={goToPrevDay}
+                onClick={goToPrev}
                 sx={{ color: colors.textSecondary, '&:hover': { bgcolor: '#f5f5f5' } }}
               >
                 <PrevIcon fontSize="small" />
@@ -633,48 +725,48 @@ export default function LancamentosCaixaPage() {
 
               <Box
                 sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1,
-                  cursor: 'pointer',
-                  px: 1.5,
-                  py: 0.5,
-                  borderRadius: '8px',
-                  '&:hover': { bgcolor: '#f5f5f5' }
+                  display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer',
+                  px: 1.5, py: 0.5, borderRadius: '8px', '&:hover': { bgcolor: '#f5f5f5' }
                 }}
                 onClick={() => dateInputRef.current?.showPicker?.()}
               >
                 <Typography
                   variant="body1"
                   sx={{
-                    fontWeight: 500,
-                    fontSize: '1rem',
-                    color: colors.textPrimary,
-                    minWidth: 100,
-                    textAlign: 'center'
+                    fontWeight: 500, fontSize: '1rem', color: colors.textPrimary,
+                    minWidth: viewMode === 'week' ? 160 : 100, textAlign: 'center'
                   }}
                 >
-                  {currentDateStr}
+                  {periodLabel}
                 </Typography>
                 <CalendarIcon fontSize="small" sx={{ color: colors.textSecondary }} />
               </Box>
 
               <IconButton
                 size="small"
-                onClick={goToNextDay}
+                onClick={goToNext}
                 sx={{ color: colors.textSecondary, '&:hover': { bgcolor: '#f5f5f5' } }}
               >
                 <NextIcon fontSize="small" />
               </IconButton>
 
+              {/* Input oculto para seleção de data/semana/mês */}
               <input
                 ref={dateInputRef}
-                type="date"
-                value={toLocalDateString(currentDate)}
+                type={viewMode === 'month' ? 'month' : 'date'}
+                value={viewMode === 'month'
+                  ? `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`
+                  : toLocalDateString(currentDate)
+                }
                 onChange={(e) => {
                   if (!e.target.value) return
-                  const [y, m, d] = e.target.value.split('-').map(Number)
-                  setCurrentDate(new Date(y, m - 1, d))
+                  if (viewMode === 'month') {
+                    const [y, m] = e.target.value.split('-').map(Number)
+                    setCurrentDate(new Date(y, m - 1, 1))
+                  } else {
+                    const [y, m, d] = e.target.value.split('-').map(Number)
+                    setCurrentDate(new Date(y, m - 1, d))
+                  }
                 }}
                 style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
               />
