@@ -89,7 +89,7 @@ describe('TransactionForm', () => {
     fireEvent.mouseDown(repeticao)
     fireEvent.click(screen.getByText(/parcelado/i))
     await waitFor(() => {
-      expect(screen.getByLabelText(/valor por parcela/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/total comprometido/i)).toBeInTheDocument()
     })
   })
 

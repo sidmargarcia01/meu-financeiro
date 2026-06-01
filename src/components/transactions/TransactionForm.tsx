@@ -145,9 +145,9 @@ export function TransactionForm({
   const installmentsValue = watch('installments')
   const amountValue = watch('amount')
 
-  // Preview do valor por parcela (calculado)
+  // Preview do total comprometido (valor da parcela × número de parcelas)
   const installmentPreview = (amountValue && installmentsValue && installmentsValue >= 2)
-    ? (amountValue / installmentsValue).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    ? (amountValue * installmentsValue).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     : ''
 
   const filteredCategories = categories.filter(c => {
@@ -458,12 +458,12 @@ export function TransactionForm({
 
           <TextField
             disabled
-            label="Valor por Parcela (calculado)"
+            label="Total Comprometido"
             value={installmentPreview}
             InputProps={{
               startAdornment: <InputAdornment position="start">R$</InputAdornment>,
             }}
-            helperText="Calculado automaticamente"
+            helperText="Valor da parcela × número de parcelas"
           />
         </Box>
       )}

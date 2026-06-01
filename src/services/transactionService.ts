@@ -526,11 +526,11 @@ export class TransactionService {
         projectId: data.projectId,
         contactId: data.contactId,
         description: data.description,
-        totalAmount: data.amount,
+        installmentAmount: data.amount,
         installments: data.recurrenceData.totalInstallments,
         dueDate: data.recurrenceData.firstDueDate,
         type: data.type as 'RECEITA' | 'DESPESA',
-        installmentType: 'VALOR_TOTAL',
+        installmentType: 'VALOR_PARCELA',
         regime: data.regime,
         notes: data.notes
       })

@@ -66,18 +66,10 @@ export async function POST(request: NextRequest) {
           tags: data.tags || []
         })
         return NextResponse.json(transaction, { status: 201 })
-      } catch (error) {
-        if (error instanceof Error) {
-          return NextResponse.json(
-            { error: error.message },
-            { status: 400 }
-          )
-        }
-
-        return NextResponse.json(
-          { error: 'Erro ao criar transação' },
-          { status: 500 }
-        )
+      } catch (error: any) {
+        const msg = error?.message || error?.details || 'Erro ao criar transação'
+        console.error('[POST /api/transactions]', error)
+        return NextResponse.json({ error: msg }, { status: 400 })
       }
     })
   })
