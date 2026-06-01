@@ -695,14 +695,20 @@ export class TransactionService {
     // Verificar limites do plano
     await this.checkPlanLimits(data.userId)
 
-    // Criar recorrência
-    const recurrence = await this.recurrenceRepository.create({
-      userId: data.userId,
-      type: 'PARCELADA',
-      totalInstallments: data.installments,
-      currentInstallment: 1,
-      isActive: true
-    })
+    // Criar recorrência (opcional: se falhar por RLS/permissão, segue sem o vínculo)
+    let recurrenceId: string | undefined
+    try {
+      const recurrence = await this.recurrenceRepository.create({
+        userId: data.userId,
+        type: 'PARCELADA',
+        totalInstallments: data.installments,
+        currentInstallment: 1,
+        isActive: true
+      })
+      recurrenceId = recurrence.id
+    } catch (recErr: any) {
+      console.warn('[createInstallmentTransaction] recurrences table unavailable, proceeding without recurrenceId:', recErr?.message)
+    }
 
     // Calcular valor das parcelas
     let installmentValue: number
@@ -731,7 +737,7 @@ export class TransactionService {
         userId: data.userId,
         accountId: data.accountId,
         categoryId: data.categoryId,
-        recurrenceId: recurrence.id,
+        recurrenceId,
         centerId: data.centerId,
         projectId: data.projectId,
         contactId: data.contactId,
@@ -750,7 +756,7 @@ export class TransactionService {
     const createdTransactions = await this.transactionRepository.createMany(transactions)
 
     return {
-      recurrenceId: recurrence.id,
+      recurrenceId,
       transactions: createdTransactions
     }
   }
