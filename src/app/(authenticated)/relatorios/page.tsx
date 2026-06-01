@@ -189,7 +189,12 @@ export default function RelatoriosPage() {
       if (!res.ok) throw new Error()
       const data = await res.json()
       const all: Transaction[] = Array.isArray(data) ? data : (data.data ?? [])
-      setTransactions(all.filter(t => t.type !== 'TRANSFERENCIA'))
+      setTransactions(all.filter(t => {
+        if (t.type === 'TRANSFERENCIA') return false
+        const desc = t.description?.toLowerCase() ?? ''
+        if (desc.startsWith('transfer') && (desc.includes(' para ') || desc.includes(' de '))) return false
+        return true
+      }))
     } catch { setError('Erro ao carregar dados.') }
     finally { setLoading(false) }
   }, [startStr, endStr])
