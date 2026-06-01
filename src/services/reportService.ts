@@ -138,7 +138,7 @@ export class ReportService {
     fim: string,
     regime: 'CAIXA' | 'COMPETENCIA' = 'CAIXA'
   ): Promise<DRERelatorio> {
-    const dateField = regime === 'COMPETENCIA' ? 'competence_date' : 'payment_date'
+    const dateField = regime === 'COMPETENCIA' ? 'competence_date' : 'due_date'
     const statusFilter = regime === 'CAIXA'
       ? ['CONFIRMADO', 'CONCILIADO']
       : ['PENDENTE', 'CONFIRMADO', 'CONCILIADO']
@@ -380,9 +380,9 @@ export class ReportService {
       `)
       .eq('user_id', userId)
       .in('status', ['CONFIRMADO', 'CONCILIADO'])
-      .gte('payment_date', inicio)
-      .lte('payment_date', fim)
-      .order('payment_date')
+      .gte('due_date', inicio)
+      .lte('due_date', fim)
+      .order('due_date')
 
     if (error) throw error
 
