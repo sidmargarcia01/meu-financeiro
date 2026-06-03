@@ -67,8 +67,9 @@ function fmtSaldo(v: number) {
 interface Transaction {
   id: string; type: 'RECEITA' | 'DESPESA' | 'TRANSFERENCIA'
   amount: number; description: string; due_date: string
-  category_name?: string; account_name?: string; account_id?: string
+  category_name?: string; category_id?: string; account_name?: string; account_id?: string
   status: string; notes?: string; tags?: string[]
+  dre_group?: string | null
 }
 interface CatData { name: string; value: number; pct: number; color: string; transactions: Transaction[] }
 
@@ -172,7 +173,7 @@ export default function RelatoriosPage() {
   const [editTarget, setEditTarget] = useState<Transaction | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const [groupBy, setGroupBy] = useState<'category' | 'account'>('category')
+  const [groupBy, setGroupBy] = useState<'category' | 'account' | 'type'>('category')
   const dateInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -277,12 +278,29 @@ export default function RelatoriosPage() {
     }
   }
 
+  const DRE_LABELS: Record<string, string> = {
+    RECEITAS_OPERACIONAIS: 'Receitas Operacionais',
+    IMPOSTOS_FATURAMENTO: 'Impostos sobre Faturamento',
+    CUSTOS_OPERACIONAIS: 'Custos Operacionais',
+    DESPESAS_VARIAVEIS: 'Despesas Variáveis',
+    DESPESAS_FIXAS: 'Despesas Fixas',
+    RECEITAS_NAO_OPERACIONAIS: 'Receitas Não Operacionais',
+    DESPESAS_NAO_OPERACIONAIS: 'Despesas Não Operacionais',
+    IMPOSTOS_LUCRO: 'Impostos sobre Lucro',
+    DISTRIBUICAO_LUCROS: 'Distribuição de Lucros',
+  }
+
   const buildData = useCallback((type: 'RECEITA' | 'DESPESA'): CatData[] => {
     const map = new Map<string, { value: number; txs: Transaction[] }>()
-    const field = groupBy === 'account' ? 'account_name' : 'category_name'
-    const fallback = groupBy === 'account' ? 'Sem conta' : 'Sem categoria'
     transactions.filter(t => t.type === type).forEach(t => {
-      const key = (t as any)[field] || fallback
+      let key: string
+      if (groupBy === 'account') {
+        key = t.account_name || 'Sem conta'
+      } else if (groupBy === 'type') {
+        key = t.dre_group ? (DRE_LABELS[t.dre_group] || t.dre_group) : 'Sem classificação'
+      } else {
+        key = t.category_name || 'Sem categoria'
+      }
       const cur = map.get(key) || { value: 0, txs: [] }
       map.set(key, { value: cur.value + Math.abs(t.amount), txs: [...cur.txs, t] })
     })
@@ -320,10 +338,11 @@ export default function RelatoriosPage() {
             labelId="groupby-label"
             value={groupBy}
             label="Agrupar"
-            onChange={e => setGroupBy(e.target.value as 'category' | 'account')}
+            onChange={e => setGroupBy(e.target.value as 'category' | 'account' | 'type')}
             sx={{ fontSize: '0.8rem', borderRadius: '8px', height: 34 }}
           >
             <MenuItem value="category" sx={{ fontSize: '0.8rem' }}>Por Categoria</MenuItem>
+            <MenuItem value="type" sx={{ fontSize: '0.8rem' }}>Por Tipo (DRE)</MenuItem>
             <MenuItem value="account" sx={{ fontSize: '0.8rem' }}>Por Conta</MenuItem>
           </Select>
         </FormControl>
@@ -379,14 +398,14 @@ export default function RelatoriosPage() {
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         {!loading && !error && (
           <Box sx={{ display: 'grid', gridTemplateColumns: selected ? '1fr 1fr 360px' : '1fr 1fr', gap: 3, maxWidth: 1400, mx: 'auto' }}>
-            <ChartCard title={groupBy === 'account' ? 'Despesas por Conta' : 'Despesas por Categoria'} color={clrs.despesa}
+            <ChartCard title={groupBy === 'account' ? 'Despesas por Conta' : groupBy === 'type' ? 'Despesas por Tipo' : 'Despesas por Categoria'} color={clrs.despesa}
               data={despesaData} total={totalD}
               activeIdx={activeIdx?.chart === 'd' ? activeIdx.idx : null}
               selectedName={selected?.type === 'DESPESA' ? selected.cat.name : null}
               onEnter={i => setActiveIdx({ chart: 'd', idx: i })} onLeave={() => setActiveIdx(null)}
               onClick={cat => toggleSelect(cat, 'DESPESA')} />
 
-            <ChartCard title={groupBy === 'account' ? 'Receitas por Conta' : 'Receitas por Categoria'} color={clrs.receita}
+            <ChartCard title={groupBy === 'account' ? 'Receitas por Conta' : groupBy === 'type' ? 'Receitas por Tipo' : 'Receitas por Categoria'} color={clrs.receita}
               data={receitaData} total={totalR}
               activeIdx={activeIdx?.chart === 'r' ? activeIdx.idx : null}
               selectedName={selected?.type === 'RECEITA' ? selected.cat.name : null}

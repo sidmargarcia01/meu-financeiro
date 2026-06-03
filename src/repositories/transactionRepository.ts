@@ -235,17 +235,20 @@ export class TransactionRepository {
         ? supabase.from('accounts').select('id, name').in('id', accountIds)
         : Promise.resolve({ data: [] }),
       categoryIds.length > 0
-        ? supabase.from('categories').select('id, name').in('id', categoryIds)
+        ? supabase.from('categories').select('id, name, dre_group').in('id', categoryIds)
         : Promise.resolve({ data: [] }),
     ])
 
     const accountsMap = new Map((accountsRes.data || []).map((a: any) => [a.id, a.name]))
     const categoriesMap = new Map((categoriesRes.data || []).map((c: any) => [c.id, c.name]))
+    const dreGroupMap = new Map((categoriesRes.data || []).map((c: any) => [c.id, c.dre_group]))
 
     return transactions.map((t: any) => ({
       ...t,
       account_name: accountsMap.get(t.account_id) ?? null,
       category_name: categoriesMap.get(t.category_id) ?? null,
+      category_id: t.category_id ?? null,
+      dre_group: dreGroupMap.get(t.category_id) ?? null,
     }))
   }
 

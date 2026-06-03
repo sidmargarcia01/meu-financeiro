@@ -82,6 +82,7 @@ export interface Category {
   id: string
   name: string
   type: string
+  dre_group?: string | null
   children: Category[]
 }
 
