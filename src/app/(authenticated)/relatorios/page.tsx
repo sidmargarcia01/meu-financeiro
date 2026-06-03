@@ -11,7 +11,8 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import {
   Box, Paper, Typography, IconButton, CircularProgress,
-  Alert, ToggleButton, ToggleButtonGroup, Tooltip, Divider, Chip, Drawer
+  Alert, ToggleButton, ToggleButtonGroup, Tooltip, Divider, Chip, Drawer,
+  Select, MenuItem, FormControl, InputLabel
 } from '@mui/material'
 import {
   ChevronLeft as PrevIcon, ChevronRight as NextIcon,
@@ -171,6 +172,7 @@ export default function RelatoriosPage() {
   const [editTarget, setEditTarget] = useState<Transaction | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [groupBy, setGroupBy] = useState<'category' | 'account'>('category')
   const dateInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -277,10 +279,12 @@ export default function RelatoriosPage() {
 
   const buildData = useCallback((type: 'RECEITA' | 'DESPESA'): CatData[] => {
     const map = new Map<string, { value: number; txs: Transaction[] }>()
+    const field = groupBy === 'account' ? 'account_name' : 'category_name'
+    const fallback = groupBy === 'account' ? 'Sem conta' : 'Sem categoria'
     transactions.filter(t => t.type === type).forEach(t => {
-      const cat = t.category_name || 'Sem categoria'
-      const cur = map.get(cat) || { value: 0, txs: [] }
-      map.set(cat, { value: cur.value + Math.abs(t.amount), txs: [...cur.txs, t] })
+      const key = (t as any)[field] || fallback
+      const cur = map.get(key) || { value: 0, txs: [] }
+      map.set(key, { value: cur.value + Math.abs(t.amount), txs: [...cur.txs, t] })
     })
     const total = Array.from(map.values()).reduce((s, v) => s + v.value, 0)
     return Array.from(map.entries())
@@ -290,7 +294,9 @@ export default function RelatoriosPage() {
         color: CAT_COLORS[i % CAT_COLORS.length],
         transactions: txs.sort((a, b) => b.due_date.localeCompare(a.due_date))
       }))
-  }, [transactions])
+  }, [transactions, groupBy])
+
+  useEffect(() => { setSelected(null) }, [groupBy])
 
   const despesaData = useMemo(() => buildData('DESPESA'), [buildData])
   const receitaData = useMemo(() => buildData('RECEITA'), [buildData])
@@ -308,6 +314,20 @@ export default function RelatoriosPage() {
       </Paper>
 
       <Paper elevation={0} sx={{ px: 2, py: 1.5, borderBottom: `1px solid ${clrs.border}`, bgcolor: 'white', display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+        <FormControl size="small" sx={{ minWidth: 140 }}>
+          <InputLabel id="groupby-label" sx={{ fontSize: '0.75rem' }}>Agrupar</InputLabel>
+          <Select
+            labelId="groupby-label"
+            value={groupBy}
+            label="Agrupar"
+            onChange={e => setGroupBy(e.target.value as 'category' | 'account')}
+            sx={{ fontSize: '0.8rem', borderRadius: '8px', height: 34 }}
+          >
+            <MenuItem value="category" sx={{ fontSize: '0.8rem' }}>Por Categoria</MenuItem>
+            <MenuItem value="account" sx={{ fontSize: '0.8rem' }}>Por Conta</MenuItem>
+          </Select>
+        </FormControl>
+
         <ToggleButtonGroup value={viewMode} exclusive onChange={(_: any, v: any) => { if (v) setViewMode(v) }} size="small"
           sx={{ '& .MuiToggleButton-root': { px: 1, py: 0.4, border: `1px solid ${clrs.border}`, fontSize: '0.7rem', fontWeight: 600, color: clrs.textSecondary, '&.Mui-selected': { bgcolor: clrs.primary, color: 'white', borderColor: clrs.primary } } }}>
           <Tooltip title="Diario"><ToggleButton value="day"><ViewDayIcon sx={{ fontSize: 16 }} /></ToggleButton></Tooltip>
@@ -359,14 +379,14 @@ export default function RelatoriosPage() {
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         {!loading && !error && (
           <Box sx={{ display: 'grid', gridTemplateColumns: selected ? '1fr 1fr 360px' : '1fr 1fr', gap: 3, maxWidth: 1400, mx: 'auto' }}>
-            <ChartCard title="Despesas por Categoria" color={clrs.despesa}
+            <ChartCard title={groupBy === 'account' ? 'Despesas por Conta' : 'Despesas por Categoria'} color={clrs.despesa}
               data={despesaData} total={totalD}
               activeIdx={activeIdx?.chart === 'd' ? activeIdx.idx : null}
               selectedName={selected?.type === 'DESPESA' ? selected.cat.name : null}
               onEnter={i => setActiveIdx({ chart: 'd', idx: i })} onLeave={() => setActiveIdx(null)}
               onClick={cat => toggleSelect(cat, 'DESPESA')} />
 
-            <ChartCard title="Receitas por Categoria" color={clrs.receita}
+            <ChartCard title={groupBy === 'account' ? 'Receitas por Conta' : 'Receitas por Categoria'} color={clrs.receita}
               data={receitaData} total={totalR}
               activeIdx={activeIdx?.chart === 'r' ? activeIdx.idx : null}
               selectedName={selected?.type === 'RECEITA' ? selected.cat.name : null}
