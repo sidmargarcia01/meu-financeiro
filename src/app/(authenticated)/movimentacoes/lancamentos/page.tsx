@@ -382,17 +382,18 @@ export default function LancamentosCaixaPage() {
     return balances
   }, [transactions, accounts, selectedDateStr])
 
-  // Agrupar por data
+  // Agrupar por data (vencidos aparecem no grupo de hoje)
   const groupedByDate = useMemo(() => {
     const groups: { [key: string]: Transaction[] } = {}
     listTransactions.forEach(tx => {
-      const date = tx.due_date
+      const isOverdue = tx.status === 'PENDENTE' && tx.due_date < todayStr
+      const date = isOverdue ? todayStr : tx.due_date
       if (!groups[date]) groups[date] = []
       groups[date].push(tx)
     })
     return Object.entries(groups)
       .sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
-  }, [listTransactions])
+  }, [listTransactions, todayStr])
 
   // Toggle status
   const toggleStatus = (key: string) => {
