@@ -18,9 +18,9 @@ export async function withValidation<T>(
   try {
     // Extrair dados da requisição
     let data: any
-    
+
     const contentType = request.headers.get('content-type')
-    
+
     if (contentType?.includes('application/json')) {
       // Requisição JSON
       const body = await request.json()
@@ -38,28 +38,30 @@ export async function withValidation<T>(
         { status: 400 }
       )
     }
-    
+
     // Validar com Zod
     const validatedData = schema.parse(data)
-    
+
     // Executar handler com dados validados
     return handler(request, validatedData)
-    
+
   } catch (error) {
     if (error instanceof ZodError) {
       // Erro de validação Zod
+      const details = error.errors.map(err => ({
+        field: err.path.join('.'),
+        message: err.message,
+      }))
+      const firstError = details[0]
       return NextResponse.json(
         {
-          error: 'Dados inválidos',
-          details: error.errors.map(err => ({
-            field: err.path.join('.'),
-            message: err.message,
-          })),
+          error: firstError ? `${firstError.field}: ${firstError.message}` : 'Dados inválidos',
+          details,
         },
         { status: 400 }
       )
     }
-    
+
     // Outros erros
     console.error('Erro de validação:', error)
     return NextResponse.json(
@@ -78,27 +80,29 @@ export async function withQueryValidation<T>(
   try {
     // Extrair query params
     const query = Object.fromEntries(request.nextUrl.searchParams.entries())
-    
+
     // Validar com Zod
     const validatedQuery = schema.parse(query)
-    
+
     // Executar handler com query validado
     return handler(request, validatedQuery)
-    
+
   } catch (error) {
     if (error instanceof ZodError) {
+      const details = error.errors.map(err => ({
+        field: err.path.join('.'),
+        message: err.message,
+      }))
+      const firstError = details[0]
       return NextResponse.json(
         {
-          error: 'Parâmetros inválidos',
-          details: error.errors.map(err => ({
-            field: err.path.join('.'),
-            message: err.message,
-          })),
+          error: firstError ? `${firstError.field}: ${firstError.message}` : 'Parâmetros inválidos',
+          details,
         },
         { status: 400 }
       )
     }
-    
+
     console.error('Erro de validação de query:', error)
     return NextResponse.json(
       { error: 'Erro ao processar requisição' },
@@ -117,24 +121,26 @@ export async function withParamsValidation<T>(
   try {
     // Validar parâmetros com Zod
     const validatedParams = schema.parse(params)
-    
+
     // Executar handler com parâmetros validados
     return handler(request, validatedParams)
-    
+
   } catch (error) {
     if (error instanceof ZodError) {
+      const details = error.errors.map(err => ({
+        field: err.path.join('.'),
+        message: err.message,
+      }))
+      const firstError = details[0]
       return NextResponse.json(
         {
-          error: 'Parâmetros da rota inválidos',
-          details: error.errors.map(err => ({
-            field: err.path.join('.'),
-            message: err.message,
-          })),
+          error: firstError ? `${firstError.field}: ${firstError.message}` : 'Parâmetros da rota inválidos',
+          details,
         },
         { status: 400 }
       )
     }
-    
+
     console.error('Erro de validação de parâmetros:', error)
     return NextResponse.json(
       { error: 'Erro ao processar requisição' },

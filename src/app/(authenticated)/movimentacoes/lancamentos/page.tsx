@@ -92,6 +92,15 @@ const STATUS_CONFIG = {
   }
 }
 
+// Helper: formata erros de validação da API em mensagem legível
+function fmtValidationError(err: any): string {
+  if (!err) return 'Erro ao salvar lançamento.'
+  if (err.details && Array.isArray(err.details) && err.details.length > 0) {
+    return err.details.map((d: any) => `${d.field}: ${d.message}`).join('; ')
+  }
+  return err.error || 'Erro ao salvar lançamento.'
+}
+
 // Helper: converte Date para string YYYY-MM-DD usando timezone local
 function toLocalDateString(date: Date): string {
   const year = date.getFullYear()
@@ -489,7 +498,7 @@ export default function LancamentosCaixaPage() {
       )
       if (!res.ok) {
         const data = await res.json().catch(() => null)
-        setSubmitError(data?.error || 'Erro ao conciliar lançamento.')
+        setSubmitError(fmtValidationError(data) || 'Erro ao conciliar lançamento.')
         return
       }
     } catch {
@@ -558,7 +567,7 @@ export default function LancamentosCaixaPage() {
 
       if (!response.ok) {
         const err = await response.json().catch(() => null)
-        throw new Error(err?.error || 'Erro ao salvar')
+        throw new Error(fmtValidationError(err))
       }
 
       setFormOpen(false)

@@ -63,6 +63,13 @@ function fmtSaldo(v: number) {
   const sinal = v < 0 ? '- ' : ''
   return `${sinal}${fmtCurrency(Math.abs(v))}`
 }
+function fmtValidationError(err: any): string {
+  if (!err) return 'Erro ao salvar.'
+  if (err.details && Array.isArray(err.details) && err.details.length > 0) {
+    return err.details.map((d: any) => `${d.field}: ${d.message}`).join('; ')
+  }
+  return err.error || 'Erro ao salvar.'
+}
 
 interface Transaction {
   id: string; type: 'RECEITA' | 'DESPESA' | 'TRANSFERENCIA'
@@ -267,7 +274,7 @@ export default function RelatoriosPage() {
       })
       if (!response.ok) {
         const err = await response.json().catch(() => null)
-        throw new Error(err?.error || 'Erro ao salvar')
+        throw new Error(fmtValidationError(err))
       }
       closeForm()
       fetchData()
