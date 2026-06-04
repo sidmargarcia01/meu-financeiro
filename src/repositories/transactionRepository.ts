@@ -373,6 +373,17 @@ export class TransactionRepository {
     if (error) throw error
   }
 
+  // Excluir todas as transações de uma recorrência
+  async deleteByRecurrenceId(recurrenceId: string, userId: string) {
+    const { error } = await supabase
+      .from('transactions')
+      .delete()
+      .eq('recurrence_id', recurrenceId)
+      .eq('user_id', userId)
+
+    if (error) throw error
+  }
+
   // Buscar transação por ID
   async findById(id: string, userId: string): Promise<TransactionWithRelations | null> {
     const { data, error } = await supabase

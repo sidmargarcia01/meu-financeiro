@@ -198,6 +198,16 @@ export class TransactionService {
     return this.transactionRepository.delete(transactionId, userId)
   }
 
+  async deleteTransactionsByRecurrenceId(userId: string, recurrenceId: string) {
+    // Desativar a recorrência primeiro para liberar as transações
+    const recurrence = await this.recurrenceRepository.findById(recurrenceId, userId)
+    if (recurrence && recurrence.isActive) {
+      await this.recurrenceRepository.update(recurrenceId, userId, { isActive: false })
+    }
+
+    return this.transactionRepository.deleteByRecurrenceId(recurrenceId, userId)
+  }
+
   async confirmTransaction(userId: string, transactionId: string) {
     // Verificar se transação existe
     const transaction = await this.transactionRepository.findById(transactionId, userId)

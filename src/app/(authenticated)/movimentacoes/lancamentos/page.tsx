@@ -165,6 +165,7 @@ interface Transaction {
   tags?: string[]
   competence_date?: string
   is_recurring?: boolean
+  recurrence_id?: string
 }
 
 export default function LancamentosCaixaPage() {
@@ -194,6 +195,14 @@ export default function LancamentosCaixaPage() {
     notes: '',
     tags: ''
   })
+
+  // Seleção múltipla
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkMode, setBulkMode] = useState(false)
+
+  // Diálogo de exclusão inteligente
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteDialogTarget, setDeleteDialogTarget] = useState<Transaction | null>(null)
 
   // Data formatada
   const currentDateStr = useMemo(() => formatDate(currentDate.toISOString()), [currentDate])
@@ -562,13 +571,87 @@ export default function LancamentosCaixaPage() {
     }
   }
 
-  const handleDelete = async () => {
+  // ─── Seleção múltipla ────────────────────────────────────────────────
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      if (next.size === 0) setBulkMode(false)
+      return next
+    })
+  }
+
+  const clearSelection = () => {
+    setSelectedIds(new Set())
+    setBulkMode(false)
+  }
+
+  const allVisibleIds = useMemo(() => {
+    const ids: string[] = []
+    listTransactions.forEach(tx => ids.push(tx.id))
+    return ids
+  }, [listTransactions])
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === allVisibleIds.length && allVisibleIds.length > 0) {
+      clearSelection()
+    } else {
+      setSelectedIds(new Set(allVisibleIds))
+      setBulkMode(true)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    if (!confirm(`Tem certeza que deseja excluir ${selectedIds.size} lançamentos?`)) return
+    await Promise.all(
+      Array.from(selectedIds).map(id => fetch(`/api/transactions/${id}`, { method: 'DELETE' }))
+    )
+    clearSelection()
+    fetchTransactions()
+  }
+
+  const handleBulkConfirm = async () => {
+    if (selectedIds.size === 0) return
+    const today = toLocalDateString(new Date())
+    await Promise.all(
+      Array.from(selectedIds).map(id =>
+        fetch(`/api/transactions/${id}?action=confirm`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'CONFIRMADO', due_date: today })
+        })
+      )
+    )
+    clearSelection()
+    fetchTransactions()
+  }
+
+  // ─── Exclusão inteligente (parcelado / fixo) ─────────────────────────
+  const handleDelete = () => {
     if (!selectedTransaction) return
-    if (confirm('Tem certeza que deseja excluir este lançamento?')) {
-      await fetch(`/api/transactions/${selectedTransaction.id}`, { method: 'DELETE' })
-      fetchTransactions()
+    if (selectedTransaction.recurrence_id) {
+      setDeleteDialogTarget(selectedTransaction)
+      setDeleteDialogOpen(true)
+    } else {
+      if (confirm('Tem certeza que deseja excluir este lançamento?')) {
+        doDeleteSingle(selectedTransaction.id)
+      }
     }
     closeMenu()
+  }
+
+  const doDeleteSingle = async (id: string) => {
+    await fetch(`/api/transactions/${id}`, { method: 'DELETE' })
+    fetchTransactions()
+  }
+
+  const doDeleteSeries = async (recurrenceId: string) => {
+    await fetch(`/api/transactions?recurrenceId=${recurrenceId}`, { method: 'DELETE' })
+    setDeleteDialogOpen(false)
+    setDeleteDialogTarget(null)
+    fetchTransactions()
   }
 
   const handleClone = () => {
@@ -949,6 +1032,53 @@ export default function LancamentosCaixaPage() {
 
               {/* Lista de Lançamentos */}
               <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+                {/* Toolbar de ações em massa */}
+                {bulkMode && selectedIds.size > 0 && (
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 1.5,
+                      mb: 2,
+                      borderRadius: '12px',
+                      border: `1px solid ${colors.border}`,
+                      bgcolor: '#f8f9fa',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 2
+                    }}
+                  >
+                    <Checkbox
+                      size="small"
+                      checked={selectedIds.size === allVisibleIds.length && allVisibleIds.length > 0}
+                      indeterminate={selectedIds.size > 0 && selectedIds.size < allVisibleIds.length}
+                      onChange={toggleSelectAll}
+                    />
+                    <Typography variant="body2" sx={{ flex: 1, fontWeight: 500 }}>
+                      {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
+                    </Typography>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={handleBulkConfirm}
+                      sx={{ textTransform: 'none', fontWeight: 500, borderRadius: '8px', fontSize: '0.75rem' }}
+                    >
+                      Confirmar
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="error"
+                      onClick={handleBulkDelete}
+                      sx={{ textTransform: 'none', fontWeight: 500, borderRadius: '8px', fontSize: '0.75rem' }}
+                    >
+                      Excluir
+                    </Button>
+                    <IconButton size="small" onClick={clearSelection} sx={{ ml: -0.5 }}>
+                      <CloseIcon fontSize="small" />
+                    </IconButton>
+                  </Paper>
+                )}
+
                 {loading ? (
                   <Box display="flex" justifyContent="center" py={6}>
                     <CircularProgress />
@@ -985,14 +1115,29 @@ export default function LancamentosCaixaPage() {
                                   alignItems: 'center',
                                   gap: 2,
                                   borderRadius: '12px',
-                                  bgcolor: 'white',
+                                  bgcolor: selectedIds.has(tx.id) ? '#f0f7ff' : 'white',
                                   cursor: 'pointer',
                                   mb: 1,
-                                  '&:hover': { bgcolor: '#fafafa', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
+                                  '&:hover': { bgcolor: selectedIds.has(tx.id) ? '#e6f0ff' : '#fafafa', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
                                   transition: 'all 0.2s'
                                 }}
-                                onClick={() => openEdit(tx)}
+                                onClick={() => {
+                                  if (bulkMode) toggleSelect(tx.id)
+                                  else openEdit(tx)
+                                }}
                               >
+                                {/* Checkbox de seleção */}
+                                <Checkbox
+                                  size="small"
+                                  checked={selectedIds.has(tx.id)}
+                                  onClick={e => {
+                                    e.stopPropagation()
+                                    if (!bulkMode && selectedIds.size === 0) setBulkMode(true)
+                                    toggleSelect(tx.id)
+                                  }}
+                                  sx={{ p: 0.5 }}
+                                />
+
                                 {/* Indicador de Status + Data */}
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 90 }}>
                                   <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: dotColor }} />
@@ -1199,6 +1344,60 @@ export default function LancamentosCaixaPage() {
           onCancel={() => { setFormOpen(false); setEditTarget(null) }}
         />
       </Drawer>
+
+      {/* Diálogo de Exclusão Inteligente */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => { setDeleteDialogOpen(false); setDeleteDialogTarget(null) }}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ pb: 1, pt: 2.5, px: 3 }}>
+          <Typography variant="h6" fontWeight={600}>Excluir Lançamento</Typography>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 1, pb: 2, px: 3 }}>
+          <Typography variant="body2" color="text.secondary">
+            Este lançamento faz parte de uma série. O que deseja fazer?
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button
+            onClick={() => { setDeleteDialogOpen(false); setDeleteDialogTarget(null) }}
+            variant="outlined"
+            size="small"
+            sx={{ textTransform: 'none', fontWeight: 500, borderRadius: '8px' }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={() => {
+              if (deleteDialogTarget) doDeleteSingle(deleteDialogTarget.id)
+              setDeleteDialogOpen(false)
+              setDeleteDialogTarget(null)
+            }}
+            variant="outlined"
+            color="error"
+            size="small"
+            sx={{ textTransform: 'none', fontWeight: 500, borderRadius: '8px' }}
+          >
+            Apenas este
+          </Button>
+          <Button
+            onClick={() => {
+              if (deleteDialogTarget?.recurrence_id) {
+                doDeleteSeries(deleteDialogTarget.recurrence_id)
+              }
+            }}
+            variant="contained"
+            color="error"
+            size="small"
+            sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px' }}
+          >
+            Todos da sequência
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Modal de Conciliação */}
       <Dialog

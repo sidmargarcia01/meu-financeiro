@@ -75,6 +75,26 @@ export async function POST(request: NextRequest) {
   })
 }
 
+// DELETE /api/transactions?recurrenceId=xxx - Excluir série de recorrência
+export async function DELETE(request: NextRequest) {
+  return withAuth(request, async (req, user) => {
+    try {
+      const { searchParams } = new URL(req.url)
+      const recurrenceId = searchParams.get('recurrenceId')
+
+      if (!recurrenceId) {
+        return NextResponse.json({ error: 'recurrenceId é obrigatório' }, { status: 400 })
+      }
+
+      await transactionService.deleteTransactionsByRecurrenceId(user.id, recurrenceId)
+      return NextResponse.json({ success: true })
+    } catch (error: any) {
+      console.error('[DELETE /api/transactions]', error)
+      return NextResponse.json({ error: error.message || 'Erro ao excluir recorrência' }, { status: 500 })
+    }
+  })
+}
+
 // GET /api/transactions/[id] - Obter transação específica
 // MOVIDO para: src/app/api/transactions/[id]/route.ts
 
