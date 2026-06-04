@@ -374,26 +374,36 @@ export class TransactionRepository {
     if (error) throw error
   }
 
-  // Excluir todas as transações de uma recorrência
-  async deleteByRecurrenceId(recurrenceId: string, userId: string) {
-    const { error } = await supabase
+  // Excluir todas as transações de uma recorrência (a partir de uma data opcional)
+  async deleteByRecurrenceId(recurrenceId: string, userId: string, fromDate?: string) {
+    let query = supabase
       .from('transactions')
       .delete()
       .eq('recurrence_id', recurrenceId)
       .eq('user_id', userId)
 
+    if (fromDate) {
+      query = query.gte('due_date', fromDate)
+    }
+
+    const { error } = await query
     if (error) throw error
   }
 
   // Excluir transações por descrição base (fallback para parcelas sem recurrence_id)
-  async deleteByDescriptionPattern(userId: string, accountId: string, baseDescription: string) {
-    const { error } = await supabase
+  async deleteByDescriptionPattern(userId: string, accountId: string, baseDescription: string, fromDate?: string) {
+    let query = supabase
       .from('transactions')
       .delete()
       .eq('user_id', userId)
       .eq('account_id', accountId)
       .ilike('description', `${baseDescription} - Parcela %/%`)
 
+    if (fromDate) {
+      query = query.gte('due_date', fromDate)
+    }
+
+    const { error } = await query
     if (error) throw error
   }
 

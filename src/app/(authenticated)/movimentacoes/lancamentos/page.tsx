@@ -669,13 +669,14 @@ export default function LancamentosCaixaPage() {
   }
 
   const doDeleteSeries = async (tx: Transaction) => {
+    const fromDate = tx.due_date
     if (tx.recurrence_id) {
-      // Excluir via recurrence_id (forma correta)
-      await fetch(`/api/transactions?recurrenceId=${tx.recurrence_id}`, { method: 'DELETE' })
+      // Excluir via recurrence_id (forma correta) — apenas a partir desta data
+      await fetch(`/api/transactions?recurrenceId=${tx.recurrence_id}&fromDate=${fromDate}`, { method: 'DELETE' })
     } else if (isInstallmentPattern(tx.description)) {
       // Fallback: excluir por descrição base (para transações criadas sem recurrence_id)
       const baseDesc = getInstallmentBase(tx.description)
-      await fetch(`/api/transactions?baseDescription=${encodeURIComponent(baseDesc)}&accountId=${tx.account_id}`, { method: 'DELETE' })
+      await fetch(`/api/transactions?baseDescription=${encodeURIComponent(baseDesc)}&accountId=${tx.account_id}&fromDate=${fromDate}`, { method: 'DELETE' })
     }
     setDeleteDialogOpen(false)
     setDeleteDialogTarget(null)

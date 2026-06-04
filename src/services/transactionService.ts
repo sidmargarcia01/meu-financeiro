@@ -198,18 +198,18 @@ export class TransactionService {
     return this.transactionRepository.delete(transactionId, userId)
   }
 
-  async deleteTransactionsByRecurrenceId(userId: string, recurrenceId: string) {
+  async deleteTransactionsByRecurrenceId(userId: string, recurrenceId: string, fromDate?: string) {
     // Desativar a recorrência primeiro para liberar as transações
     const recurrence = await this.recurrenceRepository.findById(recurrenceId, userId)
     if (recurrence && recurrence.isActive) {
       await this.recurrenceRepository.update(recurrenceId, userId, { isActive: false })
     }
 
-    return this.transactionRepository.deleteByRecurrenceId(recurrenceId, userId)
+    return this.transactionRepository.deleteByRecurrenceId(recurrenceId, userId, fromDate)
   }
 
-  async deleteTransactionsByDescription(userId: string, accountId: string, baseDescription: string) {
-    return this.transactionRepository.deleteByDescriptionPattern(userId, accountId, baseDescription)
+  async deleteTransactionsByDescription(userId: string, accountId: string, baseDescription: string, fromDate?: string) {
+    return this.transactionRepository.deleteByDescriptionPattern(userId, accountId, baseDescription, fromDate)
   }
 
   async confirmTransaction(userId: string, transactionId: string) {

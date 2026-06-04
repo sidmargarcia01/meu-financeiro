@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
   })
 }
 
-// DELETE /api/transactions?recurrenceId=xxx | ?baseDescription=xxx&accountId=yyy - Excluir série
+// DELETE /api/transactions?recurrenceId=xxx&fromDate=yyyy-mm-dd | ?baseDescription=xxx&accountId=yyy&fromDate=yyyy-mm-dd - Excluir série
 export async function DELETE(request: NextRequest) {
   return withAuth(request, async (req, user) => {
     try {
@@ -83,14 +83,15 @@ export async function DELETE(request: NextRequest) {
       const recurrenceId = searchParams.get('recurrenceId')
       const baseDescription = searchParams.get('baseDescription')
       const accountId = searchParams.get('accountId')
+      const fromDate = searchParams.get('fromDate') || undefined
 
       if (recurrenceId) {
-        await transactionService.deleteTransactionsByRecurrenceId(user.id, recurrenceId)
+        await transactionService.deleteTransactionsByRecurrenceId(user.id, recurrenceId, fromDate)
         return NextResponse.json({ success: true })
       }
 
       if (baseDescription && accountId) {
-        await transactionService.deleteTransactionsByDescription(user.id, accountId, baseDescription)
+        await transactionService.deleteTransactionsByDescription(user.id, accountId, baseDescription, fromDate)
         return NextResponse.json({ success: true })
       }
 
