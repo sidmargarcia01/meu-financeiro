@@ -208,6 +208,10 @@ export class TransactionService {
     return this.transactionRepository.deleteByRecurrenceId(recurrenceId, userId)
   }
 
+  async deleteTransactionsByDescription(userId: string, accountId: string, baseDescription: string) {
+    return this.transactionRepository.deleteByDescriptionPattern(userId, accountId, baseDescription)
+  }
+
   async confirmTransaction(userId: string, transactionId: string) {
     // Verificar se transação existe
     const transaction = await this.transactionRepository.findById(transactionId, userId)

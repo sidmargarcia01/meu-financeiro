@@ -637,10 +637,22 @@ export default function LancamentosCaixaPage() {
     fetchTransactions()
   }
 
+  // ─── Helpers para detecção de parcelamento ────────────────────────────
+  const isInstallmentPattern = (description: string): boolean =>
+    / - Parcela \d+\/\d+$/.test(description)
+
+  const getInstallmentBase = (description: string): string => {
+    const match = description.match(/^(.*) - Parcela \d+\/\d+$/)
+    return match ? match[1] : description
+  }
+
+  const isSeriesTransaction = (tx: Transaction): boolean =>
+    !!tx.recurrence_id || isInstallmentPattern(tx.description)
+
   // ─── Exclusão inteligente (parcelado / fixo) ─────────────────────────
   const handleDelete = () => {
     if (!selectedTransaction) return
-    if (selectedTransaction.recurrence_id) {
+    if (isSeriesTransaction(selectedTransaction)) {
       setDeleteDialogTarget(selectedTransaction)
       setDeleteDialogOpen(true)
     } else {
@@ -656,8 +668,15 @@ export default function LancamentosCaixaPage() {
     fetchTransactions()
   }
 
-  const doDeleteSeries = async (recurrenceId: string) => {
-    await fetch(`/api/transactions?recurrenceId=${recurrenceId}`, { method: 'DELETE' })
+  const doDeleteSeries = async (tx: Transaction) => {
+    if (tx.recurrence_id) {
+      // Excluir via recurrence_id (forma correta)
+      await fetch(`/api/transactions?recurrenceId=${tx.recurrence_id}`, { method: 'DELETE' })
+    } else if (isInstallmentPattern(tx.description)) {
+      // Fallback: excluir por descrição base (para transações criadas sem recurrence_id)
+      const baseDesc = getInstallmentBase(tx.description)
+      await fetch(`/api/transactions?baseDescription=${encodeURIComponent(baseDesc)}&accountId=${tx.account_id}`, { method: 'DELETE' })
+    }
     setDeleteDialogOpen(false)
     setDeleteDialogTarget(null)
     fetchTransactions()
@@ -1394,8 +1413,8 @@ export default function LancamentosCaixaPage() {
           </Button>
           <Button
             onClick={() => {
-              if (deleteDialogTarget?.recurrence_id) {
-                doDeleteSeries(deleteDialogTarget.recurrence_id)
+              if (deleteDialogTarget) {
+                doDeleteSeries(deleteDialogTarget)
               }
             }}
             variant="contained"

@@ -75,22 +75,29 @@ export async function POST(request: NextRequest) {
   })
 }
 
-// DELETE /api/transactions?recurrenceId=xxx - Excluir série de recorrência
+// DELETE /api/transactions?recurrenceId=xxx | ?baseDescription=xxx&accountId=yyy - Excluir série
 export async function DELETE(request: NextRequest) {
   return withAuth(request, async (req, user) => {
     try {
       const { searchParams } = new URL(req.url)
       const recurrenceId = searchParams.get('recurrenceId')
+      const baseDescription = searchParams.get('baseDescription')
+      const accountId = searchParams.get('accountId')
 
-      if (!recurrenceId) {
-        return NextResponse.json({ error: 'recurrenceId é obrigatório' }, { status: 400 })
+      if (recurrenceId) {
+        await transactionService.deleteTransactionsByRecurrenceId(user.id, recurrenceId)
+        return NextResponse.json({ success: true })
       }
 
-      await transactionService.deleteTransactionsByRecurrenceId(user.id, recurrenceId)
-      return NextResponse.json({ success: true })
+      if (baseDescription && accountId) {
+        await transactionService.deleteTransactionsByDescription(user.id, accountId, baseDescription)
+        return NextResponse.json({ success: true })
+      }
+
+      return NextResponse.json({ error: 'Informe recurrenceId ou baseDescription+accountId' }, { status: 400 })
     } catch (error: any) {
       console.error('[DELETE /api/transactions]', error)
-      return NextResponse.json({ error: error.message || 'Erro ao excluir recorrência' }, { status: 500 })
+      return NextResponse.json({ error: error.message || 'Erro ao excluir série' }, { status: 500 })
     }
   })
 }

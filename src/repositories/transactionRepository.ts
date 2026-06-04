@@ -245,6 +245,7 @@ export class TransactionRepository {
 
     return transactions.map((t: any) => ({
       ...t,
+      recurrence_id: t.recurrence_id ?? null,
       account_name: accountsMap.get(t.account_id) ?? null,
       category_name: categoriesMap.get(t.category_id) ?? null,
       category_id: t.category_id ?? null,
@@ -380,6 +381,18 @@ export class TransactionRepository {
       .delete()
       .eq('recurrence_id', recurrenceId)
       .eq('user_id', userId)
+
+    if (error) throw error
+  }
+
+  // Excluir transações por descrição base (fallback para parcelas sem recurrence_id)
+  async deleteByDescriptionPattern(userId: string, accountId: string, baseDescription: string) {
+    const { error } = await supabase
+      .from('transactions')
+      .delete()
+      .eq('user_id', userId)
+      .eq('account_id', accountId)
+      .ilike('description', `${baseDescription} - Parcela %/%`)
 
     if (error) throw error
   }
