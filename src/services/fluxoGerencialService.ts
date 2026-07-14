@@ -61,6 +61,8 @@ interface BucketMes {
   despesasNaoOperacionais: number
   impostosLucro: number
   distribuicaoLucros: number
+  receitasSemCategoria: number
+  despesasSemCategoria: number
   saldoFinalReal: number
   categorias: Map<string, CategoriaNode>
 }
@@ -153,6 +155,8 @@ function agruparTransacoes(
       despesasNaoOperacionais: 0,
       impostosLucro: 0,
       distribuicaoLucros: 0,
+      receitasSemCategoria: 0,
+      despesasSemCategoria: 0,
       saldoFinalReal: 0,
       categorias: new Map<string, CategoriaNode>(),
     })
@@ -205,8 +209,8 @@ function agruparTransacoes(
           bucket.distribuicaoLucros += valor
           break
         default:
-          if (ehReceita) bucket.receitaFaturamento += valor
-          else bucket.despesasVariaveis += valor
+          if (ehReceita) bucket.receitasSemCategoria += valor
+          else bucket.despesasSemCategoria += valor
       }
     } else {
       if (ehReceita) {
@@ -305,6 +309,8 @@ function calcularLinhaCalculada(
   acertoDoCaixa: number
   saldoInicial: number
   saldoFinal: number
+  receitasSemCategoria: number
+  despesasSemCategoria: number
 } {
   const receitaFaturamento = bucket.receitaFaturamento
   const custosVariaveis = -(bucket.custosOperacionais + bucket.despesasVariaveis)
@@ -349,6 +355,8 @@ function calcularLinhaCalculada(
     acertoDoCaixa,
     saldoInicial,
     saldoFinal,
+    receitasSemCategoria: bucket.receitasSemCategoria,
+    despesasSemCategoria: bucket.despesasSemCategoria,
   }
 }
 
@@ -593,6 +601,35 @@ export class FluxoGerencialService {
       false
     ))
 
+    // Linhas de transações sem categoria (só aparecem quando houver valor)
+    const temReceitasSemCategoria = calculosPorMes.some(c => c.receitasSemCategoria !== 0)
+    if (temReceitasSemCategoria) {
+      linhas.push(criarLinha(
+        'receitas_sem_categoria',
+        'RECEITAS NÃO CLASSIFICADAS',
+        'grupo',
+        0,
+        'receita',
+        calculosPorMes.map(c => c.receitasSemCategoria),
+        receitasPorMes,
+        false
+      ))
+    }
+
+    const temDespesasSemCategoria = calculosPorMes.some(c => c.despesasSemCategoria !== 0)
+    if (temDespesasSemCategoria) {
+      linhas.push(criarLinha(
+        'despesas_sem_categoria',
+        'DESPESAS NÃO CLASSIFICADAS',
+        'grupo',
+        0,
+        'deducao',
+        calculosPorMes.map(c => -c.despesasSemCategoria),
+        receitasPorMes,
+        false
+      ))
+    }
+
     // 10. RESULTADO LÍQUIDO
     linhas.push(criarLinha(
       'resultado_liquido',
@@ -673,7 +710,7 @@ export class FluxoGerencialService {
       const receita = receitasPorMes[idx]
 
       for (const cat of bucket.categorias.values()) {
-        const parentLine = linhas.find(l => l.id === categoriaParaLinhaPai(cat.dreGroup, cat.tipo))
+        const parentLine = linhas.find(l => l.id === categoriaParaLinhaPai(cat.dreGroup, cat.tipo, usarDreGroup))
         if (!parentLine) continue
 
         const catId = `cat:${cat.id}:${key}`
@@ -717,14 +754,17 @@ export class FluxoGerencialService {
   }
 }
 
-function categoriaParaLinhaPai(dreGroup: DreGroup | null, tipo: 'RECEITA' | 'DESPESA'): string | null {
+function categoriaParaLinhaPai(dreGroup: DreGroup | null, tipo: 'RECEITA' | 'DESPESA', usarDreGroup: boolean): string | null {
   if (tipo === 'RECEITA') {
+    if (usarDreGroup && !dreGroup) return 'receitas_sem_categoria'
     if (dreGroup === 'RECEITAS_OPERACIONAIS' || dreGroup === 'IMPOSTOS_FATURAMENTO' || !dreGroup) {
       return 'receita_faturamento'
     }
     if (dreGroup === 'RECEITAS_NAO_OPERACIONAIS') return 'movimentacoes_nao_operacionais'
     return null
   }
+
+  if (usarDreGroup && !dreGroup) return 'despesas_sem_categoria'
 
   switch (dreGroup) {
     case 'CUSTOS_OPERACIONAIS':

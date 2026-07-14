@@ -449,4 +449,40 @@ describe('fluxoGerencialService', () => {
     expect(fixa.valores[0].realizado).toBe(0)
     expect(fixa.valores[1].realizado).toBe(-5000)
   })
+
+  it('deve separar receitas e despesas sem categoria quando DRE group está configurado', async () => {
+    const transactions = [
+      mockTransaction({
+        amount: 10000,
+        type: 'RECEITA',
+        due_date: '2026-01-15',
+        categories: { id: 'cat-receita', name: 'Vendas', type: 'RECEITA', parent_id: null, dre_group: 'RECEITAS_OPERACIONAIS' },
+      }),
+      mockTransaction({
+        amount: 5000,
+        type: 'RECEITA',
+        due_date: '2026-01-15',
+        categories: null,
+      }),
+      mockTransaction({
+        amount: -3000,
+        type: 'DESPESA',
+        due_date: '2026-01-15',
+        categories: null,
+      }),
+    ]
+
+    mockTransactionRepository.findAllForPeriodWithCategory.mockResolvedValue(transactions)
+    mockTransactionRepository.sumConfirmedBefore.mockResolvedValue(0)
+
+    const result = await fluxoGerencialService.gerarMatriz('user-1', '2026-01-01', '2026-01-31')
+
+    const receita = result.linhas.find(l => l.id === 'receita_faturamento')!
+    const recSemCat = result.linhas.find(l => l.id === 'receitas_sem_categoria')!
+    const despSemCat = result.linhas.find(l => l.id === 'despesas_sem_categoria')!
+
+    expect(receita.valores[0].realizado).toBe(10000)
+    expect(recSemCat.valores[0].realizado).toBe(5000)
+    expect(despSemCat.valores[0].realizado).toBe(-3000)
+  })
 })
