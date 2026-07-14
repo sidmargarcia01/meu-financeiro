@@ -60,10 +60,10 @@ function BarGroup({ mes, receitas, despesas, saldo, maxVal }: {
 }
 
 function GraficoFluxo() {
-  const [data, setData]       = useState<FluxoData | null>(null)
+  const [data, setData] = useState<FluxoData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState<string | null>(null)
-  const [meses, setMeses]     = useState(6)
+  const [error, setError] = useState<string | null>(null)
+  const [meses, setMeses] = useState(6)
 
   const fetchFluxo = useCallback(async () => {
     setLoading(true)
@@ -81,11 +81,11 @@ function GraficoFluxo() {
 
   useEffect(() => { fetchFluxo() }, [fetchFluxo])
 
-  const mesesData   = data?.meses ?? []
-  const totalRec    = mesesData.reduce((s, m) => s + m.receitas, 0)
-  const totalDesp   = mesesData.reduce((s, m) => s + m.despesas, 0)
-  const saldoFinal  = totalRec - totalDesp
-  const maxVal      = Math.max(...mesesData.map(m => Math.max(m.receitas, m.despesas, Math.abs(m.saldo))), 1)
+  const mesesData = data?.meses ?? []
+  const totalRec = mesesData.reduce((s, m) => s + m.receitas, 0)
+  const totalDesp = mesesData.reduce((s, m) => s + m.despesas, 0)
+  const saldoFinal = totalRec - totalDesp
+  const maxVal = Math.max(...mesesData.map(m => Math.max(m.receitas, m.despesas, Math.abs(m.saldo))), 1)
 
   return (
     <Box>
@@ -109,8 +109,8 @@ function GraficoFluxo() {
       {/* Cards resumo */}
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mb={3}>
         {[
-          { label: 'Total Receitas',  value: totalRec,   color: 'success.main' },
-          { label: 'Total Despesas',  value: totalDesp,  color: 'error.main' },
+          { label: 'Total Receitas', value: totalRec, color: 'success.main' },
+          { label: 'Total Despesas', value: totalDesp, color: 'error.main' },
           { label: 'Saldo Acumulado', value: saldoFinal, color: saldoFinal >= 0 ? 'primary.main' : 'warning.main' },
         ].map(c => (
           <Card key={c.label} sx={{ flex: 1 }}>
@@ -134,7 +134,7 @@ function GraficoFluxo() {
             <Stack direction="row" spacing={3} mb={2}>
               {[
                 { color: 'success.main', label: 'Receitas' },
-                { color: 'error.main',   label: 'Despesas' },
+                { color: 'error.main', label: 'Despesas' },
                 { color: 'primary.main', label: 'Saldo' },
               ].map(l => (
                 <Stack key={l.label} direction="row" alignItems="center" spacing={0.5}>
@@ -173,7 +173,7 @@ function GraficoFluxo() {
                   <TableRow key={`${m.ano}-${m.mes}`} hover>
                     <TableCell>{MES_LABELS[m.mes - 1]}/{m.ano}</TableCell>
                     <TableCell align="right" sx={{ color: 'success.main', fontWeight: 600 }}>{formatCurrency(m.receitas)}</TableCell>
-                    <TableCell align="right" sx={{ color: 'error.main',   fontWeight: 600 }}>{formatCurrency(m.despesas)}</TableCell>
+                    <TableCell align="right" sx={{ color: 'error.main', fontWeight: 600 }}>{formatCurrency(m.despesas)}</TableCell>
                     <TableCell align="right" sx={{ color: m.saldo >= 0 ? 'primary.main' : 'warning.main', fontWeight: 700 }}>
                       {formatCurrency(m.saldo)}
                     </TableCell>
@@ -182,7 +182,7 @@ function GraficoFluxo() {
                 <TableRow sx={{ bgcolor: 'grey.50' }}>
                   <TableCell sx={{ fontWeight: 700 }}>Total</TableCell>
                   <TableCell align="right" sx={{ color: 'success.main', fontWeight: 700 }}>{formatCurrency(totalRec)}</TableCell>
-                  <TableCell align="right" sx={{ color: 'error.main',   fontWeight: 700 }}>{formatCurrency(totalDesp)}</TableCell>
+                  <TableCell align="right" sx={{ color: 'error.main', fontWeight: 700 }}>{formatCurrency(totalDesp)}</TableCell>
                   <TableCell align="right" sx={{ color: saldoFinal >= 0 ? 'primary.main' : 'warning.main', fontWeight: 700 }}>
                     {formatCurrency(saldoFinal)}
                   </TableCell>
@@ -260,7 +260,14 @@ export default function FluxoPage() {
             </Box>
           )}
           {!loading && data && (
-            <FluxoGerencialTable data={data} showChildren={showChildren} />
+            <FluxoGerencialTable
+              data={data}
+              showChildren={showChildren}
+              inicio={inicio}
+              fim={fim}
+              regime={regime}
+              onRefresh={refetch}
+            />
           )}
           {!loading && !data && !error && (
             <Alert severity="info">Selecione um período para visualizar o fluxo de caixa.</Alert>

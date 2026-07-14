@@ -26,8 +26,10 @@ export async function GET(request: NextRequest) {
         categoryId: searchParams.get('categoryId') || undefined,
         type: searchParams.get('type') as any || undefined,
         status: searchParams.get('status') as any || undefined,
+        statuses: searchParams.get('statuses')?.split(',').filter(Boolean) as any || undefined,
         startDate: searchParams.get('startDate') || undefined,
         endDate: searchParams.get('endDate') || undefined,
+        dateField: searchParams.get('dateField') as any || undefined,
         search: searchParams.get('search') || undefined,
         tags: searchParams.get('tags')?.split(',').filter(Boolean) || undefined,
       }

@@ -61,12 +61,14 @@ export const transactionFiltersSchema = z.object({
   categoryId: z.string().uuid().optional(),
   type: z.enum(['RECEITA', 'DESPESA', 'TRANSFERENCIA']).optional(),
   status: z.enum(['PENDENTE', 'CONFIRMADO', 'CONCILIADO']).optional(),
+  statuses: z.array(z.enum(['PENDENTE', 'CONFIRMADO', 'CONCILIADO'])).optional(),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
+  dateField: z.enum(['due_date', 'competence_date', 'payment_date']).optional(),
   search: z.string().optional(),
   tags: z.array(z.string().uuid()).optional(),
   page: z.number().positive().optional(),
-  limit: z.number().positive().max(100).optional(),
+  limit: z.number().positive().max(1000).optional(),
 })
 
 // Schema para parcelamento

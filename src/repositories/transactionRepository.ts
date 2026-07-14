@@ -184,22 +184,26 @@ export class TransactionRepository {
     categoryId?: string
     type?: string
     status?: string
+    statuses?: string[]
     search?: string
+    dateField?: 'due_date' | 'competence_date' | 'payment_date'
     limit?: number
     page?: number
   }): Promise<any[]> {
+    const dateField = filters?.dateField || 'due_date'
+
     // Buscar transações
     let query = supabase
       .from('transactions')
       .select('*')
       .eq('user_id', userId)
-      .order('due_date', { ascending: false })
+      .order(dateField, { ascending: false })
 
     if (filters?.startDate) {
-      query = query.gte('due_date', filters.startDate)
+      query = query.gte(dateField, filters.startDate)
     }
     if (filters?.endDate) {
-      query = query.lte('due_date', filters.endDate)
+      query = query.lte(dateField, filters.endDate)
     }
     if (filters?.accountId) {
       query = query.eq('account_id', filters.accountId)
@@ -212,6 +216,9 @@ export class TransactionRepository {
     }
     if (filters?.status) {
       query = query.eq('status', filters.status)
+    }
+    if (filters?.statuses && filters.statuses.length > 0) {
+      query = query.in('status', filters.statuses)
     }
     if (filters?.search) {
       query = query.ilike('description', `%${filters.search}%`)

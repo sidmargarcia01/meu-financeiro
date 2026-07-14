@@ -27,13 +27,19 @@ import {
 import {
   ChevronRight as ChevronRightIcon,
   ExpandMore as ExpandMoreIcon,
+  ArrowForward as ArrowForwardIcon,
 } from '@mui/icons-material'
 import { formatCurrency } from '@/utils/formatCurrency'
 import type { FluxoGerencialRelatorio, FluxoLinha, MesFluxo } from '@/services/fluxoGerencialService'
+import { FluxoGerencialDrillDown } from './FluxoGerencialDrillDown'
 
 interface FluxoGerencialTableProps {
   data: FluxoGerencialRelatorio
   showChildren: boolean
+  inicio: string
+  fim: string
+  regime: 'CAIXA' | 'COMPETENCIA'
+  onRefresh: () => void
 }
 
 const labelMes = (m: MesFluxo) => `${['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][m.mes - 1]}/${String(m.ano).slice(-2)}`
@@ -50,8 +56,25 @@ function corValor(valor: number, avTipo: FluxoLinha['avTipo']): string {
   return valor > 0 ? 'success.main' : 'error.main'
 }
 
-export function FluxoGerencialTable({ data, showChildren }: FluxoGerencialTableProps) {
+function linhaTemDrillDown(id: string): boolean {
+  if (id.startsWith('cat:') || id.startsWith('sub:')) return true
+  const comDrill = [
+    'receita_faturamento',
+    'custos_variaveis',
+    'despesas_fixas',
+    'investimentos',
+    'movimentacoes_nao_operacionais',
+    'receitas_sem_categoria',
+    'despesas_sem_categoria',
+  ]
+  return comDrill.includes(id)
+}
+
+export function FluxoGerencialTable({ data, showChildren, inicio, fim, regime, onRefresh }: FluxoGerencialTableProps) {
   const { meses, linhas } = data
+
+  // Drill-down: linha selecionada para edição de lançamentos
+  const [selectedLine, setSelectedLine] = useState<{ id: string; label: string } | null>(null)
 
   // Determina quais linhas de grupo possuem filhas
   const gruposComFilhas = useMemo(() => {
@@ -178,6 +201,7 @@ export function FluxoGerencialTable({ data, showChildren }: FluxoGerencialTableP
           {linhas.filter(isVisible).map(linha => {
             const temFilhas = gruposComFilhas.has(linha.id)
             const isExpanded = expanded.has(linha.id)
+            const comDrillDown = linhaTemDrillDown(linha.id)
 
             return (
               <TableRow
@@ -215,6 +239,18 @@ export function FluxoGerencialTable({ data, showChildren }: FluxoGerencialTableP
                       </IconButton>
                     )}
                     {!temFilhas && <Box sx={{ width: 26 }} />}
+                    {comDrillDown && (
+                      <Tooltip title="Ver lançamentos">
+                        <IconButton
+                          size="small"
+                          onClick={() => setSelectedLine({ id: linha.id, label: linha.label })}
+                          sx={{ p: 0.3, color: 'primary.main' }}
+                        >
+                          <ArrowForwardIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {!comDrillDown && !temFilhas && <Box sx={{ width: 26 }} />}
                     <Typography
                       variant="body2"
                       sx={{
@@ -272,6 +308,19 @@ export function FluxoGerencialTable({ data, showChildren }: FluxoGerencialTableP
           })}
         </TableBody>
       </Table>
+
+      {selectedLine && (
+        <FluxoGerencialDrillDown
+          open
+          onClose={() => setSelectedLine(null)}
+          lineId={selectedLine.id}
+          lineLabel={selectedLine.label}
+          inicio={inicio}
+          fim={fim}
+          regime={regime}
+          onSaved={onRefresh}
+        />
+      )}
     </Paper>
   )
 }
