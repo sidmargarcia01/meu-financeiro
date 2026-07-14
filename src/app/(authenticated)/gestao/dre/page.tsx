@@ -39,6 +39,8 @@ interface DREEstruturado {
   despesasFixas: number
   ebitda: number
   ebitdaPercent: number | null
+  investimentos: number
+  lucroOperacional: number
   receitasNaoOperacionais: number
   despesasNaoOperacionais: number
   resultadoAntesIR: number
@@ -100,7 +102,9 @@ export default function DrePage() {
     { label: '(-) Despesas Variáveis', valor: -e.despesasVariaveis, pct: fmtPct(e.receitaLiquida > 0 ? -(e.despesasVariaveis / e.receitaLiquida) * 100 : null), destaque: false, tipo: 'deducao' },
     { label: 'Margem de Contribuição', valor: e.margemContribuicao, pct: fmtPct(e.margemContribuicaoPercent), destaque: true, tipo: 'subtotal' },
     { label: '(-) Despesas Fixas', valor: -e.despesasFixas, pct: fmtPct(e.receitaLiquida > 0 ? -(e.despesasFixas / e.receitaLiquida) * 100 : null), destaque: false, tipo: 'deducao' },
-    { label: 'EBITDA (Resultado Operacional)', valor: e.ebitda, pct: fmtPct(e.ebitdaPercent), destaque: true, tipo: 'subtotal' },
+    { label: 'Lucro Operacional Antes dos Investimentos (EBITDA)', valor: e.ebitda, pct: fmtPct(e.ebitdaPercent), destaque: true, tipo: 'subtotal' },
+    { label: '(-) Investimentos', valor: -e.investimentos, pct: fmtPct(e.receitaLiquida > 0 ? -(e.investimentos / e.receitaLiquida) * 100 : null), destaque: false, tipo: 'deducao' },
+    { label: 'Lucro Operacional', valor: e.lucroOperacional, pct: fmtPct(e.receitaLiquida > 0 ? (e.lucroOperacional / e.receitaLiquida) * 100 : null), destaque: true, tipo: 'subtotal' },
     { label: '(+) Receitas Não Operacionais', valor: e.receitasNaoOperacionais, pct: '', destaque: false, tipo: 'receita' },
     { label: '(-) Despesas Não Operacionais', valor: -e.despesasNaoOperacionais, pct: '', destaque: false, tipo: 'deducao' },
     { label: 'Resultado antes do IR (EBT)', valor: e.resultadoAntesIR, pct: '', destaque: true, tipo: 'subtotal' },

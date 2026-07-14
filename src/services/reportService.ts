@@ -9,6 +9,7 @@
  */
 
 import { supabase } from '@/lib/supabase'
+import { classifyDespesaFallback } from '@/services/dreClassifier'
 
 export interface DRELinha {
   descricao: string
@@ -18,7 +19,7 @@ export interface DRELinha {
   nivel: number
 }
 
-// DRE estruturado gerencial (9 grupos) — alinhado com personal-website dre-report.service
+// DRE estruturado gerencial (10 grupos) — alinhado com personal-website dre-report.service
 export interface DREEstruturado {
   receitasOperacionais: number         // RECEITAS_OPERACIONAIS (ROB)
   impostosFaturamento: number          // IMPOSTOS_FATURAMENTO
@@ -30,8 +31,10 @@ export interface DREEstruturado {
   margemContribuicao: number           // MB - variáveis
   margemContribuicaoPercent: number | null
   despesasFixas: number                // DESPESAS_FIXAS
-  ebitda: number                       // MC - fixas (Resultado Operacional)
+  ebitda: number                       // MC - fixas (Lucro Operacional Antes dos Investimentos)
   ebitdaPercent: number | null
+  investimentos: number               // INVESTIMENTOS
+  lucroOperacional: number             // EBITDA - investimentos
   receitasNaoOperacionais: number      // RECEITAS_NAO_OPERACIONAIS
   despesasNaoOperacionais: number      // DESPESAS_NAO_OPERACIONAIS
   resultadoAntesIR: number             // EBT
@@ -254,6 +257,7 @@ export class ReportService {
     let custosOperacionais: number
     let despesasVariaveis: number
     let despesasFixas: number
+    let investimentos: number
     let receitasNaoOperacionais: number
     let despesasNaoOperacionais: number
     let impostosLucro: number
@@ -276,6 +280,7 @@ export class ReportService {
       custosOperacionais = sumGroup('CUSTOS_OPERACIONAIS')
       despesasVariaveis = sumGroup('DESPESAS_VARIAVEIS')
       despesasFixas = sumGroup('DESPESAS_FIXAS')
+      investimentos = sumGroup('INVESTIMENTOS')
       despesasNaoOperacionais = sumGroup('DESPESAS_NAO_OPERACIONAIS')
       impostosLucro = sumGroup('IMPOSTOS_LUCRO')
       distribuicaoLucros = sumGroup('DISTRIBUICAO_LUCROS')
@@ -283,40 +288,22 @@ export class ReportService {
       // Fallback por palavras-chave — default é VARIÁVEL (operacional)
       const despesasCategorias = categorias.filter(c => c.tipo === 'DESPESA')
 
-      // Custos Operacionais (CPV/CSV): produção, mercadoria, matéria-prima
-      const custosKeywords = [
-        'mercadoria', 'produto para revenda', 'revenda', 'produção', 'producao',
-        'matéria-prima', 'materia-prima', 'matéria prima', 'materia prima',
-        'embalagem', 'custo de produção', 'cpv', 'csv'
-      ]
-
-      // Despesas Fixas: estruturais, não variam com volume
-      const fixasKeywords = [
-        'aluguel', 'salário', 'salario', 'salarios', 'folha', 'folha de pagamento',
-        'pró-labore', 'pro-labore', 'prolabore', 'inss', 'fgts', 'férias', 'ferias',
-        '13º', '13o', 'contabilidade', 'contador', 'financiamento', 'amortização',
-        'amortizacao', 'depreciação', 'depreciacao', 'juros', 'empréstimo',
-        'emprestimo', 'leasing', 'debenture', 'seguro', 'plano de saúde',
-        'plano de saude', 'benefício', 'beneficio', 'transporte de funcionário',
-        'vale transporte', 'vale alimentação', 'vale refeição', 'licença', 'licenca',
-        'anuidade', 'sindico', 'síndico'
-      ]
-
       let totalCustos = 0
       let totalFixas = 0
       let totalVariaveis = 0
+      let totalInvestimentos = 0
 
       despesasCategorias.forEach(c => {
-        const nome = c.nome.toLowerCase()
-          .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos para comparação
         const valor = Math.abs(c.total)
+        const classificacao = c.dreGroup === 'INVESTIMENTOS'
+          ? 'INVESTIMENTO'
+          : classifyDespesaFallback(c.nome)
 
-        // Normalizar também as keywords para comparação sem acento
-        const normalizar = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-
-        if (custosKeywords.some(k => nome.includes(normalizar(k)))) {
+        if (classificacao === 'INVESTIMENTO') {
+          totalInvestimentos += valor
+        } else if (classificacao === 'CUSTO') {
           totalCustos += valor
-        } else if (fixasKeywords.some(k => nome.includes(normalizar(k)))) {
+        } else if (classificacao === 'FIXA') {
           totalFixas += valor
         } else {
           // DEFAULT: despesa variável (operacional — água, energia, serviços, etc.)
@@ -327,6 +314,7 @@ export class ReportService {
       custosOperacionais = totalCustos
       despesasVariaveis = totalVariaveis
       despesasFixas = totalFixas
+      investimentos = totalInvestimentos
       despesasNaoOperacionais = 0
       impostosLucro = 0
       distribuicaoLucros = 0
@@ -339,7 +327,8 @@ export class ReportService {
     const margemContribuicaoPercent = pctRL(margemContribuicao, receitaLiquida)
     const ebitda = margemContribuicao - despesasFixas
     const ebitdaPercent = pctRL(ebitda, receitaLiquida)
-    const resultadoAntesIR = ebitda + receitasNaoOperacionais - despesasNaoOperacionais
+    const lucroOperacional = ebitda - investimentos
+    const resultadoAntesIR = lucroOperacional + receitasNaoOperacionais - despesasNaoOperacionais
     const resultadoLiquido = resultadoAntesIR - impostosLucro - distribuicaoLucros
     const margemLiquidaPercent = pctRL(resultadoLiquido, receitaLiquida)
 
@@ -348,6 +337,7 @@ export class ReportService {
       custosOperacionais, margemBruta, margemBrutaPercent,
       despesasVariaveis, margemContribuicao, margemContribuicaoPercent,
       despesasFixas, ebitda, ebitdaPercent,
+      investimentos, lucroOperacional,
       receitasNaoOperacionais, despesasNaoOperacionais, resultadoAntesIR,
       impostosLucro, distribuicaoLucros, resultadoLiquido, margemLiquidaPercent,
     }

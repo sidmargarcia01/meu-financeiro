@@ -41,6 +41,7 @@ const DRE_GROUP_COLOR: Record<DreGroup, 'default' | 'success' | 'warning' | 'err
     CUSTOS_OPERACIONAIS: 'error',
     DESPESAS_VARIAVEIS: 'info',
     DESPESAS_FIXAS: 'secondary',
+    INVESTIMENTOS: 'primary',
     RECEITAS_NAO_OPERACIONAIS: 'primary',
     DESPESAS_NAO_OPERACIONAIS: 'default',
     IMPOSTOS_LUCRO: 'error',

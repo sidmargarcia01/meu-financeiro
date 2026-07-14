@@ -7,13 +7,14 @@
 
 import { z } from 'zod'
 
-// 9 grupos DRE gerencial — alinhado com personal-website (indicators-report.service)
+// 10 grupos DRE gerencial — alinhado com personal-website (indicators-report.service)
 export const DRE_GROUPS = [
   'RECEITAS_OPERACIONAIS',     // ROB → Receita Líquida
   'IMPOSTOS_FATURAMENTO',      // (-) Impostos sobre faturamento
   'CUSTOS_OPERACIONAIS',       // (-) CPV / CSV → Margem Bruta
   'DESPESAS_VARIAVEIS',        // (-) Variáveis → Margem de Contribuição
   'DESPESAS_FIXAS',            // (-) Fixas → EBITDA
+  'INVESTIMENTOS',             // (-) Investimentos → Lucro Operacional
   'RECEITAS_NAO_OPERACIONAIS', // (+) Outras receitas
   'DESPESAS_NAO_OPERACIONAIS', // (-) Outras despesas → EBT
   'IMPOSTOS_LUCRO',            // (-) IR / CSLL
@@ -28,6 +29,7 @@ export const DRE_GROUP_LABELS: Record<DreGroup, string> = {
   CUSTOS_OPERACIONAIS: 'Custos Operacionais (CPV/CSV)',
   DESPESAS_VARIAVEIS: 'Despesas Variáveis',
   DESPESAS_FIXAS: 'Despesas Fixas',
+  INVESTIMENTOS: 'Investimentos',
   RECEITAS_NAO_OPERACIONAIS: 'Receitas Não Operacionais',
   DESPESAS_NAO_OPERACIONAIS: 'Despesas Não Operacionais',
   IMPOSTOS_LUCRO: 'Impostos sobre Lucros (IR/CSLL)',

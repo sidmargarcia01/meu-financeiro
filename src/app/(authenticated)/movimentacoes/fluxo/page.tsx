@@ -1,25 +1,29 @@
 /**
- * 📄 Descrição: Página de Fluxo de Caixa — visualização mensal com barras CSS
+ * 📄 Descrição: Página de Fluxo de Caixa com abas Matriz Gerencial e Gráfico
  * 🧱 Contexto: Módulo 3c — rota /movimentacoes/fluxo
  * 📌 Responsável: Windsurf AI
- * 📅 Data: 2026-04-07
- * ⚙️ Tecnologias: Next.js App Router, React, Material-UI
- * 🔍 Dependências: /api/dashboard/fluxo-caixa, formatCurrency
+ * 📅 Data: 2026-07-14
+ * ⚙️ Tecnologias: Next.js App Router, React, Material-UI, TanStack Query
+ * 🔍 Dependências: /api/reports/fluxo-gerencial, /api/dashboard/fluxo-caixa, useFluxoGerencial, FluxoGerencialTable, FluxoGerencialToolbar
  * ✅ Revisado: Sim
  */
 
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   Box, Typography, Paper, CircularProgress, Alert,
   IconButton, Tooltip, Stack, Card, CardContent,
   FormControl, InputLabel, Select, MenuItem, Divider,
   Table, TableBody, TableCell, TableHead, TableRow,
+  Tabs, Tab,
 } from '@mui/material'
 import { Refresh as RefreshIcon } from '@mui/icons-material'
 import { formatCurrency } from '@/utils/formatCurrency'
+import { useFluxoGerencial } from '@/hooks/useFluxoGerencial'
+import { FluxoGerencialToolbar } from '@/components/fluxo/FluxoGerencialToolbar'
+import { FluxoGerencialTable } from '@/components/fluxo/FluxoGerencialTable'
 
 const MES_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 
@@ -55,7 +59,7 @@ function BarGroup({ mes, receitas, despesas, saldo, maxVal }: {
   )
 }
 
-export default function FluxoPage() {
+function GraficoFluxo() {
   const [data, setData]       = useState<FluxoData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
@@ -84,9 +88,9 @@ export default function FluxoPage() {
   const maxVal      = Math.max(...mesesData.map(m => Math.max(m.receitas, m.despesas, Math.abs(m.saldo))), 1)
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h5" fontWeight={700}>Fluxo de Caixa</Typography>
+        <Typography variant="h6" fontWeight={700}>Evolução Mensal</Typography>
         <Stack direction="row" spacing={1} alignItems="center">
           <FormControl size="small" sx={{ minWidth: 120 }}>
             <InputLabel>Período</InputLabel>
@@ -124,11 +128,9 @@ export default function FluxoPage() {
         <Box display="flex" justifyContent="center" py={8}><CircularProgress /></Box>
       ) : (
         <>
-          {/* Gráfico de barras CSS */}
           <Paper sx={{ p: 3, mb: 3 }}>
             <Typography variant="subtitle2" fontWeight={600} mb={2}>Evolução Mensal</Typography>
 
-            {/* Legenda */}
             <Stack direction="row" spacing={3} mb={2}>
               {[
                 { color: 'success.main', label: 'Receitas' },
@@ -156,7 +158,6 @@ export default function FluxoPage() {
             </Box>
           </Paper>
 
-          {/* Tabela detalhada */}
           <Paper>
             <Table size="small">
               <TableHead>
@@ -197,6 +198,77 @@ export default function FluxoPage() {
           </Paper>
         </>
       )}
+    </Box>
+  )
+}
+
+function defaultDates() {
+  const now = new Date()
+  const fim = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  const inicio = new Date(now.getFullYear(), now.getMonth() - 5, 1)
+  return {
+    inicio: inicio.toISOString().split('T')[0],
+    fim: fim.toISOString().split('T')[0],
+  }
+}
+
+export default function FluxoPage() {
+  const defaults = useMemo(() => defaultDates(), [])
+  const [inicio, setInicio] = useState(defaults.inicio)
+  const [fim, setFim] = useState(defaults.fim)
+  const [regime, setRegime] = useState<'CAIXA' | 'COMPETENCIA'>('CAIXA')
+  const [showChildren, setShowChildren] = useState(false)
+  const [aba, setAba] = useState<'matriz' | 'grafico'>('matriz')
+
+  const { data, loading, error, refetch } = useFluxoGerencial({
+    inicio,
+    fim,
+    regime,
+    enabled: aba === 'matriz',
+  })
+
+  return (
+    <Box sx={{ p: 3 }}>
+      <FluxoGerencialToolbar
+        inicio={inicio}
+        fim={fim}
+        regime={regime}
+        showChildren={showChildren}
+        loading={loading}
+        onInicioChange={setInicio}
+        onFimChange={setFim}
+        onRegimeChange={setRegime}
+        onToggleChildren={() => setShowChildren(v => !v)}
+        onRefresh={refetch}
+      />
+
+      <Tabs
+        value={aba}
+        onChange={(_, v) => setAba(v)}
+        sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
+      >
+        <Tab value="matriz" label="Matriz Gerencial" />
+        <Tab value="grafico" label="Gráfico" />
+      </Tabs>
+
+      {aba === 'matriz' && (
+        <>
+          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+          {loading && (
+            <Box display="flex" justifyContent="center" py={8}>
+              <CircularProgress />
+            </Box>
+          )}
+          {!loading && data && (
+            <FluxoGerencialTable data={data} showChildren={showChildren} />
+          )}
+          {!loading && !data && !error && (
+            <Alert severity="info">Selecione um período para visualizar o fluxo de caixa.</Alert>
+          )}
+        </>
+      )}
+
+      {aba === 'grafico' && <GraficoFluxo />}
     </Box>
   )
 }

@@ -718,6 +718,54 @@ export class TransactionRepository {
       ano: year
     }
   }
+
+  /**
+   * MÉTODO: findAllForPeriodWithCategory
+   * RESPONSABILIDADE: Buscar transações de um período com dados da categoria
+   * NÃO DEVE: Calcular saldos ou agrupar — isso é do service
+   */
+  async findAllForPeriodWithCategory(
+    userId: string,
+    inicio: string,
+    fim: string,
+    statusFilter: string[],
+    dateField: 'due_date' | 'competence_date' = 'due_date'
+  ): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select(`
+        id, description, amount, type, status,
+        due_date, competence_date, payment_date,
+        categories(id, name, type, parent_id, dre_group)
+      `)
+      .eq('user_id', userId)
+      .in('type', ['RECEITA', 'DESPESA'])
+      .in('status', statusFilter)
+      .gte(dateField, inicio)
+      .lte(dateField, fim)
+      .order(dateField)
+
+    if (error) throw error
+    return data || []
+  }
+
+  /**
+   * MÉTODO: sumConfirmedBefore
+   * RESPONSABILIDADE: Somar saldo de transações confirmadas antes de uma data
+   * NÃO DEVE: Filtrar por conta ou categoria — mantém total do usuário
+   */
+  async sumConfirmedBefore(userId: string, date: string): Promise<number> {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('amount, type')
+      .eq('user_id', userId)
+      .in('status', ['CONFIRMADO', 'CONCILIADO'])
+      .lt('due_date', date)
+
+    if (error) throw error
+
+    return (data || []).reduce((sum, t) => sum + Number(t.amount), 0)
+  }
 }
 
 export const transactionRepository = new TransactionRepository()
