@@ -25,6 +25,12 @@ import {
 } from '@mui/material'
 import { Refresh as RefreshIcon } from '@mui/icons-material'
 
+function ultimoDiaDoMes(anoMes: string): string {
+  const [ano, mes] = anoMes.split('-').map(Number)
+  const d = new Date(ano, mes, 0)
+  return d.toISOString().split('T')[0]
+}
+
 interface FluxoGerencialToolbarProps {
   inicio: string
   fim: string
@@ -74,7 +80,7 @@ export function FluxoGerencialToolbar(props: FluxoGerencialToolbarProps) {
           type="month"
           size="small"
           value={fim.slice(0, 7)}
-          onChange={(e) => onFimChange(`${e.target.value}-01`)}
+          onChange={(e) => onFimChange(ultimoDiaDoMes(e.target.value))}
           InputLabelProps={{ shrink: true }}
         />
         <FormControl size="small" sx={{ minWidth: 140 }}>
