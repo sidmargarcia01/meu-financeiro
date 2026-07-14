@@ -27,7 +27,6 @@ import {
 import {
   ChevronRight as ChevronRightIcon,
   ExpandMore as ExpandMoreIcon,
-  ArrowForward as ArrowForwardIcon,
 } from '@mui/icons-material'
 import { formatCurrency } from '@/utils/formatCurrency'
 import type { FluxoGerencialRelatorio, FluxoLinha, MesFluxo } from '@/services/fluxoGerencialService'
@@ -73,8 +72,8 @@ function linhaTemDrillDown(id: string): boolean {
 export function FluxoGerencialTable({ data, showChildren, inicio, fim, regime, onRefresh }: FluxoGerencialTableProps) {
   const { meses, linhas } = data
 
-  // Drill-down: linha selecionada para edição de lançamentos
-  const [selectedLine, setSelectedLine] = useState<{ id: string; label: string } | null>(null)
+  // Drill-down: linhas expandidas para edição de lançamentos
+  const [expandedDrillDown, setExpandedDrillDown] = useState<Set<string>>(new Set())
 
   // Determina quais linhas de grupo possuem filhas
   const gruposComFilhas = useMemo(() => {
@@ -104,6 +103,15 @@ export function FluxoGerencialTable({ data, showChildren, inicio, fim, regime, o
 
   const toggleExpand = (id: string) => {
     setExpanded(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleDrillDown = (id: string) => {
+    setExpandedDrillDown(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
@@ -202,14 +210,14 @@ export function FluxoGerencialTable({ data, showChildren, inicio, fim, regime, o
             const temFilhas = gruposComFilhas.has(linha.id)
             const isExpanded = expanded.has(linha.id)
             const comDrillDown = linhaTemDrillDown(linha.id)
+            const isDrillExpanded = expandedDrillDown.has(linha.id)
 
-            return (
+            return [
               <TableRow
                 key={linha.id}
                 sx={{
                   bgcolor: bgRow(linha),
                   '&:hover': { bgcolor: 'action.hover' },
-                  display: linha.tipo === 'subcategoria' ? 'table-row' : 'table-row',
                 }}
               >
                 <TableCell
@@ -240,15 +248,13 @@ export function FluxoGerencialTable({ data, showChildren, inicio, fim, regime, o
                     )}
                     {!temFilhas && <Box sx={{ width: 26 }} />}
                     {comDrillDown && (
-                      <Tooltip title="Ver lançamentos">
-                        <IconButton
-                          size="small"
-                          onClick={() => setSelectedLine({ id: linha.id, label: linha.label })}
-                          sx={{ p: 0.3, color: 'primary.main' }}
-                        >
-                          <ArrowForwardIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
+                      <IconButton
+                        size="small"
+                        onClick={() => toggleDrillDown(linha.id)}
+                        sx={{ p: 0.3, color: 'primary.main', transform: isDrillExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}
+                      >
+                        <ChevronRightIcon fontSize="small" />
+                      </IconButton>
                     )}
                     {!comDrillDown && !temFilhas && <Box sx={{ width: 26 }} />}
                     <Typography
@@ -303,24 +309,28 @@ export function FluxoGerencialTable({ data, showChildren, inicio, fim, regime, o
                     </TableCell>
                   </Box>
                 ))}
-              </TableRow>
-            )
+              </TableRow>,
+              isDrillExpanded && comDrillDown && (
+                <TableRow key={`${linha.id}-drill`} sx={{ bgcolor: 'grey.50' }}>
+                  <TableCell
+                    colSpan={1 + meses.length * 3}
+                    sx={{ p: 0, borderBottom: 1, borderColor: 'divider' }}
+                  >
+                    <FluxoGerencialDrillDown
+                      lineId={linha.id}
+                      lineLabel={linha.label}
+                      inicio={inicio}
+                      fim={fim}
+                      regime={regime}
+                      onSaved={onRefresh}
+                    />
+                  </TableCell>
+                </TableRow>
+              ),
+            ]
           })}
         </TableBody>
       </Table>
-
-      {selectedLine && (
-        <FluxoGerencialDrillDown
-          open
-          onClose={() => setSelectedLine(null)}
-          lineId={selectedLine.id}
-          lineLabel={selectedLine.label}
-          inicio={inicio}
-          fim={fim}
-          regime={regime}
-          onSaved={onRefresh}
-        />
-      )}
     </Paper>
   )
 }

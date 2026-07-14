@@ -1,5 +1,5 @@
 /**
- * 📄 Descrição: Drawer de drill-down da matriz — lista e edita lançamentos de uma linha
+ * 📄 Descrição: Painel inline de drill-down da matriz — lista e edita lançamentos de uma linha
  * 🧱 Contexto: Módulo Movimentações — tabela /movimentacoes/fluxo
  * 📌 Responsável: Windsurf AI
  * 📅 Data: 2026-07-14
@@ -13,14 +13,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Box,
-  Drawer,
   Typography,
   IconButton,
   List,
   ListItem,
   ListItemText,
   Chip,
-  Tooltip,
   Stack,
   CircularProgress,
   Alert,
@@ -31,7 +29,6 @@ import {
   DialogActions,
 } from '@mui/material'
 import {
-  Close as CloseIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
 } from '@mui/icons-material'
@@ -57,8 +54,6 @@ interface FluxoDrillDownTransaction {
 }
 
 interface FluxoGerencialDrillDownProps {
-  open: boolean
-  onClose: () => void
   lineId: string
   lineLabel: string
   inicio: string
@@ -74,12 +69,7 @@ interface LineCriteria {
 }
 
 function getLineCriteria(lineId: string): LineCriteria | undefined {
-  // Categoria/subcategoria do fluxo
-  if (lineId.startsWith('cat:')) {
-    const categoryId = lineId.split(':')[1]
-    return { categoryId }
-  }
-  if (lineId.startsWith('sub:')) {
+  if (lineId.startsWith('cat:') || lineId.startsWith('sub:')) {
     const categoryId = lineId.split(':')[1]
     return { categoryId }
   }
@@ -115,8 +105,6 @@ function statusColor(status: string): 'default' | 'primary' | 'success' | 'warni
 }
 
 export function FluxoGerencialDrillDown({
-  open,
-  onClose,
   lineId,
   lineLabel,
   inicio,
@@ -132,13 +120,10 @@ export function FluxoGerencialDrillDown({
   const [accounts, setAccounts] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
   const [settings, setSettings] = useState<any>(null)
-  const [metaLoading, setMetaLoading] = useState(false)
 
   const criteria = useMemo(() => getLineCriteria(lineId), [lineId])
 
   useEffect(() => {
-    if (!open) return
-    setMetaLoading(true)
     Promise.all([
       fetch('/api/accounts').then(r => r.json()),
       fetch('/api/categories').then(r => r.json()),
@@ -150,8 +135,7 @@ export function FluxoGerencialDrillDown({
         setSettings(set || {})
       })
       .catch(() => setError('Erro ao carregar dados do formulário.'))
-      .finally(() => setMetaLoading(false))
-  }, [open])
+  }, [])
 
   const fetchTransactions = async () => {
     if (!criteria) return
@@ -192,8 +176,8 @@ export function FluxoGerencialDrillDown({
   }
 
   useEffect(() => {
-    if (open) fetchTransactions()
-  }, [open, lineId, inicio, fim, regime])
+    fetchTransactions()
+  }, [lineId, inicio, fim, regime])
 
   const handleDelete = async () => {
     if (!deleting) return
@@ -227,60 +211,52 @@ export function FluxoGerencialDrillDown({
 
   return (
     <>
-      <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: { xs: '100%', sm: 520 } } }}>
-        <Box sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
-            <Typography variant="h6" fontWeight={700} noWrap sx={{ maxWidth: 420 }}>
-              {lineLabel}
-            </Typography>
-            <IconButton onClick={onClose} size="small"><CloseIcon /></IconButton>
-          </Stack>
+      <Box sx={{ pl: 4, pr: 2, py: 1, bgcolor: 'grey.50', borderBottom: 1, borderColor: 'divider' }}>
+        <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+          {lineLabel} · {transactions.length} lançamento{transactions.length !== 1 ? 's' : ''}
+        </Typography>
 
-          <Typography variant="caption" color="text.secondary" mb={2}>
-            Período: {formatDate(inicio)} a {formatDate(fim)} · Regime: {regime}
-          </Typography>
+        {error && <Alert severity="error" sx={{ mb: 1, py: 0.5 }}>{error}</Alert>}
 
-          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-
-          {loading ? (
-            <Box display="flex" justifyContent="center" py={6}><CircularProgress /></Box>
-          ) : transactions.length === 0 ? (
-            <Alert severity="info">Nenhum lançamento encontrado para este item.</Alert>
-          ) : (
-            <List sx={{ overflow: 'auto', flex: 1 }}>
-              {transactions.map(tx => (
-                <ListItem
-                  key={tx.id}
-                  divider
-                  secondaryAction={
-                    <Stack direction="row" spacing={1}>
-                      <IconButton edge="end" size="small" onClick={() => setEditing(tx)}><EditIcon fontSize="small" /></IconButton>
-                      <IconButton edge="end" size="small" onClick={() => setDeleting(tx)}><DeleteIcon fontSize="small" /></IconButton>
+        {loading ? (
+          <Box display="flex" justifyContent="center" py={2}><CircularProgress size={20} /></Box>
+        ) : transactions.length === 0 ? (
+          <Alert severity="info" sx={{ py: 0.5 }}>Nenhum lançamento encontrado para este item.</Alert>
+        ) : (
+          <List dense disablePadding>
+            {transactions.map(tx => (
+              <ListItem
+                key={tx.id}
+                divider
+                secondaryAction={
+                  <Stack direction="row" spacing={0.5}>
+                    <IconButton edge="end" size="small" onClick={() => setEditing(tx)}><EditIcon fontSize="small" /></IconButton>
+                    <IconButton edge="end" size="small" onClick={() => setDeleting(tx)}><DeleteIcon fontSize="small" /></IconButton>
+                  </Stack>
+                }
+                sx={{ px: 0 }}
+              >
+                <ListItemText
+                  primary={
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Typography variant="body2" fontWeight={600}>{tx.description}</Typography>
+                      <Chip label={tx.status} size="small" color={statusColor(tx.status)} sx={{ height: 18, fontSize: 10 }} />
                     </Stack>
                   }
-                >
-                  <ListItemText
-                    primary={
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Typography variant="body2" fontWeight={600}>{tx.description}</Typography>
-                        <Chip label={tx.status} size="small" color={statusColor(tx.status)} sx={{ height: 20, fontSize: 10 }} />
-                      </Stack>
-                    }
-                    secondary={
-                      <Typography variant="caption" color="text.secondary">
-                        {formatDate(tx.due_date)} · {tx.account_name || 'Sem conta'} · {tx.category_name || 'Sem categoria'} ·{' '}
-                        <Typography component="span" variant="caption" color={tx.type === 'RECEITA' ? 'success.main' : 'error.main'} fontWeight={600}>
-                          {formatCurrency(Math.abs(tx.amount))}
-                        </Typography>
+                  secondary={
+                    <Typography variant="caption" color="text.secondary">
+                      {formatDate(tx.due_date)} · {tx.account_name || 'Sem conta'} · {tx.category_name || 'Sem categoria'} ·{' '}
+                      <Typography component="span" variant="caption" color={tx.type === 'RECEITA' ? 'success.main' : 'error.main'} fontWeight={600}>
+                        {formatCurrency(Math.abs(tx.amount))}
                       </Typography>
-                    }
-                  />
-                </ListItem>
-              ))}
-            </List>
-          )}
-        </Box>
-      </Drawer>
+                    </Typography>
+                  }
+                />
+              </ListItem>
+            ))}
+          </List>
+        )}
+      </Box>
 
       {editing && settings && (
         <Dialog open onClose={() => setEditing(null)} maxWidth="sm" fullWidth>
@@ -307,7 +283,7 @@ export function FluxoGerencialDrillDown({
         <Dialog open onClose={() => setDeleting(null)} maxWidth="xs" fullWidth>
           <DialogTitle>Excluir lançamento?</DialogTitle>
           <DialogContent>
-            <Typography variant="body2">Deseja excluir "{deleting.description}"?</Typography>
+            <Typography variant="body2">Deseja excluir &quot;{deleting.description}&quot;?</Typography>
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setDeleting(null)}>Cancelar</Button>
