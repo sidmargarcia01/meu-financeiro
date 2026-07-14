@@ -57,3 +57,6 @@ coverage/
 *.backup
 
 .vercel
+
+# TypeScript incremental build info
+*.tsbuildinfo
