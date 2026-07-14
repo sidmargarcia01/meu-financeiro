@@ -352,6 +352,10 @@ function calcularLinhaCalculada(
   }
 }
 
+function normalizarZero(valor: number): number {
+  return valor === 0 ? 0 : valor
+}
+
 function calcularAV(valor: number, receitaFaturamento: number, avTipo: FluxoLinha['avTipo']): number | null {
   if (receitaFaturamento === 0) return null
 
@@ -387,8 +391,8 @@ function criarLinha(
     destaque,
     avTipo,
     valores: valores.map((valor, i) => ({
-      realizado: valor,
-      av: calcularAV(valor, receitas[i], avTipo),
+      realizado: normalizarZero(valor),
+      av: calcularAV(normalizarZero(valor), receitas[i], avTipo),
       ah: null,
     })),
   }

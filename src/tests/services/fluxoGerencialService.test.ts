@@ -413,4 +413,40 @@ describe('fluxoGerencialService', () => {
     expect(acerto.valores[0].ah).toBeNull()
     expect(acerto.valores[1].ah).toBeNull()
   })
+
+  it('deve isolar transações por mês sem vazamento entre buckets', async () => {
+    const transactions = [
+      mockTransaction({
+        amount: 10000,
+        type: 'RECEITA',
+        due_date: '2026-01-15',
+        categories: { id: 'cat-receita', name: 'Vendas', type: 'RECEITA', parent_id: null, dre_group: 'RECEITAS_OPERACIONAIS' },
+      }),
+      mockTransaction({
+        amount: 20000,
+        type: 'RECEITA',
+        due_date: '2026-02-15',
+        categories: { id: 'cat-receita', name: 'Vendas', type: 'RECEITA', parent_id: null, dre_group: 'RECEITAS_OPERACIONAIS' },
+      }),
+      mockTransaction({
+        amount: -5000,
+        type: 'DESPESA',
+        due_date: '2026-02-10',
+        categories: { id: 'cat-fixa', name: 'Aluguel', type: 'DESPESA', parent_id: null, dre_group: 'DESPESAS_FIXAS' },
+      }),
+    ]
+
+    mockTransactionRepository.findAllForPeriodWithCategory.mockResolvedValue(transactions)
+    mockTransactionRepository.sumConfirmedBefore.mockResolvedValue(0)
+
+    const result = await fluxoGerencialService.gerarMatriz('user-1', '2026-01-01', '2026-02-28')
+
+    const receita = result.linhas.find(l => l.id === 'receita_faturamento')!
+    const fixa = result.linhas.find(l => l.id === 'despesas_fixas')!
+
+    expect(receita.valores[0].realizado).toBe(10000)
+    expect(receita.valores[1].realizado).toBe(20000)
+    expect(fixa.valores[0].realizado).toBe(0)
+    expect(fixa.valores[1].realizado).toBe(-5000)
+  })
 })
