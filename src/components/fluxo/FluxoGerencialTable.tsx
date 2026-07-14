@@ -10,7 +10,7 @@
 
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import {
   Box,
   Table,
@@ -24,10 +24,7 @@ import {
   Tooltip,
   Stack,
 } from '@mui/material'
-import {
-  ChevronRight as ChevronRightIcon,
-  ExpandMore as ExpandMoreIcon,
-} from '@mui/icons-material'
+import { ChevronRight as ChevronRightIcon } from '@mui/icons-material'
 import { formatCurrency } from '@/utils/formatCurrency'
 import type { FluxoGerencialRelatorio, FluxoLinha, MesFluxo } from '@/services/fluxoGerencialService'
 import { FluxoGerencialDrillDown } from './FluxoGerencialDrillDown'
@@ -75,39 +72,10 @@ export function FluxoGerencialTable({ data, showChildren, inicio, fim, regime, o
   // Drill-down: linhas expandidas para edição de lançamentos
   const [expandedDrillDown, setExpandedDrillDown] = useState<Set<string>>(new Set())
 
-  // Determina quais linhas de grupo possuem filhas
-  const gruposComFilhas = useMemo(() => {
-    const set = new Set<string>()
-    for (const linha of linhas) {
-      if (linha.parentId) set.add(linha.parentId)
-    }
-    return set
-  }, [linhas])
-
-  // Expansão individual por grupo
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
-
   // Determina se uma linha deve ser visível
   const isVisible = (linha: FluxoLinha): boolean => {
     if (linha.nivel === 0) return true
-    if (linha.parentId && !showChildren && !expanded.has(linha.parentId)) {
-      return false
-    }
-    if (linha.nivel === 2 && linha.parentId) {
-      const categoriaPai = linhas.find(l => l.id === linha.parentId)
-      if (!categoriaPai) return false
-      return showChildren || expanded.has(categoriaPai.parentId || '')
-    }
-    return showChildren || expanded.has(linha.parentId || '')
-  }
-
-  const toggleExpand = (id: string) => {
-    setExpanded(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+    return showChildren
   }
 
   const toggleDrillDown = (id: string) => {
@@ -207,8 +175,6 @@ export function FluxoGerencialTable({ data, showChildren, inicio, fim, regime, o
         </TableHead>
         <TableBody>
           {linhas.filter(isVisible).map(linha => {
-            const temFilhas = gruposComFilhas.has(linha.id)
-            const isExpanded = expanded.has(linha.id)
             const comDrillDown = linhaTemDrillDown(linha.id)
             const isDrillExpanded = expandedDrillDown.has(linha.id)
 
@@ -233,20 +199,7 @@ export function FluxoGerencialTable({ data, showChildren, inicio, fim, regime, o
                   }}
                 >
                   <Stack direction="row" alignItems="center" spacing={0.5}>
-                    {temFilhas && (
-                      <IconButton
-                        size="small"
-                        onClick={() => toggleExpand(linha.id)}
-                        sx={{ p: 0.3 }}
-                      >
-                        {isExpanded || showChildren ? (
-                          <ExpandMoreIcon fontSize="small" />
-                        ) : (
-                          <ChevronRightIcon fontSize="small" />
-                        )}
-                      </IconButton>
-                    )}
-                    {!temFilhas && <Box sx={{ width: 26 }} />}
+                    <Box sx={{ width: 26 }} />
                     {comDrillDown && (
                       <IconButton
                         size="small"
@@ -256,7 +209,7 @@ export function FluxoGerencialTable({ data, showChildren, inicio, fim, regime, o
                         <ChevronRightIcon fontSize="small" />
                       </IconButton>
                     )}
-                    {!comDrillDown && !temFilhas && <Box sx={{ width: 26 }} />}
+                    {!comDrillDown && <Box sx={{ width: 26 }} />}
                     <Typography
                       variant="body2"
                       sx={{
