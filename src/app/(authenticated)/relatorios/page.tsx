@@ -75,6 +75,7 @@ interface Transaction {
   id: string; type: 'RECEITA' | 'DESPESA' | 'TRANSFERENCIA'
   amount: number; description: string; due_date: string
   category_name?: string; category_id?: string; account_name?: string; account_id?: string
+  center_id?: string; project_id?: string; contact_id?: string
   status: string; notes?: string; tags?: string[]
   dre_group?: string | null
 }
@@ -484,10 +485,10 @@ export default function RelatoriosPage() {
             due_date: editTarget.due_date,
             description: editTarget.description,
             status: (editTarget.status === 'AGENDADO' ? 'PENDENTE' : editTarget.status) as 'PENDENTE' | 'CONFIRMADO' | 'CONCILIADO',
-            category_id: '',
-            center_id: '',
-            project_id: '',
-            contact_id: '',
+            category_id: editTarget.category_id ?? '',
+            center_id: editTarget.center_id ?? '',
+            project_id: editTarget.project_id ?? '',
+            contact_id: editTarget.contact_id ?? '',
             notes: editTarget.notes || '',
             tags: editTarget.tags || [],
             regime: 'CAIXA',
