@@ -264,13 +264,8 @@ export class ReportService {
     let distribuicaoLucros: number
 
     // ── Receitas ─────────────────────────────────────────────────────────────
-    // Receitas sem dre_group são tratadas como operacionais (default)
-    const receitasSemGrupo = categorias
-      .filter(c => c.tipo === 'RECEITA' && !c.dreGroup)
-      .reduce((s, c) => s + Math.abs(c.total), 0)
-
     if (hasReceitaDreGroup) {
-      receitasOperacionais = sumGroup('RECEITAS_OPERACIONAIS') + receitasSemGrupo
+      receitasOperacionais = sumGroup('RECEITAS_OPERACIONAIS')
       impostosFaturamento = sumGroup('IMPOSTOS_FATURAMENTO')
       receitasNaoOperacionais = sumGroup('RECEITAS_NAO_OPERACIONAIS')
     } else {
@@ -280,15 +275,10 @@ export class ReportService {
     }
 
     // ── Despesas ─────────────────────────────────────────────────────────────
-    // Despesas sem dre_group são tratadas como variáveis (default do fallback)
-    const despesasSemGrupo = categorias
-      .filter(c => c.tipo === 'DESPESA' && !c.dreGroup)
-      .reduce((s, c) => s + Math.abs(c.total), 0)
-
     if (hasDespesaDreGroup) {
       // Usar classificação por dre_group configurada no banco
       custosOperacionais = sumGroup('CUSTOS_OPERACIONAIS')
-      despesasVariaveis = sumGroup('DESPESAS_VARIAVEIS') + despesasSemGrupo
+      despesasVariaveis = sumGroup('DESPESAS_VARIAVEIS')
       despesasFixas = sumGroup('DESPESAS_FIXAS')
       investimentos = sumGroup('INVESTIMENTOS')
       despesasNaoOperacionais = sumGroup('DESPESAS_NAO_OPERACIONAIS')

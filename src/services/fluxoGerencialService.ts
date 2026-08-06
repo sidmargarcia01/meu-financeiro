@@ -184,7 +184,7 @@ function agruparTransacoes(
           bucket.receitaFaturamento += valor
           break
         case 'IMPOSTOS_FATURAMENTO':
-          bucket.custosOperacionais += valor
+          // Tratado como filha negativa da receita quando expandida
           break
         case 'CUSTOS_OPERACIONAIS':
           bucket.custosOperacionais += valor
@@ -211,8 +211,8 @@ function agruparTransacoes(
           bucket.distribuicaoLucros += valor
           break
         default:
-          if (ehReceita) bucket.receitaFaturamento += valor
-          else bucket.despesasVariaveis += valor
+          if (ehReceita) bucket.receitasSemCategoria += valor
+          else bucket.despesasSemCategoria += valor
       }
     } else {
       if (ehReceita) {
