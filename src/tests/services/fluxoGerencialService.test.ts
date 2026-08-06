@@ -484,5 +484,8 @@ describe('fluxoGerencialService', () => {
     expect(receita.valores[0].realizado).toBe(10000)
     expect(recSemCat.valores[0].realizado).toBe(5000)
     expect(despSemCat.valores[0].realizado).toBe(-3000)
+
+    const resultadoLiquido = result.linhas.find(l => l.id === 'resultado_liquido')!
+    expect(resultadoLiquido.valores[0].realizado).toBe(10000 + 5000 - 3000)
   })
 })

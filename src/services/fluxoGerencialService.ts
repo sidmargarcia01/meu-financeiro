@@ -140,7 +140,8 @@ function agruparTransacoes(
   transactions: any[],
   meses: MesFluxo[],
   parentCatMap: Map<string, { nome: string; dreGroup: DreGroup | null }>,
-  usarDreGroup: boolean
+  usarDreGroup: boolean,
+  dateField: 'due_date' | 'competence_date' = 'due_date'
 ): Map<string, BucketMes> {
   const buckets = new Map<string, BucketMes>()
 
@@ -165,7 +166,7 @@ function agruparTransacoes(
   for (const tx of transactions) {
     const cat = tx.categories as any
     const tipo: 'RECEITA' | 'DESPESA' = tx.type
-    const data = (tx.due_date as string)
+    const data = (tx[dateField] as string) || (tx.due_date as string)
     const [anoStr, mesStr] = data.split('-')
     const key = `${anoStr}-${mesStr}`
     const bucket = buckets.get(key)
@@ -322,7 +323,9 @@ function calcularLinhaCalculada(
   const lucroOperacional = receitaFaturamento + despesaOperacionalTotal
   const movimentacoesNaoOperacionais =
     bucket.receitasNaoOperacionais - bucket.despesasNaoOperacionais - bucket.impostosLucro - bucket.distribuicaoLucros
-  const resultadoLiquido = lucroOperacional + movimentacoesNaoOperacionais
+  const receitasSemCategoria = bucket.receitasSemCategoria
+  const despesasSemCategoria = bucket.despesasSemCategoria
+  const resultadoLiquido = lucroOperacional + movimentacoesNaoOperacionais + receitasSemCategoria - despesasSemCategoria
 
   const pctMC = receitaFaturamento > 0 && margemContribuicao > 0
     ? margemContribuicao / receitaFaturamento
@@ -355,8 +358,8 @@ function calcularLinhaCalculada(
     acertoDoCaixa,
     saldoInicial,
     saldoFinal,
-    receitasSemCategoria: bucket.receitasSemCategoria,
-    despesasSemCategoria: bucket.despesasSemCategoria,
+    receitasSemCategoria,
+    despesasSemCategoria,
   }
 }
 
@@ -454,7 +457,7 @@ export class FluxoGerencialService {
     })
     const usarDreGroup = hasReceitaDreGroup || hasDespesaDreGroup
 
-    const buckets = agruparTransacoes(transactions, meses, parentCatMap, usarDreGroup)
+    const buckets = agruparTransacoes(transactions, meses, parentCatMap, usarDreGroup, dateField)
 
     // Buscar saldo final real de cada mês
     await Promise.all(
@@ -609,7 +612,7 @@ export class FluxoGerencialService {
         'RECEITAS NÃO CLASSIFICADAS',
         'grupo',
         0,
-        'receita',
+        'nao_aplica',
         calculosPorMes.map(c => c.receitasSemCategoria),
         receitasPorMes,
         false
