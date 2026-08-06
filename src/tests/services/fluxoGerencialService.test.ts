@@ -484,12 +484,11 @@ describe('fluxoGerencialService', () => {
     const result = await fluxoGerencialService.gerarMatriz('user-1', '2026-01-01', '2026-01-31')
 
     const receita = result.linhas.find(l => l.id === 'receita_faturamento')!
-    const recSemCat = result.linhas.find(l => l.id === 'receitas_sem_categoria')!
-    const despSemCat = result.linhas.find(l => l.id === 'despesas_sem_categoria')!
+    const custosVar = result.linhas.find(l => l.id === 'custos_variaveis')!
 
-    expect(receita.valores[0].realizado).toBe(10000)
-    expect(recSemCat.valores[0].realizado).toBe(5000)
-    expect(despSemCat.valores[0].realizado).toBe(-3000)
+    // Sem categoria: receitas vão para faturamento, despesas para custos variáveis
+    expect(receita.valores[0].realizado).toBe(10000 + 5000)
+    expect(custosVar.valores[0].realizado).toBe(-3000)
 
     const resultadoLiquido = result.linhas.find(l => l.id === 'resultado_liquido')!
     expect(resultadoLiquido.valores[0].realizado).toBe(10000 + 5000 - 3000)
