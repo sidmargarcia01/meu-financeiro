@@ -771,7 +771,10 @@ export class TransactionRepository {
 
     if (error) throw error
 
-    return (data || []).reduce((sum, t) => sum + Number(t.amount), 0)
+    return (data || []).reduce((sum, t) => {
+      const abs = Math.abs(Number(t.amount) || 0)
+      return sum + (t.type === 'RECEITA' ? abs : -abs)
+    }, 0)
   }
 }
 
