@@ -8,10 +8,13 @@
 
 import { fluxoGerencialService } from '@/services/fluxoGerencialService'
 import { transactionRepository } from '@/repositories/transactionRepository'
+import { accountRepository } from '@/repositories/accountRepository'
 
 jest.mock('@/repositories/transactionRepository')
+jest.mock('@/repositories/accountRepository')
 
 const mockTransactionRepository = transactionRepository as jest.Mocked<typeof transactionRepository>
+const mockAccountRepository = accountRepository as jest.Mocked<typeof accountRepository>
 
 function mockTransaction(
   overrides: Partial<{
@@ -37,7 +40,10 @@ function mockTransaction(
 }
 
 describe('fluxoGerencialService', () => {
-  beforeEach(() => jest.clearAllMocks())
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockAccountRepository.sumInitialBalancesBefore.mockResolvedValue(0)
+  })
 
   it('deve retornar meses ordenados do mais antigo para o mais recente', async () => {
     mockTransactionRepository.findAllForPeriodWithCategory.mockResolvedValue([])

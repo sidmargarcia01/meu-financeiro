@@ -9,6 +9,7 @@
  */
 
 import { transactionRepository } from '@/repositories/transactionRepository'
+import { accountRepository } from '@/repositories/accountRepository'
 import { classifyDespesaFallback } from '@/services/dreClassifier'
 import type { DreGroup } from '@/schemas/categorySchema'
 
@@ -440,10 +441,12 @@ export class FluxoGerencialService {
       return { periodo: { inicio, fim }, regime, meses: [], linhas: [] }
     }
 
-    const [transactions, saldoInicialInicial] = await Promise.all([
+    const [transactions, txSaldoInicial, saldoInicialContas] = await Promise.all([
       transactionRepository.findAllForPeriodWithCategory(userId, inicio, fim, statusFilter, dateField),
       transactionRepository.sumConfirmedBefore(userId, inicio),
+      accountRepository.sumInitialBalancesBefore(userId, inicio),
     ])
+    const saldoInicialInicial = txSaldoInicial + saldoInicialContas
 
     const parentCatMap = buildParentCategoryMap(transactions)
 
@@ -459,13 +462,17 @@ export class FluxoGerencialService {
 
     const buckets = agruparTransacoes(transactions, meses, parentCatMap, usarDreGroup, dateField)
 
-    // Buscar saldo final real de cada mês
+    // Buscar saldo final real de cada mês (transações + saldo inicial das contas)
     await Promise.all(
       meses.map(async ({ ano, mes }) => {
         const ultimoDia = ultimoDiaDoMes(ano, mes)
-        const saldo = await transactionRepository.sumConfirmedBefore(userId, addOneDay(ultimoDia))
+        const proximoDia = addOneDay(ultimoDia)
+        const [txSaldo, contasSaldo] = await Promise.all([
+          transactionRepository.sumConfirmedBefore(userId, proximoDia),
+          accountRepository.sumInitialBalancesBefore(userId, proximoDia),
+        ])
         const key = chaveMes(ano, mes)
-        buckets.get(key)!.saldoFinalReal = saldo
+        buckets.get(key)!.saldoFinalReal = txSaldo + contasSaldo
       })
     )
 

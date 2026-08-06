@@ -498,6 +498,25 @@ export class AccountRepository {
       createdAt: new Date(account.created_at)
     }))
   }
+
+  /**
+   * MÉTODO: sumInitialBalancesBefore
+   * RESPONSABILIDADE: Somar saldos iniciais de contas ativas cuja data do saldo é anterior à data informada
+   * NÃO DEVE: Conter lógica de negócio — apenas soma bruta
+   */
+  async sumInitialBalancesBefore(userId: string, date: string): Promise<number> {
+    const { data, error } = await supabase
+      .from('accounts')
+      .select('initial_balance, initial_balance_date')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .not('initial_balance_date', 'is', null)
+      .lt('initial_balance_date', date)
+
+    if (error) throw error
+
+    return (data || []).reduce((sum, a) => sum + Number(a.initial_balance || 0), 0)
+  }
 }
 
 export const accountRepository = new AccountRepository()
