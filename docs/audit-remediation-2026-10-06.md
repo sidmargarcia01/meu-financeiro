@@ -2,7 +2,7 @@
 
 ## Escopo e estado
 
-Este pacote corrige cálculos, persistência e isolamento de usuários. A migração SQL foi validada em PostgreSQL isolado; não foi aplicada ao banco de produção durante a preparação deste pacote. O código e a migração devem ser publicados de forma coordenada. Não se deve habilitar o novo isolamento enquanto o servidor antigo ainda faz consultas anônimas.
+Este pacote corrige cálculos, persistência e isolamento de usuários. A expansão de esquema e a restauração do gatilho de perfis já foram aplicadas e verificadas. A migração de isolamento deve ser aplicada assim que o novo servidor estiver publicado. A checagem smoke-production aguarda essa etapa e verifica o endereço oficial.
 
 ## Alterações
 
@@ -23,16 +23,21 @@ Datas de pagamento ou competência ausentes nos registros antigos usam venciment
 
 ## Validação
 
-325 testes Jest, 16 cenários da auditoria e 14 verificações SQL de isolamento/integridade. Também foram executados TypeScript, ESLint e build de produção. Os testes SQL usam PGlite, sem acessar dados financeiros reais. Não substituem a homologação do login e dos fluxos completos em um projeto Supabase de testes.
+325 testes Jest, 16 cenários financeiros, 14 verificações PostgreSQL e sete verificações autenticadas de integração passaram, além de TypeScript, ESLint e build. A integração real usa dois usuários temporários no Supabase, login pela API, criação de contas/categorias/despesas, confirmação, transferência, parcelas no fim do mês e persistência de planejamento. Os usuários e seus registros são removidos em finally. O teste da versão publicada acrescenta RLS, revogação do acesso anônimo e repetição idempotente de OFX.
 
 ## Publicação e pendências
 
-O workflow antigo `deploy.yml` tentava publicar produção em eventos de pull request. A condição foi corrigida para permitir apenas push em develop; a execução seguinte confirmou o job ignorado em pull request. A tentativa inicial falhou antes do envio porque o CLI 25.1.0 estava obsoleto. Os workflows agora fixam Vercel CLI 62.5.0 e Node 24. O Next.js e seu pacote ESLint foram atualizados para 16.4.0 após o CI identificar alerta crítico na versão anterior.
+O workflow duplicado de deploy foi removido. O pipeline de publicação exige validação de qualidade e não oculta falhas. Ele usa Node 24, Next.js 16.4.0 e Vercel CLI 62.5.0. Os arquivos com credenciais antigas e os helpers inseguros foram retirados; uma verificação no CI impede sua reintrodução. As duas chaves administrativas antigas testadas foram rejeitadas com HTTP 401. Remover arquivos não apaga segredos do histórico; credenciais históricas devem permanecer revogadas.
 
-Após a atualização, `npm audit --audit-level=critical` passou, sem alertas críticos. Permanecem 57 alertas de dependências (38 altos, 18 moderados e 1 baixo), incluindo ferramentas de desenvolvimento e dependências transitivas. Esses alertas não foram desativados nem considerados resolvidos; precisam de análise de alcance e atualização própria. O conector Vercel desta sessão respondeu 403 para o projeto, portanto a promoção e a homologação autenticada não foram realizadas.
+Dependências de produção: zero vulnerabilidades em npm audit --omit=dev. Inventário completo: 26 avisos em ferramentas de desenvolvimento, provenientes de braces e sprintf-js, sem correção publicada para as versões usadas. Esses avisos continuam visíveis e documentados; não representam 26 falhas distintas do código do app. Referências: https://github.com/advisories/GHSA-vfj7-8cjw-p6xm e https://github.com/advisories/GHSA-hp3w-g68c-fv3c.
 
-1. Homologar o pacote com cópia anonimizada do esquema e autenticação Supabase de testes; verificar login, lançamento, confirmação, transferência, recorrência, conciliação e salvamento de metas.
-2. Preparar backup e janela de atualização para aplicar `supabase/migrations/20261006194244_audit_financial_integrity.sql` junto do novo servidor.
-3. Confirmar isolamento de usuários, privilégio anônimo, login e operações no ambiente publicado. Em rollback, manter RLS e usar versão compatível com autenticação por requisição; não restaurar acesso anônimo.
+O teste real revelou dois erros adicionais, corrigidos: ausência do gatilho de criação do perfil financeiro e inserções em lote que enviavam etiquetas nulas. A criação do perfil agora é atômica com Supabase Auth; transferências sem etiquetas enviam uma lista vazia.
+
+1. Expansão compatível: 20261006203405_audit_expand_compatibility.sql. Mantém o servidor antigo funcionando e protege imediatamente as tabelas novas.
+2. Gatilho de perfis: 20261006205343_restore_auth_profile_trigger.sql. Não reescreve usuários existentes.
+3. Publicar o servidor validado e aplicar 20261006194244_audit_financial_integrity.sql. O script de produção aguarda o bloqueio do acesso anônimo antes de testar.
+4. Conferir RLS, advisors, nove verificações autenticadas na URL oficial e preservação dos dados originais: 578 lançamentos, 4 contas e 5 usuários antes dos testes.
+
+Rollback de código deve manter RLS e usar versão compatível com autenticação por requisição; não restaurar privilégios anônimos.
 
 Ainda não há contabilidade por partidas dobradas, fechamento com bloqueio de período, cartões completos ou exportação contábil real. Consolidar moedas diferentes exige política explícita de câmbio; o extrato rejeita consolidação de moedas incompatíveis, mas os demais relatórios precisam de evolução equivalente. Limites comerciais verificados no serviço ainda podem sofrer concorrência entre requisições; uma quota transacional no banco é uma melhoria adicional. Esta entrega não é certificação de que todo fluxo ou dado histórico esteja correto.
