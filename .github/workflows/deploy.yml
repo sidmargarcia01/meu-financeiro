@@ -1,4 +1,3 @@
-
 name: Deploy to Vercel
 
 on:
@@ -9,6 +8,7 @@ on:
 
 jobs:
   deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     
     steps:
@@ -43,3 +43,4 @@ jobs:
         vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
         vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
         vercel-args: '--prod'
+
