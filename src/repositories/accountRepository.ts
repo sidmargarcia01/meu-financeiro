@@ -1,3 +1,5 @@
+import { queryAll } from '@/lib/queryAll'
+import { signedAmount } from '@/lib/financial'
 /**
  * CAMADA: Repository
  * MÓDULO: Account
@@ -6,7 +8,7 @@
  * DEPENDE DE: Supabase, Account models
  */
 
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/requestSupabase'
 import {
   Account,
   AccountWithBalance,
@@ -158,34 +160,24 @@ export class AccountRepository {
 
   // Listar contas com saldos
   async listWithBalances(userId: string): Promise<AccountWithBalance[]> {
-    const { data: accounts, error } = await supabase
-      .from('accounts')
-      .select(`
-        *,
-        transactions (
-          amount,
-          status,
-          type
-        )
-      `)
-      .eq('user_id', userId)
-      .eq('is_active', true)
-      .order('type', { ascending: true })
-      .order('name', { ascending: true })
-
-    if (error) throw error
+    const [{ data: accounts, error }, { data: movements, error: movementError }] = await Promise.all([
+      queryAll(supabase.from('accounts').select('*').eq('user_id', userId).eq('is_active', true).order('name')),
+      queryAll(supabase.from('transactions').select('account_id,amount,status,type,due_date,payment_date').eq('user_id', userId)),
+    ])
+    if (error || movementError) throw error || movementError
 
     // Calcular saldos — fórmula robusta: usa type para determinar sinal,
     // ignorando o sinal armazenado no DB (corrige inconsistências históricas)
     return (accounts || []).map((account: any) => {
-      const transactions = account.transactions || []
+      const transactions = movements.filter(t => t.account_id === account.id &&
+        (!account.initial_balance_date || (t.status === 'PENDENTE' ? t.due_date : t.payment_date || t.due_date) >= account.initial_balance_date))
       const initialBalance = Number(account.initial_balance) || 0
 
       // Impacto de uma transação no saldo (RECEITA=+, qualquer outra=-),
       // sempre usa valor absoluto para neutralizar inconsistências no DB
       const impact = (t: any): number => {
         const abs = Math.abs(Number(t.amount) || 0)
-        return t.type === 'RECEITA' ? abs : -abs
+        return signedAmount(t.type, t.amount)
       }
 
       // Projetado = saldo inicial + TODAS as transações (pendentes, confirmadas, conciliadas)
@@ -197,7 +189,7 @@ export class AccountRepository {
       // Confirmado = saldo inicial + somente CONCILIADO
       // (reflete o saldo real reconciliado com o extrato bancário)
       const confirmedBalance = transactions
-        .filter((t: any) => t.status === 'CONCILIADO')
+        .filter((t: any) => ['CONFIRMADO', 'CONCILIADO'].includes(t.status))
         .reduce((sum: number, t: any) => sum + impact(t), initialBalance)
 
       return {
@@ -206,6 +198,7 @@ export class AccountRepository {
         name: account.name,
         type: account.type,
         initialBalance: initialBalance,
+        initialBalanceDate: account.initial_balance_date ? new Date(account.initial_balance_date) : undefined,
         currency: account.currency,
         icon: account.icon,
         isActive: account.is_active,
@@ -509,9 +502,7 @@ export class AccountRepository {
       .from('accounts')
       .select('initial_balance, initial_balance_date')
       .eq('user_id', userId)
-      .eq('is_active', true)
-      .not('initial_balance_date', 'is', null)
-      .lt('initial_balance_date', date)
+      .or(`initial_balance_date.is.null,initial_balance_date.lt.${date}`)
 
     if (error) throw error
 

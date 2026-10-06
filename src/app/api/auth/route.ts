@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { createRequestClient } from '@/lib/requestSupabase'
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 import { withValidation } from '@/middlewares/validation'
 import { z } from 'zod'
@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
 }
 
 async function login(request: NextRequest, body: any) {
+  const supabase = createRequestClient()
   const { email, password } = body
 
   // Validar entrada
@@ -93,6 +94,7 @@ async function login(request: NextRequest, body: any) {
 }
 
 async function register(request: NextRequest, body: any) {
+  const supabase = createRequestClient()
   const { email, password, name, planId } = body
 
   // Validar entrada
@@ -123,83 +125,6 @@ async function register(request: NextRequest, body: any) {
     )
   }
 
-  console.log('✅ Auth user created:', authData.user?.id)
-
-  // Aguardar trigger executar (pequeno delay)
-  await new Promise(resolve => setTimeout(resolve, 500))
-
-  // Verificar se usuário foi criado na tabela users pelo trigger
-  const { data: userRecord, error: userCheckError } = await supabase
-    .from('users')
-    .select('id')
-    .eq('id', authData.user!.id)
-    .single()
-
-  if (userCheckError || !userRecord) {
-    console.error('❌ User not found in users table:', userCheckError)
-    console.log('🔑 ENV check:', {
-      hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-      hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-      serviceKeyLength: process.env.SUPABASE_SERVICE_ROLE_KEY?.length || 0
-    })
-    // Tentar criar manualmente usando admin (ignora RLS)
-    try {
-      console.log('🚀 Initializing admin client...')
-      const adminClient = getSupabaseAdmin()
-      console.log('✅ Admin client initialized')
-
-      console.log('📝 Inserting user data:', {
-        id: authData.user!.id,
-        email: validation.data.email,
-        name: validation.data.name
-      })
-
-      // Usar upsert para evitar erro se usuário já existe (conflito de email)
-      const { error: insertError } = await adminClient
-        .from('users')
-        .upsert({
-          id: authData.user!.id,
-          email: validation.data.email,
-          name: validation.data.name,
-          plan_id: validation.data.planId || null,
-          default_currency: 'BRL',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'id',
-          ignoreDuplicates: false
-        })
-
-      if (insertError) {
-        console.error('❌ Failed to insert user with admin:', insertError)
-        return NextResponse.json(
-          { error: 'Database error saving new user', details: insertError.message, hint: 'Insert failed' },
-          { status: 500 }
-        )
-      }
-      console.log('✅ User inserted manually with admin client')
-    } catch (adminError: any) {
-      console.error('❌ Admin client failed:', adminError)
-      return NextResponse.json(
-        { error: 'Database error saving new user', details: adminError.message, hint: 'Admin init failed' },
-        { status: 500 }
-      )
-    }
-  } else {
-    console.log('✅ User created by trigger')
-    // Atualizar plan_id se necessário
-    if (validation.data.planId) {
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ plan_id: validation.data.planId })
-        .eq('id', authData.user!.id)
-
-      if (updateError) {
-        console.error('Erro ao atualizar plano:', updateError)
-      }
-    }
-  }
-
   return NextResponse.json({
     user: authData.user,
     message: 'Conta criada com sucesso. Verifique seu email para confirmar.',
@@ -219,6 +144,7 @@ export async function GET(request: NextRequest) {
     }
 
     const token = authHeader.substring(7)
+    const supabase = createRequestClient(token)
 
     // Verificar token com Supabase
     const { data: { user }, error } = await supabase.auth.getUser(token)
@@ -270,9 +196,10 @@ export async function DELETE(request: NextRequest) {
     }
 
     const token = authHeader.substring(7)
+    const supabase = createRequestClient(token)
 
     // Fazer logout no Supabase
-    const { error } = await supabase.auth.signOut()
+    const { error } = await getSupabaseAdmin().auth.admin.signOut(token, 'local')
 
     if (error) {
       return NextResponse.json(

@@ -44,7 +44,7 @@ export class PlanService {
     const plan = await this.userRepository.getUserPlan(userId)
     
     if (!plan) {
-      return true // Admin ou sem plano
+      return currentCount < 100
     }
     
     return currentCount < plan.transactionLimit
@@ -55,7 +55,7 @@ export class PlanService {
     const plan = await this.userRepository.getUserPlan(userId)
     
     if (!plan || !plan.storageLimitMb) {
-      return true // Sem limite de storage
+      return false // Nenhuma cota de upload configurada
     }
     
     const limitBytes = plan.storageLimitMb * 1024 * 1024

@@ -6,14 +6,16 @@
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint src --quiet",
     "type-check": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "test:audit": "node scripts/audit-regressions.cjs",
+    "test:database": "node scripts/test-migration.cjs"
   },
   "dependencies": {
     "@emotion/cache": "^11.14.0",
@@ -38,7 +40,7 @@
     "date-fns": "^3.6.0",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.427.0",
-    "next": "^16.2.4",
+    "next": "16.4.0",
     "pg": "^8.20.0",
     "prisma": "^5.19.1",
     "react": "^18",
@@ -50,12 +52,13 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "@tanstack/react-query-devtools": "^5.96.2",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/bcryptjs": "^2.4.6",
-    "@types/jest": "^30.0.0",
+    "@types/jest": "30.0.0",
     "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^20",
     "@types/react": "^18",
@@ -63,14 +66,18 @@
     "autoprefixer": "^10.4.19",
     "dotenv-cli": "^11.0.0",
     "eslint": "^9",
-    "eslint-config-next": "^16.2.4",
-    "jest": "^29.7.0",
-    "jest-environment-jsdom": "^30.3.0",
+    "eslint-config-next": "16.4.0",
+    "jest": "30.5.2",
+    "jest-environment-jsdom": "30.5.2",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
     "typescript": "^5"
   },
   "engines": {
     "node": ">=20.9.0"
+  },
+  "overrides": {
+    "brace-expansion@^1.1.0": "1.1.21",
+    "postcss-selector-parser": "7.1.6"
   }
 }

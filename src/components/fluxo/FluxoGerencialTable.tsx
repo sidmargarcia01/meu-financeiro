@@ -230,12 +230,12 @@ export function FluxoGerencialTable({ data, showChildren, inicio, fim, regime, o
                         borderLeft: 1,
                         borderColor: 'divider',
                         fontWeight: linha.destaque ? 700 : 400,
-                        color: corValor(valor.realizado, linha.avTipo),
+                        color: corValor(valor.realizado ?? 0, linha.avTipo),
                         whiteSpace: 'nowrap',
                       }}
                     >
                       <Tooltip title={linha.label}>
-                        <span>{formatCurrency(valor.realizado)}</span>
+                        <span>{valor.realizado === null ? '—' : formatCurrency(valor.realizado)}</span>
                       </Tooltip>
                     </TableCell>
                     <TableCell

@@ -1,3 +1,5 @@
+import { queryAll } from '@/lib/queryAll'
+import { signedAmount } from '@/lib/financial'
 /**
  * 📄 Descrição: Serviço de Conciliação Bancária — parse OFX e matching de transações
  * 🧱 Contexto: Módulo de conciliação do Meu Financeiro
@@ -7,7 +9,7 @@
  * ✅ Revisado: Sim
  */
 
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/requestSupabase'
 import { transactionRepository } from '@/repositories/transactionRepository'
 import { accountRepository } from '@/repositories/accountRepository'
 
@@ -77,36 +79,46 @@ export class ReconciliationService {
   /**
    * Encontrar sugestões de matching para cada transação OFX
    */
-  async findMatches(userId: string, ofxTransactions: OFXTransaction[]): Promise<ReconciliationMatch[]> {
+  async findMatches(userId: string, ofxTransactions: OFXTransaction[], accountId?: string): Promise<ReconciliationMatch[]> {
     if (ofxTransactions.length === 0) return []
+    if (!accountId) throw new Error('Selecione a conta do extrato')
 
     const dates = ofxTransactions.map(t => t.dtposted)
     const minDate = dates.reduce((a, b) => (a < b ? a : b))
     const maxDate = dates.reduce((a, b) => (a > b ? a : b))
 
-    const { data: dbTransactions } = await supabase
+    const from = new Date(minDate + 'T00:00:00Z'); from.setUTCDate(from.getUTCDate() - 3)
+    const until = new Date(maxDate + 'T00:00:00Z'); until.setUTCDate(until.getUTCDate() + 3)
+    const { data: dbTransactions, error } = await queryAll(supabase
       .from('transactions')
       .select('id, description, amount, type, due_date, status')
       .eq('user_id', userId)
-      .gte('due_date', minDate)
-      .lte('due_date', maxDate)
-      .in('status', ['PENDENTE', 'CONFIRMADO'])
+      .eq('account_id', accountId)
+      .gte('due_date', from.toISOString().slice(0,10))
+      .lte('due_date', until.toISOString().slice(0,10))
+      .in('status', ['PENDENTE', 'CONFIRMADO']))
+    if (error) throw error
 
     const db = dbTransactions || []
+    const used = new Set<string>()
+    const bankIds = new Set<string>()
 
     return ofxTransactions.map(ofx => {
+      if (bankIds.has(ofx.fitid)) return { ofxTransaction: ofx, status: 'ignored' } as ReconciliationMatch
+      bankIds.add(ofx.fitid)
       const expectedType = ofx.trntype === 'CREDIT' ? 'RECEITA' : 'DESPESA'
 
       // Tentativa de match: mesmo valor + tipo + data próxima (±3 dias)
       const ofxDate = new Date(ofx.dtposted)
       const suggestion = db.find(tx => {
-        if (tx.type !== expectedType) return false
-        if (Math.abs(tx.amount - ofx.trnamt) > 0.01) return false
+        if (used.has(tx.id) || tx.type !== expectedType) return false
+        if (Math.abs(Math.abs(tx.amount) - ofx.trnamt) > 0.01) return false
         const txDate = new Date(tx.due_date)
         const diff = Math.abs(ofxDate.getTime() - txDate.getTime()) / (1000 * 60 * 60 * 24)
         return diff <= 3
       })
 
+      if (suggestion) used.add(suggestion.id)
       return {
         ofxTransaction: ofx,
         suggestion: suggestion
@@ -145,43 +157,42 @@ export class ReconciliationService {
 
     const transactions = await transactionRepository.list(userId, {
       accountId,
-      startDate: filters.dateFrom,
-      endDate: filters.dateTo,
+
     })
 
-    const initialBalance = (account as any).initialBalance ?? (account as any).initial_balance ?? 0
+    const baseDate = account.initialBalanceDate ? new Date(account.initialBalanceDate).toISOString().slice(0,10) : undefined
+    const initialBalance = (!baseDate || !filters.dateTo || baseDate <= filters.dateTo) ? account.initialBalance ?? 0 : 0
+    const eligible = transactions.filter(tx => {
+      const date = tx.status === 'PENDENTE' ? tx.due_date : tx.payment_date || tx.due_date
+      return (!baseDate || date >= baseDate) && (!filters.dateTo || date <= filters.dateTo)
+    })
 
-    const saldo_projetado = transactions.reduce((acc, tx) => {
+    const saldo_projetado = eligible.reduce((acc, tx) => {
       const signal = tx.type === 'RECEITA' ? 1 : -1
-      return acc + tx.amount * signal
+      return acc + signedAmount(tx.type, tx.amount)
     }, initialBalance)
 
-    const saldo_confirmado = transactions
+    const saldo_confirmado = eligible
       .filter(tx => ['CONFIRMADO', 'CONCILIADO'].includes(tx.status))
       .reduce((acc, tx) => {
         const signal = tx.type === 'RECEITA' ? 1 : -1
-        return acc + tx.amount * signal
+        return acc + signedAmount(tx.type, tx.amount)
       }, initialBalance)
 
-    return { transactions, saldo_projetado, saldo_confirmado, account }
+    return { transactions: eligible.filter(t => (!filters.dateFrom || (t.payment_date || t.due_date) >= filters.dateFrom) && (!filters.status || t.status === filters.status)), saldo_projetado, saldo_confirmado, account }
   }
 
   /**
    * Confirmar conciliação: marcar transações como CONCILIADO
    */
-  async confirmMatches(userId: string, matchIds: string[]): Promise<{ updated: number }> {
-    if (matchIds.length === 0) return { updated: 0 }
-
-    const { data, error } = await supabase
-      .from('transactions')
-      .update({ status: 'CONCILIADO', updated_at: new Date().toISOString() })
-      .eq('user_id', userId)
-      .in('id', matchIds)
-      .select('id')
-
+  async confirmMatches(userId: string, matches: Array<{ id: string; fitid: string; date: string; amount: number }>, accountId: string): Promise<{ updated: number }> {
+    if (!accountId) throw new Error('Conta obrigatória')
+    if (new Set(matches.map(m => m.id)).size !== matches.length) throw new Error('Um lançamento não pode ser reutilizado')
+    const { data, error } = await supabase.rpc('confirm_ofx_matches', { account: accountId, matches })
     if (error) throw error
-    return { updated: data?.length || 0 }
+    return { updated: Number(data || 0) }
   }
+
 }
 
 export const reconciliationService = new ReconciliationService()

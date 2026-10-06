@@ -7,6 +7,9 @@
  */
 
 import { fluxoGerencialService } from '@/services/fluxoGerencialService'
+jest.mock('@/lib/requestSupabase', () => ({ supabase: {
+  from: () => ({ select: () => ({ eq: () => ({ is: async () => ({ data: [], error: null }) }) }) }),
+} }))
 import { transactionRepository } from '@/repositories/transactionRepository'
 import { accountRepository } from '@/repositories/accountRepository'
 
@@ -275,8 +278,8 @@ describe('fluxoGerencialService', () => {
     const peAntes = result.linhas.find(l => l.id === 'ponto_equilibrio_antes_investimento')!.valores[0].realizado
     const peCom = result.linhas.find(l => l.id === 'ponto_equilibrio_com_investimento')!.valores[0].realizado
 
-    expect(peAntes).toBe(0)
-    expect(peCom).toBe(0)
+    expect(peAntes).toBeNull()
+    expect(peCom).toBeNull()
   })
 
   it('deve encadear Saldo Inicial do mês N+1 igual ao Saldo Final do mês N', async () => {

@@ -76,7 +76,7 @@ function getLineCriteria(lineId: string): LineCriteria | undefined {
 
   switch (lineId) {
     case 'receita_faturamento':
-      return { type: 'RECEITA', dreGroups: ['RECEITAS_OPERACIONAIS', 'IMPOSTOS_FATURAMENTO'] }
+      return { dreGroups: ['RECEITAS_OPERACIONAIS', 'IMPOSTOS_FATURAMENTO'] }
     case 'custos_variaveis':
       return { type: 'DESPESA', dreGroups: ['CUSTOS_OPERACIONAIS', 'DESPESAS_VARIAVEIS'] }
     case 'despesas_fixas':
@@ -145,8 +145,8 @@ export function FluxoGerencialDrillDown({
       const params = new URLSearchParams()
       params.set('startDate', inicio)
       params.set('endDate', fim)
-      params.set('limit', '1000')
-      params.set('dateField', regime === 'COMPETENCIA' ? 'competence_date' : 'due_date')
+      params.set('all', 'true')
+      params.set('dateField', regime === 'COMPETENCIA' ? 'competence_date' : 'payment_date')
       params.set('statuses', regime === 'CAIXA' ? 'CONFIRMADO,CONCILIADO' : 'PENDENTE,CONFIRMADO,CONCILIADO')
       if (criteria.type) params.set('type', criteria.type)
       if (criteria.categoryId) params.set('categoryId', criteria.categoryId)
@@ -198,7 +198,11 @@ export function FluxoGerencialDrillDown({
       const res = await fetch(`/api/transactions/${editing.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ description: formData.description, amount: formData.amount, type: formData.type,
+          dueDate: formData.due_date, accountId: formData.account_id, categoryId: formData.category_id || null,
+          centerId: formData.center_id || null, projectId: formData.project_id || null, contactId: formData.contact_id || null,
+          competenceDate: formData.competence_date || null, notes: formData.notes || null, tags: formData.tags || [],
+        }),
       })
       if (!res.ok) throw new Error('Erro ao salvar')
       setEditing(null)

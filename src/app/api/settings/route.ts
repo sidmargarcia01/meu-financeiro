@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/middlewares/auth'
 import { withValidation } from '@/middlewares/validation'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/requestSupabase'
 import { userSettingsSchema } from '@/models/user'
 
 export async function GET(request: NextRequest) {

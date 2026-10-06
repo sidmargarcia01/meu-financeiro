@@ -21,11 +21,11 @@ import { Refresh as RefreshIcon } from '@mui/icons-material'
 import { formatCurrency } from '@/utils/formatCurrency'
 
 interface CatDistribuicao {
-  categoryId: string
-  categoryName: string
+  category_id: string
+  category_name: string
   total: number
-  percentage: number
-  transactionCount: number
+  percentual: number
+  transactionCount?: number
 }
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
@@ -99,22 +99,22 @@ export default function OrcamentoPage() {
                   <Typography color="text.secondary">Nenhuma despesa registrada neste período.</Typography>
                 </TableCell></TableRow>
               ) : data.map(c => (
-                <TableRow key={c.categoryId} hover>
-                  <TableCell><Typography variant="body2" fontWeight={500}>{c.categoryName}</Typography></TableCell>
+                <TableRow key={c.category_id} hover>
+                  <TableCell><Typography variant="body2" fontWeight={500}>{c.category_name}</Typography></TableCell>
                   <TableCell align="right" sx={{ color: 'error.main', fontWeight: 600 }}>{formatCurrency(c.total)}</TableCell>
                   <TableCell align="right">
-                    <Chip label={`${c.percentage.toFixed(1)}%`} size="small"
-                      color={pctColor(c.percentage)} variant="outlined" />
+                    <Chip label={`${c.percentual.toFixed(1)}%`} size="small"
+                      color={pctColor(c.percentual)} variant="outlined" />
                   </TableCell>
                   <TableCell sx={{ minWidth: 180 }}>
                     <LinearProgress
-                      variant="determinate" value={Math.min(c.percentage, 100)}
-                      color={pctColor(c.percentage)}
+                      variant="determinate" value={Math.min(c.percentual, 100)}
+                      color={pctColor(c.percentual)}
                       sx={{ height: 8, borderRadius: 4 }}
                     />
                   </TableCell>
                   <TableCell align="center">
-                    <Typography variant="body2" color="text.secondary">{c.transactionCount}</Typography>
+                    <Typography variant="body2" color="text.secondary">{c.transactionCount ?? '—'}</Typography>
                   </TableCell>
                 </TableRow>
               ))}

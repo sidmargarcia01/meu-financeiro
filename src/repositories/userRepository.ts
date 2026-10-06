@@ -6,7 +6,7 @@
  * DEPENDE DE: Supabase, User models
  */
 
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/requestSupabase'
 import { User, UserSettings, UserWithSettings } from '@/models/user'
 
 export class UserRepository {
@@ -96,7 +96,8 @@ export class UserRepository {
           type,
           transaction_limit,
           user_limit,
-          storage_limit_mb
+          storage_limit_mb,
+          jsonb
         )
       `)
       .eq('id', userId)
@@ -112,14 +113,15 @@ export class UserRepository {
       transactionLimit: (data.plans as any).transaction_limit,
       userLimit: (data.plans as any).user_limit,
       storageLimitMb: (data.plans as any).storage_limit_mb,
-      features: (data.plans as any).features || {}
+      features: (data.plans as any).jsonb || {}
     }
   }
 
   // Calcular uso de storage do usuário (em bytes)
   async getStorageUsage(userId: string): Promise<number> {
-    // Simplificado - retornar valor fixo para testes
-    // Em produção, calcularia tamanho real dos anexos e outros dados
-    return 10 * 1024 * 1024 // 10MB padrão
+    const { data, error } = await supabase.rpc('get_my_storage_usage')
+    if (error) throw error
+    return Number(data || 0)
   }
 }
+

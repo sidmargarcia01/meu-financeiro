@@ -91,6 +91,7 @@ const CATEGORIAS_PADRAO: Array<{
         'Aluguel',
         'Condomínio',
         'Folha de pagamento',
+        'Pró-labore',
         'Encargos trabalhistas',
         'Contabilidade',
         'Energia elétrica',
@@ -153,7 +154,6 @@ const CATEGORIAS_PADRAO: Array<{
       type: 'DESPESA',
       dre_group: 'DISTRIBUICAO_LUCROS',
       children: [
-        'Pró-labore',
         'Distribuição de lucros',
         'Dividendos',
       ],
@@ -254,9 +254,7 @@ export const categoryService = {
       .maybeSingle()
 
     if (existingByEmail) {
-      // Deleta o row com id errado e recria com auth UUID correto
-      console.log('[SERVICE] Usuário encontrado por email com id diferente. Recriando com auth UUID:', userId)
-      await supabase.from('users').delete().eq('id', existingByEmail.id)
+      throw new Error('Conflito de identidade: procure suporte para preservar seus dados. Nenhum usuário foi excluído.')
     }
 
     // 3. Insere com o auth UUID correto

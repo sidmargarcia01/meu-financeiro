@@ -10,6 +10,7 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
+import { useSavedCollection } from '@/hooks/useSavedCollection'
 import { useState } from 'react'
 import {
   Box, Typography, Paper, Button, Stack, LinearProgress,
@@ -27,7 +28,7 @@ interface Meta {
 const EMPTY = { nome: '', valorMeta: 0, valorAtual: 0, prazo: '', descricao: '' }
 
 export default function MetasEconomiaPage() {
-  const [metas, setMetas]       = useState<Meta[]>([])
+  const [metas, setMetas, persistence] = useSavedCollection<Meta>('metas-economia')
   const [open, setOpen]         = useState(false)
   const [form, setForm]         = useState(EMPTY)
   const [editId, setEditId]     = useState<string | null>(null)
@@ -55,7 +56,7 @@ export default function MetasEconomiaPage() {
 
   const handleAporte = () => {
     if (!aporteMeta || aporteValor <= 0) return
-    setMetas(ms => ms.map(m => m.id === aporteMeta ? { ...m, valorAtual: Math.min(m.valorAtual + aporteValor, m.valorMeta) } : m))
+    setMetas(ms => ms.map(m => m.id === aporteMeta ? { ...m, valorAtual: m.valorAtual + aporteValor } : m))
     setAportOpen(false); setAporteValor(0)
   }
 
@@ -64,9 +65,11 @@ export default function MetasEconomiaPage() {
 
   return (
     <Box sx={{ p: 3 }}>
+      {persistence.error && <Alert severity="error">{persistence.error}</Alert>}
+      {(!persistence.ready || persistence.saving) && <Alert severity="info">{persistence.saving ? "Salvando…" : "Carregando dados salvos…"}</Alert>}
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h5" fontWeight={700}>Metas de Economia</Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={openNew}>Nova Meta</Button>
+        <Button disabled={!persistence.ready || persistence.saving} variant="contained" startIcon={<AddIcon />} onClick={openNew}>Nova Meta</Button>
       </Stack>
 
       {metas.length > 0 && (
@@ -89,7 +92,7 @@ export default function MetasEconomiaPage() {
       {metas.length === 0 ? (
         <Paper sx={{ p: 6, textAlign: 'center' }}>
           <Typography color="text.secondary" mb={2}>Nenhuma meta cadastrada.</Typography>
-          <Button variant="outlined" onClick={openNew}>Criar primeira meta</Button>
+          <Button disabled={!persistence.ready || persistence.saving} variant="outlined" onClick={openNew}>Criar primeira meta</Button>
         </Paper>
       ) : (
         <Stack spacing={2}>
@@ -105,12 +108,12 @@ export default function MetasEconomiaPage() {
                   </Box>
                   <Stack direction="row" spacing={0.5}>
                     <Tooltip title="Registrar aporte">
-                      <Button size="small" variant="outlined" color="success"
+                      <Button disabled={!persistence.ready || persistence.saving} size="small" variant="outlined" color="success"
                         onClick={() => { setAporteMeta(m.id); setAporteValor(0); setAportOpen(true) }}
                       >+ Aporte</Button>
                     </Tooltip>
-                    <Tooltip title="Editar"><IconButton size="small" onClick={() => openEdit(m)}><EditIcon fontSize="small" /></IconButton></Tooltip>
-                    <Tooltip title="Excluir"><IconButton size="small" color="error" onClick={() => handleDelete(m.id)}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
+                    <Tooltip title="Editar"><IconButton disabled={!persistence.ready || persistence.saving} size="small" onClick={() => openEdit(m)}><EditIcon fontSize="small" /></IconButton></Tooltip>
+                    <Tooltip title="Excluir"><IconButton disabled={!persistence.ready || persistence.saving} size="small" color="error" onClick={() => handleDelete(m.id)}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
                   </Stack>
                 </Stack>
                 <Stack direction="row" spacing={2} alignItems="center" mb={1}>
@@ -145,8 +148,8 @@ export default function MetasEconomiaPage() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpen(false)}>Cancelar</Button>
-          <Button variant="contained" onClick={handleSave} disabled={!form.nome.trim() || form.valorMeta <= 0}>Salvar</Button>
+          <Button disabled={!persistence.ready || persistence.saving} onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button variant="contained" onClick={handleSave} disabled={!persistence.ready || persistence.saving || (!form.nome.trim() || form.valorMeta <= 0)}>Salvar</Button>
         </DialogActions>
       </Dialog>
 
@@ -159,8 +162,8 @@ export default function MetasEconomiaPage() {
             fullWidth size="small" sx={{ mt: 1 }} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAportOpen(false)}>Cancelar</Button>
-          <Button variant="contained" onClick={handleAporte} disabled={aporteValor <= 0}>Confirmar</Button>
+          <Button disabled={!persistence.ready || persistence.saving} onClick={() => setAportOpen(false)}>Cancelar</Button>
+          <Button variant="contained" onClick={handleAporte} disabled={!persistence.ready || persistence.saving || (aporteValor <= 0)}>Confirmar</Button>
         </DialogActions>
       </Dialog>
     </Box>

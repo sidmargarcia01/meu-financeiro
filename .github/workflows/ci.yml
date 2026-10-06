@@ -15,17 +15,29 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20.11.0'
+          node-version: '24'
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Audit regressions
+        run: npm run test:audit
+
+      - name: Database isolation checks
+        run: npm run test:database
+
+      - name: Reject tracked credentials
+        run: node scripts/check-secrets.cjs
+
       - name: Type check
         run: npm run type-check
 
       - name: Security audit
-        run: npm audit --audit-level=critical
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Run tests
         run: npm run test -- --coverage
@@ -46,6 +58,21 @@ jobs:
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
           NODE_ENV: production
 
+      - name: Authenticated integration smoke
+        run: |
+          npm start > /tmp/meu-financeiro-server.log 2>&1 &
+          APP_PID=$!
+          trap 'kill "$APP_PID" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:3000/login > /dev/null; then break; fi
+            sleep 1
+          done
+          node scripts/smoke-financial.cjs || { tail -80 /tmp/meu-financeiro-server.log; exit 1; }
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
   deploy-preview:
     needs: quality
     runs-on: ubuntu-latest
@@ -56,11 +83,12 @@ jobs:
       - name: Deploy to Vercel Preview
         uses: amondnet/vercel-action@v25
         with:
+          vercel-version: '62.5.0'
+          github-comment: false
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: '--scope meu-financeiro'
-        continue-on-error: true
+          vercel-args: '--scope sidmargarcia01s-projects'
 
   deploy-production:
     needs: quality
@@ -72,12 +100,32 @@ jobs:
       - name: Deploy to Vercel Production
         uses: amondnet/vercel-action@v25
         with:
+          vercel-version: '62.5.0'
+          github-comment: false
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: '--prod --scope meu-financeiro'
+          vercel-args: '--prod --scope sidmargarcia01s-projects'
           github-token: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
+
+  smoke-production:
+    needs: deploy-production
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - name: Validate published app and database isolation
+        run: node scripts/smoke-financial.cjs
+        env:
+          SMOKE_APP_URL: https://meu-financeiro-rouge.vercel.app
+          SMOKE_REQUIRE_RLS: 'true'
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
   security-scan:
     needs: quality
@@ -97,4 +145,3 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
-

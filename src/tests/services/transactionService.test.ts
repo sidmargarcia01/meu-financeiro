@@ -183,6 +183,7 @@ describe('TransactionService', () => {
         isRecurring: transactionData.isRecurring || false,
         attachmentUrl: transactionData.attachmentUrl,
         notes: transactionData.notes,
+        tags: transactionData.tags,
       })
     })
 
@@ -341,12 +342,13 @@ describe('TransactionService', () => {
         updatedAt: new Date(),
       }
 
-      mockTransactionRepository.create.mockResolvedValue(mockTransaction)
+      mockTransactionRepository.createMany.mockResolvedValue([mockTransaction])
 
       const result = await transactionService.createTransaction(mockUserId, fixedData)
 
       // Deve criar 12 transações (6 meses x 2 transações: débito e crédito)
-      expect(mockTransactionRepository.create).toHaveBeenCalledTimes(12)
+      expect(mockTransactionRepository.createMany.mock.calls[0][0]).toHaveLength(6)
+      expect(mockTransactionRepository.createMany.mock.calls[0][0][0].amount).toBe(-50)
       expect(result).toEqual(mockTransaction)
     })
   })
@@ -397,13 +399,15 @@ describe('TransactionService', () => {
         updatedAt: new Date(),
       }
 
-      mockTransactionRepository.create
-        .mockResolvedValueOnce(mockDebitTransaction)
-        .mockResolvedValueOnce(mockCreditTransaction)
+      mockTransactionRepository.createMany.mockResolvedValue([mockDebitTransaction, mockCreditTransaction])
 
       const result = await transactionService.createTransaction(mockUserId, transferData)
 
-      expect(mockTransactionRepository.create).toHaveBeenCalledTimes(2)
+      expect(mockTransactionRepository.createMany).toHaveBeenCalledTimes(1)
+      const pair = mockTransactionRepository.createMany.mock.calls[0][0]
+      expect(pair.map((t: any) => t.type)).toEqual(['TRANSFERENCIA','TRANSFERENCIA'])
+      expect(pair[0].amount + pair[1].amount).toBe(0)
+      expect(pair[0].transferGroupId).toBe(pair[1].transferGroupId)
       expect(result).toEqual(mockDebitTransaction)
     })
   })
@@ -558,7 +562,7 @@ describe('TransactionService', () => {
       ).rejects.toThrow('Transação conciliada não pode ser confirmada novamente')
     })
 
-    it('deve rejeitar confirmação de transação recorrente ativa', async () => {
+    it('deve permitir confirmação de uma ocorrência sem desativar a série', async () => {
       const transactionId = 'transaction-123'
       const mockTransaction = {
         id: transactionId,
@@ -570,9 +574,8 @@ describe('TransactionService', () => {
       mockTransactionRepository.findById.mockResolvedValue(mockTransaction)
       mockRecurrenceRepository.findById.mockResolvedValue({ id: 'recurrence-123', isActive: true })
 
-      await expect(
-        transactionService.confirmTransaction(mockUserId, transactionId)
-      ).rejects.toThrow('Não é possível confirmar uma transação recorrente ativa')
+      await transactionService.confirmTransaction(mockUserId, transactionId)
+      expect(mockTransactionRepository.update).toHaveBeenCalledWith(transactionId, mockUserId, expect.objectContaining({status:'CONFIRMADO'}))
     })
   })
 
@@ -653,7 +656,7 @@ describe('TransactionService', () => {
       expect(result.paymentDate).toBe('2026-05-20')
     })
 
-    it('deve rejeitar conciliação de transação recorrente ativa', async () => {
+    it('deve permitir conciliação de uma ocorrência sem desativar a série', async () => {
       const transactionId = 'transaction-123'
       const mockTransaction = {
         id: transactionId,
@@ -665,9 +668,8 @@ describe('TransactionService', () => {
       mockTransactionRepository.findById.mockResolvedValue(mockTransaction)
       mockRecurrenceRepository.findById.mockResolvedValue({ id: 'recurrence-123', isActive: true })
 
-      await expect(
-        transactionService.reconcileTransaction(mockUserId, transactionId)
-      ).rejects.toThrow('Não é possível conciliar uma transação recorrente ativa')
+      await transactionService.reconcileTransaction(mockUserId, transactionId)
+      expect(mockTransactionRepository.update).toHaveBeenCalledWith(transactionId, mockUserId, expect.objectContaining({status:'CONCILIADO'}))
     })
   })
 })

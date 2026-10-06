@@ -7,7 +7,7 @@
  * ✅ Revisado: Sim
  */
 
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/requestSupabase'
 
 export interface Investment {
   id: string
@@ -82,8 +82,9 @@ export class InvestmentService {
     name: string; type: string; ticker?: string; quantity: number
     averagePrice: number; currentPrice?: number; broker?: string; currency?: string
   }): Promise<Investment> {
+    if ([input.quantity,input.averagePrice,input.currentPrice ?? 0].some(v=>!Number.isFinite(v)||v<0)) throw new Error('Quantidade ou preço inválido')
     const totalInvested = input.quantity * input.averagePrice
-    const currentValue = input.currentPrice ? input.quantity * input.currentPrice : totalInvested
+    const currentValue = input.currentPrice !== undefined ? input.quantity * input.currentPrice : totalInvested
 
     const { data, error } = await supabase
       .from('investments').insert({
@@ -102,7 +103,16 @@ export class InvestmentService {
     name: string; type: string; ticker: string; quantity: number
     averagePrice: number; currentPrice: number; broker: string; isActive: boolean
   }>): Promise<Investment> {
-    const updateData: any = { updated_at: new Date().toISOString() }
+    const { data: current, error: currentError } = await supabase.from('investments')
+      .select('*').eq('id', id).eq('user_id', userId).single()
+    if (currentError) throw currentError
+    if (!current) throw new Error('Investimento não encontrado')
+    if ([input.quantity,input.averagePrice,input.currentPrice].some(v=>v!==undefined && (!Number.isFinite(v)||v<0))) throw new Error('Quantidade ou preço inválido')
+    const quantity = input.quantity ?? current.quantity
+    const averagePrice = input.averagePrice ?? current.average_price
+    const currentPrice = input.currentPrice ?? current.current_price ?? averagePrice
+    const updateData: any = { updated_at: new Date().toISOString(),
+      total_invested: quantity * averagePrice, current_value: quantity * currentPrice }
     if (input.name !== undefined) updateData.name = input.name
     if (input.type !== undefined) updateData.type = input.type
     if (input.ticker !== undefined) updateData.ticker = input.ticker

@@ -12,10 +12,10 @@ export async function POST(request: NextRequest) {
   return withAuth(request, async (req, user) => {
     try {
       const body = await req.json()
-      if (!Array.isArray(body.ids) || body.ids.length === 0) {
+      if (!body.accountId || !Array.isArray(body.matches) || body.matches.length === 0 || body.matches.length > 1000) {
         return NextResponse.json({ error: 'IDs são obrigatórios' }, { status: 400 })
       }
-      const result = await svc.confirmMatches(user.id, body.ids)
+      const result = await svc.confirmMatches(user.id, body.matches, body.accountId)
       return NextResponse.json(result)
     } catch (error: any) {
       return NextResponse.json({ error: error.message || 'Erro ao confirmar conciliação' }, { status: 500 })

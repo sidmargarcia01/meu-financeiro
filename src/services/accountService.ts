@@ -1,3 +1,4 @@
+import { signedAmount } from '@/lib/financial'
 /**
  * CAMADA: Service
  * MÓDULO: Account
@@ -173,13 +174,13 @@ export class AccountService {
     // Calcular saldo projetado (soma PENDENTE + CONFIRMADO + CONCILIADO)
     const projectedSum = await this.transactionRepository.sumByAccount(
       accountId,
-      ['PENDENTE', 'CONFIRMADO', 'CONCILIADO']
+      ['PENDENTE', 'CONFIRMADO', 'CONCILIADO'], account.initialBalanceDate?.toISOString().slice(0,10)
     )
 
     // Calcular saldo confirmado (soma apenas CONFIRMADO + CONCILIADO)
     const confirmedSum = await this.transactionRepository.sumByAccount(
       accountId,
-      ['CONFIRMADO', 'CONCILIADO']
+      ['CONFIRMADO', 'CONCILIADO'], account.initialBalanceDate?.toISOString().slice(0,10)
     )
 
     // Saldo inicial + somas
@@ -203,9 +204,7 @@ export class AccountService {
       throw new Error('Tipo da conta é obrigatório')
     }
 
-    if (data.initialBalance !== undefined && data.initialBalance < 0) {
-      throw new Error('Saldo inicial não pode ser negativo')
-    }
+    if (data.initialBalance !== undefined && !Number.isFinite(data.initialBalance)) throw new Error('Saldo inicial inválido')
 
     if (data.currency && data.currency.length !== 3) {
       throw new Error('Moeda deve ter 3 caracteres (ex: BRL, USD)')
@@ -216,12 +215,9 @@ export class AccountService {
     // Buscar plano do usuário
     const plan = await this.userRepository.getUserPlan(userId)
 
-    // Se não tem plano, é admin - sem limite
-    if (!plan || !plan.userLimit) {
-      return Number.MAX_SAFE_INTEGER
-    }
-
-    return plan.userLimit
+    // Account quota is independent of the number of users in a plan.
+    const limit = (plan?.features as any)?.accountLimit
+    return typeof limit === 'number' && limit >= 0 ? limit : Number.MAX_SAFE_INTEGER
   }
 
   /**
@@ -265,29 +261,31 @@ export class AccountService {
     const balances: Array<{ account_id: string; balance_until_previous_day: number }> = []
 
     for (const account of selectedAccounts) {
-      const initialBalance = account.initialBalance || 0
+      const baseDate = account.initialBalanceDate?.toISOString().slice(0,10)
+      const initialBalance = !baseDate || baseDate < date ? account.initialBalance || 0 : 0
 
       // Buscar transações CONFIRMADO/CONCILIADO até D-1 (due_date < date)
       const transactions = await this.transactionRepository.list(userId, {
         accountId: account.id,
-        endDate: date,  // <= date (o repository faz lte, precisamos de <)
+        endDate: date,
+        dateField: 'payment_date',
         status: undefined  // Não filtrar por status aqui, filtramos depois
       })
 
       // Filtrar só CONFIRMADO/CONCILIADO e data efetiva < date
       // Para CONCILIADO usar payment_date, para CONFIRMADO usar due_date
       const relevantTransactions = transactions.filter(t => {
-        const effectiveDate = t.status === 'CONCILIADO' && t.payment_date
+        const effectiveDate = t.status !== 'PENDENTE' && t.payment_date
           ? t.payment_date
           : t.due_date
-        return effectiveDate < date && (t.status === 'CONFIRMADO' || t.status === 'CONCILIADO')
+        return effectiveDate < date && (!baseDate || effectiveDate >= baseDate) && (t.status === 'CONFIRMADO' || t.status === 'CONCILIADO')
       })
 
       // Calcular saldo
       const transactionSum = relevantTransactions.reduce((sum, t) => {
         if (t.type === 'RECEITA') return sum + Math.abs(t.amount || 0)
         if (t.type === 'DESPESA') return sum - Math.abs(t.amount || 0)
-        return sum
+        return sum + signedAmount(t.type, t.amount)
       }, 0)
 
       const balanceUntilPreviousDay = initialBalance + transactionSum

@@ -11,6 +11,7 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
+import { useSavedCollection } from '@/hooks/useSavedCollection'
 import { useState, useEffect, useCallback } from 'react'
 import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableHead, TableRow,
@@ -31,8 +32,9 @@ const now = new Date()
 const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
 
 export default function MetasCentrosPage() {
+  const [realizados, setRealizados] = useState<Record<string, number>>({})
   const [centros, setCentros]   = useState<CostCenter[]>([])
-  const [metas, setMetas]       = useState<MetaCentro[]>([])
+  const [metas, setMetas, persistence] = useSavedCollection<MetaCentro>('metas-centros')
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
   const [open, setOpen]         = useState(false)
@@ -41,7 +43,20 @@ export default function MetasCentrosPage() {
   const loadCentros = useCallback(async () => {
     setLoading(true); setError(null)
     try {
-      const data = await fetch('/api/cost-centers').then(r => r.json())
+      const [centrosResponse, txResponse] = await Promise.all([fetch('/api/cost-centers'), fetch('/api/transactions?all=true&type=DESPESA&statuses=CONFIRMADO,CONCILIADO')])
+      if (!centrosResponse.ok || !txResponse.ok) throw new Error('Falha ao carregar dados')
+      const data = await centrosResponse.json()
+      const result = await txResponse.json()
+      const totals: Record<string,number> = {}
+      if (!Array.isArray(result)) throw new Error('Resposta de lançamentos inválida')
+      for (const tx of result) {
+        const center = tx.centerId || tx.center_id
+        const date = String(tx.paymentDate || tx.payment_date || tx.dueDate || tx.due_date).slice(0,10)
+        if (!center || tx.type !== 'DESPESA' || !['CONFIRMADO','CONCILIADO'].includes(tx.status)) continue
+        const key = center + ':' + date.slice(0,7)
+        totals[key] = (totals[key] || 0) + Math.abs(Number(tx.amount))
+      }
+      setRealizados(totals)
       setCentros(Array.isArray(data) ? data : [])
     } catch { setError('Erro ao carregar centros de custo.') }
     finally { setLoading(false) }
@@ -69,9 +84,11 @@ export default function MetasCentrosPage() {
 
   return (
     <Box sx={{ p: 3 }}>
+      {persistence.error && <Alert severity="error">{persistence.error}</Alert>}
+      {(!persistence.ready || persistence.saving) && <Alert severity="info">{persistence.saving ? "Salvando…" : "Carregando dados salvos…"}</Alert>}
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h5" fontWeight={700}>Metas por Centro de Custo</Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setOpen(true)}>Nova Meta</Button>
+        <Button disabled={!persistence.ready || persistence.saving} variant="contained" startIcon={<AddIcon />} onClick={() => setOpen(true)}>Nova Meta</Button>
       </Stack>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -86,7 +103,7 @@ export default function MetasCentrosPage() {
                 <TableCell sx={{ fontWeight: 700 }}>Centro de Custo</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Período</TableCell>
                 <TableCell sx={{ fontWeight: 700 }} align="right">Orçado</TableCell>
-                <TableCell sx={{ fontWeight: 700 }} align="right">Realizado</TableCell>
+                <TableCell sx={{ fontWeight: 700 }} align="right">Pago no mês</TableCell>
                 <TableCell sx={{ fontWeight: 700, minWidth: 180 }}>Progresso</TableCell>
                 <TableCell />
               </TableRow>
@@ -95,17 +112,18 @@ export default function MetasCentrosPage() {
               {metas.length === 0 ? (
                 <TableRow><TableCell colSpan={6} align="center" sx={{ py: 6 }}>
                   <Typography color="text.secondary">Nenhuma meta definida.</Typography>
-                  <Button variant="text" size="small" sx={{ mt: 1 }} onClick={() => setOpen(true)}>Criar primeira meta</Button>
+                  <Button disabled={!persistence.ready || persistence.saving} variant="text" size="small" sx={{ mt: 1 }} onClick={() => setOpen(true)}>Criar primeira meta</Button>
                 </TableCell></TableRow>
               ) : metas.map(m => {
-                const pct = m.valorMeta > 0 ? (m.valorRealizado / m.valorMeta) * 100 : 0
+                const realizado = realizados[m.centroId + ':' + m.ano + '-' + String(m.mes).padStart(2,'0')] || 0
+                const pct = m.valorMeta > 0 ? (realizado / m.valorMeta) * 100 : 0
                 const cor = pct >= 100 ? 'error' : pct >= 80 ? 'warning' : 'success'
                 return (
                   <TableRow key={m.id} hover>
                     <TableCell><Typography variant="body2" fontWeight={500}>{m.centroNome}</Typography></TableCell>
                     <TableCell><Typography variant="body2" color="text.secondary">{MESES[m.mes - 1]}/{m.ano}</Typography></TableCell>
                     <TableCell align="right" sx={{ fontWeight: 600 }}>{formatCurrency(m.valorMeta)}</TableCell>
-                    <TableCell align="right" sx={{ color: cor === 'error' ? 'error.main' : 'text.primary' }}>{formatCurrency(m.valorRealizado)}</TableCell>
+                    <TableCell align="right" sx={{ color: cor === 'error' ? 'error.main' : 'text.primary' }}>{formatCurrency(realizado)}</TableCell>
                     <TableCell sx={{ minWidth: 180 }}>
                       <Stack direction="row" alignItems="center" spacing={1}>
                         <LinearProgress variant="determinate" value={Math.min(pct, 100)} color={cor}
@@ -114,7 +132,7 @@ export default function MetasCentrosPage() {
                       </Stack>
                     </TableCell>
                     <TableCell align="right">
-                      <Tooltip title="Excluir"><IconButton size="small" color="error" onClick={() => handleDelete(m.id)}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
+                      <Tooltip title="Excluir"><IconButton disabled={!persistence.ready || persistence.saving} size="small" color="error" onClick={() => handleDelete(m.id)}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
                     </TableCell>
                   </TableRow>
                 )
@@ -153,8 +171,8 @@ export default function MetasCentrosPage() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpen(false)}>Cancelar</Button>
-          <Button variant="contained" onClick={handleSave} disabled={!form.centroId || form.valorMeta <= 0}>Salvar</Button>
+          <Button disabled={!persistence.ready || persistence.saving} onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button variant="contained" onClick={handleSave} disabled={!persistence.ready || persistence.saving || (!form.centroId || form.valorMeta <= 0)}>Salvar</Button>
         </DialogActions>
       </Dialog>
     </Box>
