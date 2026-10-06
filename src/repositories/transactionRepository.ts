@@ -62,7 +62,7 @@ export class TransactionRepository {
         is_recurring: data.isRecurring || false,
         attachment_url: data.attachmentUrl,
         notes: data.notes,
-        tags: data.tags,
+        tags: data.tags ?? [],
       })
       .select()
       .single()
@@ -138,7 +138,7 @@ export class TransactionRepository {
       is_recurring: t.isRecurring || false,
       attachment_url: t.attachmentUrl,
       notes: t.notes,
-      tags: t.tags,
+      tags: t.tags ?? [],
     }))
 
     const { data, error } = await supabase
