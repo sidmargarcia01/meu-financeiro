@@ -96,7 +96,8 @@ export class UserRepository {
           type,
           transaction_limit,
           user_limit,
-          storage_limit_mb
+          storage_limit_mb,
+          jsonb
         )
       `)
       .eq('id', userId)
@@ -112,7 +113,7 @@ export class UserRepository {
       transactionLimit: (data.plans as any).transaction_limit,
       userLimit: (data.plans as any).user_limit,
       storageLimitMb: (data.plans as any).storage_limit_mb,
-      features: (data.plans as any).features || {}
+      features: (data.plans as any).jsonb || {}
     }
   }
 
@@ -123,3 +124,4 @@ export class UserRepository {
     return Number(data || 0)
   }
 }
+

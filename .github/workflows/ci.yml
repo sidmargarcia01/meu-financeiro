@@ -30,6 +30,9 @@ jobs:
       - name: Database isolation checks
         run: npm run test:database
 
+      - name: Reject tracked credentials
+        run: node scripts/check-secrets.cjs
+
       - name: Type check
         run: npm run type-check
 
@@ -64,7 +67,7 @@ jobs:
             if curl -fsS http://127.0.0.1:3000/login > /dev/null; then break; fi
             sleep 1
           done
-          node scripts/smoke-financial.cjs
+          node scripts/smoke-financial.cjs || { tail -80 /tmp/meu-financeiro-server.log; exit 1; }
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -123,3 +126,4 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
+
