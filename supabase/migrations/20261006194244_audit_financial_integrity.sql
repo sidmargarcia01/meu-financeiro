@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS public.saved_collections (
 DO $$ DECLARE t text; p record; BEGIN
  FOREACH t IN ARRAY ARRAY['accounts','categories','contacts','cost_centers','payment_methods','projects','tags','transactions','users','recurrences','investments','saved_collections'] LOOP
   EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
-  EXECUTE format('REVOKE ALL ON public.%I FROM anon', t);
+  EXECUTE format('REVOKE ALL ON public.%I FROM anon,authenticated', t);
   FOR p IN SELECT policyname FROM pg_policies WHERE schemaname='public' AND tablename=t LOOP
    EXECUTE format('DROP POLICY %I ON public.%I', p.policyname,t);
   END LOOP;
@@ -124,3 +124,4 @@ LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $$
 $$;
 REVOKE EXECUTE ON FUNCTION public.get_my_storage_usage() FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.get_my_storage_usage() TO authenticated;
+
