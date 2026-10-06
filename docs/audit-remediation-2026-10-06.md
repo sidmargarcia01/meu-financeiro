@@ -27,6 +27,10 @@ Datas de pagamento ou competência ausentes nos registros antigos usam venciment
 
 ## Publicação e pendências
 
+O workflow antigo `deploy.yml` tentava publicar produção em eventos de pull request. A condição foi corrigida para permitir apenas push em develop; a execução seguinte confirmou o job ignorado em pull request. A tentativa inicial falhou antes do envio porque o CLI 25.1.0 estava obsoleto. Os workflows agora fixam Vercel CLI 62.5.0 e Node 24. O Next.js e seu pacote ESLint foram atualizados para 16.4.0 após o CI identificar alerta crítico na versão anterior.
+
+Após a atualização, `npm audit --audit-level=critical` passou, sem alertas críticos. Permanecem 57 alertas de dependências (38 altos, 18 moderados e 1 baixo), incluindo ferramentas de desenvolvimento e dependências transitivas. Esses alertas não foram desativados nem considerados resolvidos; precisam de análise de alcance e atualização própria. O conector Vercel desta sessão respondeu 403 para o projeto, portanto a promoção e a homologação autenticada não foram realizadas.
+
 1. Homologar o pacote com cópia anonimizada do esquema e autenticação Supabase de testes; verificar login, lançamento, confirmação, transferência, recorrência, conciliação e salvamento de metas.
 2. Preparar backup e janela de atualização para aplicar `supabase/migrations/20261006194244_audit_financial_integrity.sql` junto do novo servidor.
 3. Confirmar isolamento de usuários, privilégio anônimo, login e operações no ambiente publicado. Em rollback, manter RLS e usar versão compatível com autenticação por requisição; não restaurar acesso anônimo.

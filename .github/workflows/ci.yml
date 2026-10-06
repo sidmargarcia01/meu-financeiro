@@ -15,7 +15,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20.11.0'
+          node-version: '24'
           cache: 'npm'
 
       - name: Install dependencies
@@ -65,10 +65,12 @@ jobs:
       - name: Deploy to Vercel Preview
         uses: amondnet/vercel-action@v25
         with:
+          vercel-version: '62.5.0'
+          github-comment: false
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: '--scope meu-financeiro'
+          vercel-args: '--scope sidmargarcia01s-projects'
         continue-on-error: true
 
   deploy-production:
@@ -81,10 +83,12 @@ jobs:
       - name: Deploy to Vercel Production
         uses: amondnet/vercel-action@v25
         with:
+          vercel-version: '62.5.0'
+          github-comment: false
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: '--prod --scope meu-financeiro'
+          vercel-args: '--prod --scope sidmargarcia01s-projects'
           github-token: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
 
@@ -106,4 +110,3 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
-
