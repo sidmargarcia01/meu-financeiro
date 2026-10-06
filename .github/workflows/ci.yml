@@ -108,6 +108,25 @@ jobs:
           vercel-args: '--prod --scope sidmargarcia01s-projects'
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+  smoke-production:
+    needs: deploy-production
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - name: Validate published app and database isolation
+        run: node scripts/smoke-financial.cjs
+        env:
+          SMOKE_APP_URL: https://meu-financeiro-rouge.vercel.app
+          SMOKE_REQUIRE_RLS: 'true'
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
   security-scan:
     needs: quality
     runs-on: ubuntu-latest
@@ -126,4 +145,3 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
-

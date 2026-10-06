@@ -20,6 +20,17 @@ async function request(path, token, method='GET', body) {
  if (!url || !key || !service) throw new Error('Smoke requires Supabase URL, public key and server key');
  if (new URL(url).hostname !== 'ctjzuolergnrsrijvsjw.supabase.co') throw new Error('Unexpected Supabase project');
  const admin=createClient(url,service,{auth:{persistSession:false,autoRefreshToken:false}});
+ if(process.env.SMOKE_REQUIRE_RLS==='true'){
+  const publicClient=createClient(url,key,{auth:{persistSession:false}});
+  let ready=false;
+  for(let attempt=0;attempt<90;attempt++){
+   const probe=await publicClient.from('accounts').select('id').limit(0);
+   if(probe.error?.code==='42501'){ready=true;break;}
+   if(attempt===0)console.log('Waiting for coordinated database security migration');
+   await new Promise(resolve=>setTimeout(resolve,2000));
+  }
+  assert.ok(ready,'Database security migration is not active');
+ }
  try {
   for(let i=0;i<2;i++){
    const email=`audit-smoke-${randomUUID()}@example.invalid`, password=randomUUID()+'Aa1!';
