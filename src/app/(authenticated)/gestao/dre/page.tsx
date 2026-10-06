@@ -102,24 +102,24 @@ export default function DrePage() {
     { label: '(-) Despesas Variáveis', valor: -e.despesasVariaveis, pct: fmtPct(e.receitaLiquida > 0 ? -(e.despesasVariaveis / e.receitaLiquida) * 100 : null), destaque: false, tipo: 'deducao' },
     { label: 'Margem de Contribuição', valor: e.margemContribuicao, pct: fmtPct(e.margemContribuicaoPercent), destaque: true, tipo: 'subtotal' },
     { label: '(-) Despesas Fixas', valor: -e.despesasFixas, pct: fmtPct(e.receitaLiquida > 0 ? -(e.despesasFixas / e.receitaLiquida) * 100 : null), destaque: false, tipo: 'deducao' },
-    { label: 'Lucro Operacional Antes dos Investimentos (EBITDA)', valor: e.ebitda, pct: fmtPct(e.ebitdaPercent), destaque: true, tipo: 'subtotal' },
+    { label: 'Resultado operacional antes dos investimentos', valor: e.ebitda, pct: fmtPct(e.ebitdaPercent), destaque: true, tipo: 'subtotal' },
     { label: '(-) Investimentos', valor: -e.investimentos, pct: fmtPct(e.receitaLiquida > 0 ? -(e.investimentos / e.receitaLiquida) * 100 : null), destaque: false, tipo: 'deducao' },
     { label: 'Lucro Operacional', valor: e.lucroOperacional, pct: fmtPct(e.receitaLiquida > 0 ? (e.lucroOperacional / e.receitaLiquida) * 100 : null), destaque: true, tipo: 'subtotal' },
     { label: '(+) Receitas Não Operacionais', valor: e.receitasNaoOperacionais, pct: '', destaque: false, tipo: 'receita' },
     { label: '(-) Despesas Não Operacionais', valor: -e.despesasNaoOperacionais, pct: '', destaque: false, tipo: 'deducao' },
-    { label: 'Resultado antes do IR (EBT)', valor: e.resultadoAntesIR, pct: '', destaque: true, tipo: 'subtotal' },
+    { label: 'Resultado gerencial antes dos impostos', valor: e.resultadoAntesIR, pct: '', destaque: true, tipo: 'subtotal' },
     { label: '(-) Impostos sobre Lucros', valor: -e.impostosLucro, pct: '', destaque: false, tipo: 'deducao' },
     { label: '(-) Distribuição de Lucros', valor: -e.distribuicaoLucros, pct: '', destaque: false, tipo: 'deducao' },
-    { label: 'RESULTADO LÍQUIDO', valor: e.resultadoLiquido, pct: fmtPct(e.margemLiquidaPercent), destaque: true, tipo: 'total' },
+    { label: 'RESULTADO APÓS INVESTIMENTOS E DISTRIBUIÇÕES', valor: e.resultadoLiquido, pct: fmtPct(e.margemLiquidaPercent), destaque: true, tipo: 'total' },
   ] : []
 
   return (
     <Box sx={{ p: 3 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
         <Box>
-          <Typography variant="h5" fontWeight={700}>DRE — Demonstrativo de Resultado</Typography>
+          <Typography variant="h5" fontWeight={700}>Demonstrativo Gerencial</Typography>
           <Typography variant="caption" color="text.secondary">
-            Estrutura gerencial com Margem Bruta, Margem de Contribuição e EBITDA
+            Relatório gerencial: investimentos e distribuições reduzem o resultado apresentado. Datas ausentes usam o vencimento.
           </Typography>
         </Box>
         <Tooltip title="Atualizar"><IconButton onClick={fetchDRE} disabled={loading}><RefreshIcon /></IconButton></Tooltip>
@@ -146,8 +146,8 @@ export default function DrePage() {
           {[
             { label: 'Receita Operacional Bruta', value: e.receitasOperacionais, color: 'success.main' },
             { label: 'Margem Bruta', value: e.margemBruta, color: e.margemBruta >= 0 ? 'primary.main' : 'error.main', extra: fmtPct(e.margemBrutaPercent) },
-            { label: 'EBITDA', value: e.ebitda, color: e.ebitda >= 0 ? 'primary.main' : 'error.main', extra: fmtPct(e.ebitdaPercent) },
-            { label: 'Resultado Líquido', value: e.resultadoLiquido, color: e.resultadoLiquido >= 0 ? 'primary.main' : 'warning.main', extra: fmtPct(e.margemLiquidaPercent) },
+            { label: 'Resultado operacional gerencial', value: e.ebitda, color: e.ebitda >= 0 ? 'primary.main' : 'error.main', extra: fmtPct(e.ebitdaPercent) },
+            { label: 'Resultado gerencial', value: e.resultadoLiquido, color: e.resultadoLiquido >= 0 ? 'primary.main' : 'warning.main', extra: fmtPct(e.margemLiquidaPercent) },
           ].map(c => (
             <Card key={c.label} sx={{ flex: 1 }}>
               <CardContent sx={{ pb: '12px !important' }}>

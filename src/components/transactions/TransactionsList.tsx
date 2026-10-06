@@ -50,7 +50,7 @@ export function TransactionsList({
         <p className="text-sm text-slate-500 max-w-xs">
           Não há lançamentos para o período selecionado.
           <br />
-          Clique em "Novo" para adicionar.
+          Clique em &quot;Novo&quot; para adicionar.
         </p>
       </div>
     )

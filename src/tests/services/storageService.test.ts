@@ -35,7 +35,7 @@ describe('storageService', () => {
         storageLimitMb: 50
       })
       
-      mockUserRepository.getStorageUsage.mockResolvedValue(25.5)
+      mockUserRepository.getStorageUsage.mockResolvedValue(25.5 * 1024 * 1024)
 
       const result = await storageService.getStorageUsage(mockUserId)
 
@@ -47,14 +47,14 @@ describe('storageService', () => {
       })
     })
 
-    it('deve retornar sem limite para admin', async () => {
+    it('deve negar cota de upload quando não há plano', async () => {
       mockUserRepository.getUserPlan.mockResolvedValue(null)
-      mockUserRepository.getStorageUsage.mockResolvedValue(1000)
+      mockUserRepository.getStorageUsage.mockResolvedValue(1000 * 1024 * 1024)
 
       const result = await storageService.getStorageUsage(mockUserId)
 
-      expect(result.limitMb).toBe(Number.MAX_SAFE_INTEGER)
-      expect(result.availableMb).toBe(Number.MAX_SAFE_INTEGER - 1000)
+      expect(result.limitMb).toBe(0)
+      expect(result.availableMb).toBe(0)
       expect(result.usagePercent).toBe(0)
     })
   })
@@ -64,7 +64,7 @@ describe('storageService', () => {
       mockUserRepository.getUserPlan.mockResolvedValue({
         storageLimitMb: 50
       })
-      mockUserRepository.getStorageUsage.mockResolvedValue(25)
+      mockUserRepository.getStorageUsage.mockResolvedValue(25 * 1024 * 1024)
 
       const canUpload = await storageService.canUpload(mockUserId, 5 * 1024 * 1024) // 5MB
 
@@ -75,7 +75,7 @@ describe('storageService', () => {
       mockUserRepository.getUserPlan.mockResolvedValue({
         storageLimitMb: 50
       })
-      mockUserRepository.getStorageUsage.mockResolvedValue(48)
+      mockUserRepository.getStorageUsage.mockResolvedValue(48 * 1024 * 1024)
 
       const canUpload = await storageService.canUpload(mockUserId, 5 * 1024 * 1024) // 5MB
 
@@ -88,7 +88,7 @@ describe('storageService', () => {
       mockUserRepository.getUserPlan.mockResolvedValue({
         storageLimitMb: 50
       })
-      mockUserRepository.getStorageUsage.mockResolvedValue(25)
+      mockUserRepository.getStorageUsage.mockResolvedValue(25 * 1024 * 1024)
 
       const result = await storageService.validateAttachmentUpload(
         mockUserId, 
@@ -126,7 +126,7 @@ describe('storageService', () => {
       mockUserRepository.getUserPlan.mockResolvedValue({
         storageLimitMb: 50
       })
-      mockUserRepository.getStorageUsage.mockResolvedValue(48)
+      mockUserRepository.getStorageUsage.mockResolvedValue(48 * 1024 * 1024)
 
       const result = await storageService.validateAttachmentUpload(
         mockUserId, 

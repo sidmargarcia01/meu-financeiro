@@ -10,6 +10,7 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
+import { useSavedCollection } from '@/hooks/useSavedCollection'
 import { useState } from 'react'
 import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableHead, TableRow,
@@ -27,10 +28,7 @@ interface Cenario {
 const EMPTY = { nome: '', descricao: '', receitas: 0, despesas: 0, metaEconomia: 0 }
 
 export default function PlanejamentoPage() {
-  const [cenarios, setCenarios] = useState<Cenario[]>([
-    { id: '1', nome: 'Cenário Base', descricao: 'Projeção conservadora', receitas: 5000, despesas: 3200, metaEconomia: 1800 },
-    { id: '2', nome: 'Cenário Otimista', descricao: 'Com aumento de receitas', receitas: 6500, despesas: 3500, metaEconomia: 3000 },
-  ])
+  const [cenarios, setCenarios, persistence] = useSavedCollection<Cenario>('planejamento')
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState(EMPTY)
   const [editId, setEditId] = useState<string | null>(null)
@@ -55,9 +53,11 @@ export default function PlanejamentoPage() {
 
   return (
     <Box sx={{ p: 3 }}>
+      {persistence.error && <Alert severity="error">{persistence.error}</Alert>}
+      {(!persistence.ready || persistence.saving) && <Alert severity="info">{persistence.saving ? "Salvando…" : "Carregando dados salvos…"}</Alert>}
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h5" fontWeight={700}>Planejamento Financeiro</Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={openNew}>Novo Cenário</Button>
+        <Button disabled={!persistence.ready || persistence.saving} variant="contained" startIcon={<AddIcon />} onClick={openNew}>Novo Cenário</Button>
       </Stack>
 
       <Paper>
@@ -77,7 +77,7 @@ export default function PlanejamentoPage() {
             {cenarios.length === 0 ? (
               <TableRow><TableCell colSpan={7} align="center" sx={{ py: 6 }}>
                 <Typography color="text.secondary">Nenhum cenário criado.</Typography>
-                <Button variant="text" size="small" sx={{ mt: 1 }} onClick={openNew}>Criar primeiro cenário</Button>
+                <Button disabled={!persistence.ready || persistence.saving} variant="text" size="small" sx={{ mt: 1 }} onClick={openNew}>Criar primeiro cenário</Button>
               </TableCell></TableRow>
             ) : cenarios.map(c => {
               const pct = c.receitas > 0 ? (c.metaEconomia / c.receitas) * 100 : 0
@@ -100,8 +100,8 @@ export default function PlanejamentoPage() {
                     <LinearProgress variant="determinate" value={Math.min(pct, 100)} color={cor} sx={{ height: 8, borderRadius: 4 }} />
                   </TableCell>
                   <TableCell align="right">
-                    <Tooltip title="Editar"><IconButton size="small" onClick={() => openEdit(c)}><EditIcon fontSize="small" /></IconButton></Tooltip>
-                    <Tooltip title="Excluir"><IconButton size="small" color="error" onClick={() => handleDelete(c.id)}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
+                    <Tooltip title="Editar"><IconButton disabled={!persistence.ready || persistence.saving} size="small" onClick={() => openEdit(c)}><EditIcon fontSize="small" /></IconButton></Tooltip>
+                    <Tooltip title="Excluir"><IconButton disabled={!persistence.ready || persistence.saving} size="small" color="error" onClick={() => handleDelete(c.id)}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
                   </TableCell>
                 </TableRow>
               )
@@ -122,8 +122,8 @@ export default function PlanejamentoPage() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpen(false)}>Cancelar</Button>
-          <Button variant="contained" onClick={handleSave} disabled={!form.nome.trim()}>Salvar</Button>
+          <Button disabled={!persistence.ready || persistence.saving} onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button variant="contained" onClick={handleSave} disabled={!persistence.ready || persistence.saving || (!form.nome.trim())}>Salvar</Button>
         </DialogActions>
       </Dialog>
     </Box>

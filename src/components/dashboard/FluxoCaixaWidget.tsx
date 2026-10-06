@@ -125,7 +125,7 @@ export function FluxoCaixaWidget({ className }: FluxoCaixaWidgetProps) {
   const maxValue = getMaxValue()
 
   // Componente de gráfico simplificado
-  const SimpleChart = () => (
+  const renderSimpleChart = () => (
     <Box height={200} position="relative" px={2}>
       {/* Linha do zero */}
       <Box
@@ -221,7 +221,7 @@ export function FluxoCaixaWidget({ className }: FluxoCaixaWidgetProps) {
         </Box>
 
         {/* Gráfico */}
-        <SimpleChart />
+        {renderSimpleChart()}
 
         {/* Resumo dos valores */}
         <Box mt={3}>

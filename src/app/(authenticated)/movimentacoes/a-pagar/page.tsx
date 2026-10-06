@@ -58,7 +58,7 @@ export default function APagarPage() {
     setLoading(true)
     setError(null)
     try {
-      const params = new URLSearchParams({ status: 'PENDENTE', limit: '100' })
+      const params = new URLSearchParams({ status: 'PENDENTE', all: 'true' })
       if (filterType) params.set('type', filterType)
       if (searchTerm) params.set('search', searchTerm)
       if (filterDate) {
@@ -87,18 +87,19 @@ export default function APagarPage() {
   const handleConfirm = async (id: string) => {
     setConfirming(id)
     try {
-      await fetch(`/api/transactions/${id}`, {
+      const response = await fetch(`/api/transactions/${id}?action=confirm`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'CONFIRMADO' }),
       })
+      if (!response.ok) throw new Error((await response.json()).error || 'Não foi possível confirmar')
       fetchTransactions()
-    } finally {
+    } catch (e: any) { setError(e.message) } finally {
       setConfirming(null)
     }
   }
 
-  const totalPagar = transactions.filter(t => t.type === 'DESPESA').reduce((s, t) => s + t.amount, 0)
+  const totalPagar = transactions.filter(t => t.type === 'DESPESA').reduce((s, t) => s + Math.abs(t.amount), 0)
   const totalReceber = transactions.filter(t => t.type === 'RECEITA').reduce((s, t) => s + t.amount, 0)
   const totalVencidas = transactions.filter(t => isOverdue(t.due_date)).length
 

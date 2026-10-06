@@ -1,3 +1,5 @@
+import { queryAll } from '@/lib/queryAll'
+import { signedAmount } from '@/lib/financial'
 /**
  * CAMADA: Repository
  * MÓDULO: Transaction
@@ -6,7 +8,7 @@
  * DEPENDE DE: Supabase, Transaction models
  */
 
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/requestSupabase'
 import {
   Transaction,
   TransactionWithRelations,
@@ -20,11 +22,12 @@ export class TransactionRepository {
   async create(data: {
     userId: string
     accountId?: string
-    categoryId?: string
+    categoryId?: string | null
+    transferGroupId?: string
     recurrenceId?: string
-    centerId?: string
-    projectId?: string
-    contactId?: string
+    centerId?: string | null
+    projectId?: string | null
+    contactId?: string | null
     description: string
     amount: number
     type: 'RECEITA' | 'DESPESA' | 'TRANSFERENCIA'
@@ -34,8 +37,9 @@ export class TransactionRepository {
     competenceDate?: Date
     regime?: 'CAIXA' | 'COMPETENCIA'
     isRecurring?: boolean
+    tags?: string[]
     attachmentUrl?: string
-    notes?: string
+    notes?: string | null
   }): Promise<Transaction> {
     const { data: transaction, error } = await supabase
       .from('transactions')
@@ -58,6 +62,7 @@ export class TransactionRepository {
         is_recurring: data.isRecurring || false,
         attachment_url: data.attachmentUrl,
         notes: data.notes,
+        tags: data.tags,
       })
       .select()
       .single()
@@ -70,6 +75,7 @@ export class TransactionRepository {
       accountId: transaction.account_id,
       categoryId: transaction.category_id,
       recurrenceId: transaction.recurrence_id,
+      transferGroupId: transaction.transfer_group_id,
       centerId: transaction.center_id,
       projectId: transaction.project_id,
       contactId: transaction.contact_id,
@@ -93,11 +99,12 @@ export class TransactionRepository {
   async createMany(transactions: {
     userId: string
     accountId?: string
-    categoryId?: string
+    categoryId?: string | null
+    transferGroupId?: string
     recurrenceId?: string
-    centerId?: string
-    projectId?: string
-    contactId?: string
+    centerId?: string | null
+    projectId?: string | null
+    contactId?: string | null
     description: string
     amount: number
     type: 'RECEITA' | 'DESPESA' | 'TRANSFERENCIA'
@@ -107,14 +114,16 @@ export class TransactionRepository {
     competenceDate?: Date
     regime?: 'CAIXA' | 'COMPETENCIA'
     isRecurring?: boolean
+    tags?: string[]
     attachmentUrl?: string
-    notes?: string
+    notes?: string | null
   }[]): Promise<Transaction[]> {
     const transactionsToInsert = transactions.map(t => ({
       user_id: t.userId,
       account_id: t.accountId,
       category_id: t.categoryId,
       recurrence_id: t.recurrenceId,
+      transfer_group_id: t.transferGroupId,
       center_id: t.centerId,
       project_id: t.projectId,
       contact_id: t.contactId,
@@ -129,6 +138,7 @@ export class TransactionRepository {
       is_recurring: t.isRecurring || false,
       attachment_url: t.attachmentUrl,
       notes: t.notes,
+      tags: t.tags,
     }))
 
     const { data, error } = await supabase
@@ -144,6 +154,7 @@ export class TransactionRepository {
       accountId: transaction.account_id,
       categoryId: transaction.category_id,
       recurrenceId: transaction.recurrence_id,
+      transferGroupId: transaction.transfer_group_id,
       centerId: transaction.center_id,
       projectId: transaction.project_id,
       contactId: transaction.contact_id,
@@ -181,16 +192,16 @@ export class TransactionRepository {
     startDate?: string
     endDate?: string
     accountId?: string
-    categoryId?: string
+    categoryId?: string | null
     type?: string
     status?: string
     statuses?: string[]
     search?: string
-    dateField?: 'due_date' | 'competence_date' | 'payment_date'
+    dateField?: 'due_date' | 'competence_date' | 'payment_date' | 'effective_cash_date' | 'effective_competence_date'
     limit?: number
     page?: number
   }): Promise<any[]> {
-    const dateField = filters?.dateField || 'due_date'
+    const dateField = filters?.dateField === 'payment_date' ? 'effective_cash_date' : filters?.dateField === 'competence_date' ? 'effective_competence_date' : filters?.dateField || 'due_date'
 
     // Buscar transações
     let query = supabase
@@ -209,7 +220,9 @@ export class TransactionRepository {
       query = query.eq('account_id', filters.accountId)
     }
     if (filters?.categoryId) {
-      query = query.eq('category_id', filters.categoryId)
+      const { data: children, error: childError } = await supabase.from('categories').select('id').eq('user_id', userId).eq('parent_id', filters.categoryId)
+      if (childError) throw childError
+      query = query.in('category_id', [filters.categoryId, ...(children || []).map(c => c.id)])
     }
     if (filters?.type) {
       query = query.eq('type', filters.type)
@@ -224,10 +237,11 @@ export class TransactionRepository {
       query = query.ilike('description', `%${filters.search}%`)
     }
     if (filters?.limit) {
-      query = query.limit(filters.limit)
+      const offset = ((filters.page ?? 1) - 1) * filters.limit
+      query = query.range(offset, offset + filters.limit - 1)
     }
 
-    const { data: transactions, error } = await query
+    const { data: transactions, error } = filters?.limit ? await query : await queryAll(query)
     if (error) throw error
 
     if (!transactions || transactions.length === 0) return []
@@ -242,13 +256,15 @@ export class TransactionRepository {
         ? supabase.from('accounts').select('id, name').in('id', accountIds)
         : Promise.resolve({ data: [] }),
       categoryIds.length > 0
-        ? supabase.from('categories').select('id, name, dre_group').in('id', categoryIds)
+        ? supabase.from('categories').select('id, name, dre_group, parent_id').eq('user_id', userId)
         : Promise.resolve({ data: [] }),
     ])
 
     const accountsMap = new Map((accountsRes.data || []).map((a: any) => [a.id, a.name]))
     const categoriesMap = new Map((categoriesRes.data || []).map((c: any) => [c.id, c.name]))
-    const dreGroupMap = new Map((categoriesRes.data || []).map((c: any) => [c.id, c.dre_group]))
+    const categoryRows = categoriesRes.data || []
+    const categoryById = new Map(categoryRows.map((c: any) => [c.id, c]))
+    const dreGroupMap = new Map(categoryRows.map((c: any) => [c.id, (categoryById.get(c.parent_id) as any)?.dre_group ?? c.dre_group]))
 
     return transactions.map((t: any) => ({
       ...t,
@@ -262,64 +278,23 @@ export class TransactionRepository {
 
   // Buscar saldos por conta
   async getBalancesByAccount(userId: string): Promise<AccountBalance[]> {
-    // Buscar TODAS as transações para calcular saldo projetado
-    const { data: allTransactions, error: errorAll } = await supabase
-      .from('transactions')
-      .select('account_id, status, amount, type')
-      .eq('user_id', userId)
+    const { accountRepository } = await import('@/repositories/accountRepository')
+    const accounts = await accountRepository.listWithBalances(userId)
+    return accounts.map(a => ({ accountId: a.id, accountName: a.name,
+      projectedBalance: a.projectedBalance, confirmedBalance: a.confirmedBalance }))
+  }
 
-    if (errorAll) throw errorAll
+  async deleteTransfer(groupId: string, userId: string) {
+    const { error } = await supabase.from('transactions').delete().eq('user_id', userId).eq('transfer_group_id', groupId)
+    if (error) throw error
+  }
 
-    // Buscar apenas CONCILIADO para calcular saldo confirmado (reconciliado com extrato)
-    const { data: confirmedTransactions, error: errorConfirmed } = await supabase
-      .from('transactions')
-      .select('account_id, status, amount, type')
-      .eq('user_id', userId)
-      .eq('status', 'CONCILIADO')
-
-    if (errorConfirmed) throw errorConfirmed
-
-    const transactions = allTransactions || []
-    const confirmedTxs = confirmedTransactions || []
-
-    if (transactions.length === 0) return []
-
-    const accountIds = [...new Set(transactions.map((t: any) => t.account_id).filter(Boolean))]
-    const { data: accountsData } = accountIds.length > 0
-      ? await supabase.from('accounts').select('id, name').in('id', accountIds)
-      : { data: [] }
-
-    const accountsMap = new Map((accountsData || []).map((a: any) => [a.id, a.name]))
-
-    const balances: { [key: string]: AccountBalance } = {}
-
-    // Inicializa todas as contas
-    accountIds.forEach((accountId: string) => {
-      const accountName = accountsMap.get(accountId) || '—'
-      balances[accountId] = {
-        accountId,
-        accountName,
-        confirmedBalance: 0,
-        projectedBalance: 0,
-      }
-    })
-
-    // Impacto: usa valor direto do banco (receitas positivas, despesas negativas)
-    const impact = (t: any): number => Number(t.amount) || 0
-
-    // Projetado = todas as transações
-    transactions.forEach((transaction: any) => {
-      const accountId = transaction.account_id
-      balances[accountId].projectedBalance += impact(transaction)
-    })
-
-    // Confirmado = apenas CONCILIADO
-    confirmedTxs.forEach((transaction: any) => {
-      const accountId = transaction.account_id
-      balances[accountId].confirmedBalance += impact(transaction)
-    })
-
-    return Object.values(balances)
+  async reconcileTransfer(groupId: string, userId: string, paymentDate: string) {
+    const { data, error } = await supabase.from('transactions')
+      .update({ status: 'CONCILIADO', payment_date: paymentDate, updated_at: new Date().toISOString() })
+      .eq('user_id', userId).eq('transfer_group_id', groupId).select()
+    if (error) throw error
+    return data?.[0]
   }
 
   // Atualizar transação
@@ -329,16 +304,17 @@ export class TransactionRepository {
     type: 'RECEITA' | 'DESPESA' | 'TRANSFERENCIA'
     dueDate: string
     paymentDate?: string
-    competenceDate?: string
+    competenceDate?: string | null
     regime?: 'CAIXA' | 'COMPETENCIA'
     accountId?: string
-    categoryId?: string
-    centerId?: string
-    projectId?: string
-    contactId?: string
+    categoryId?: string | null
+    centerId?: string | null
+    projectId?: string | null
+    contactId?: string | null
     status?: 'PENDENTE' | 'CONFIRMADO' | 'CONCILIADO'
+    tags?: string[]
     attachmentUrl?: string
-    notes?: string
+    notes?: string | null
   }>) {
     const { data: transaction, error } = await supabase
       .from('transactions')
@@ -439,6 +415,7 @@ export class TransactionRepository {
       accountId: data.account_id,
       categoryId: data.category_id,
       recurrenceId: data.recurrence_id,
+      transferGroupId: data.transfer_group_id,
       centerId: data.center_id,
       projectId: data.project_id,
       contactId: data.contact_id,
@@ -485,25 +462,25 @@ export class TransactionRepository {
 
   // Somar valores por conta e status
   // eslint-disable-next-line prefer-const
-  async sumByAccount(accountId: string, statusFilter?: string[]): Promise<number> {
+  async sumByAccount(accountId: string, statusFilter?: string[], openingDate?: string): Promise<number> {
     let query = supabase
       .from('transactions')
-      .select('amount, type')
+      .select('amount, type, status, due_date, payment_date')
       .eq('account_id', accountId)
 
     if (statusFilter && statusFilter.length > 0) {
       query = query.in('status', statusFilter)
     }
 
-    const { data, error } = await query
+    const { data, error } = await queryAll(query)
 
     if (error) throw error
 
     if (!data || data.length === 0) return 0
 
-    return data.reduce((sum, transaction) => {
+    return data.filter(t => !openingDate || (t.status === 'PENDENTE' ? t.due_date : t.payment_date || t.due_date) >= openingDate).reduce((sum, transaction) => {
       // Soma direta: receitas são positivas, despesas são negativas no banco
-      return sum + Number(transaction.amount)
+      return sum + signedAmount(transaction.type, transaction.amount)
     }, 0)
   }
 
@@ -559,6 +536,7 @@ export class TransactionRepository {
       accountId: transaction.account_id,
       categoryId: transaction.category_id,
       recurrenceId: transaction.recurrence_id,
+      transferGroupId: transaction.transfer_group_id,
       centerId: transaction.center_id,
       projectId: transaction.project_id,
       contactId: transaction.contact_id,
@@ -653,7 +631,7 @@ export class TransactionRepository {
     const startDate = new Date(filters.ano, filters.mes - 1, 1)
     const endDate = new Date(filters.ano, filters.mes, 0)
 
-    const { data, error } = await supabase
+    const { data, error } = await queryAll(supabase
       .from('transactions')
       .select(`
         categories!inner(id, name),
@@ -663,7 +641,7 @@ export class TransactionRepository {
       .eq('type', filters.type)
       .gte('due_date', startDate.toISOString().split('T')[0])
       .lte('due_date', endDate.toISOString().split('T')[0])
-      .not('category_id', 'is', null)
+      .not('category_id', 'is', null))
 
     if (error) throw error
 
@@ -701,12 +679,12 @@ export class TransactionRepository {
     const startDate = new Date(year, month - 1, 1)
     const endDate = new Date(year, month, 0)
 
-    const { data, error } = await supabase
+    const { data, error } = await queryAll(supabase
       .from('transactions')
       .select('amount, type')
       .eq('user_id', userId)
       .gte('due_date', startDate.toISOString().split('T')[0])
-      .lte('due_date', endDate.toISOString().split('T')[0])
+      .lte('due_date', endDate.toISOString().split('T')[0]))
 
     if (error) throw error
 
@@ -736,13 +714,13 @@ export class TransactionRepository {
     inicio: string,
     fim: string,
     statusFilter: string[],
-    dateField: 'due_date' | 'competence_date' = 'due_date'
+    dateField: 'due_date' | 'competence_date' | 'payment_date' | 'effective_cash_date' | 'effective_competence_date' = 'due_date'
   ): Promise<any[]> {
-    const { data, error } = await supabase
+    const { data, error } = await queryAll(supabase
       .from('transactions')
       .select(`
         id, description, amount, type, status,
-        due_date, competence_date, payment_date,
+        due_date, competence_date, payment_date, effective_cash_date, effective_competence_date,
         categories(id, name, type, parent_id, dre_group)
       `)
       .eq('user_id', userId)
@@ -750,7 +728,7 @@ export class TransactionRepository {
       .in('status', statusFilter)
       .gte(dateField, inicio)
       .lte(dateField, fim)
-      .order(dateField)
+      .order(dateField))
 
     if (error) throw error
     return data || []
@@ -762,19 +740,14 @@ export class TransactionRepository {
    * NÃO DEVE: Filtrar por conta ou categoria — mantém total do usuário
    */
   async sumConfirmedBefore(userId: string, date: string): Promise<number> {
-    const { data, error } = await supabase
-      .from('transactions')
-      .select('amount, type')
-      .eq('user_id', userId)
-      .in('status', ['CONFIRMADO', 'CONCILIADO'])
-      .lt('due_date', date)
-
-    if (error) throw error
-
-    return (data || []).reduce((sum, t) => {
-      const abs = Math.abs(Number(t.amount) || 0)
-      return sum + (t.type === 'RECEITA' ? abs : -abs)
-    }, 0)
+    const [{data: rows,error},{data: accounts,error: accountError}] = await Promise.all([
+      queryAll(supabase.from('transactions').select('account_id,amount,type,effective_cash_date').eq('user_id',userId).in('status',['CONFIRMADO','CONCILIADO']).lt('effective_cash_date',date)),
+      queryAll(supabase.from('accounts').select('id,initial_balance_date').eq('user_id',userId)),
+    ])
+    if (error || accountError) throw error || accountError
+    const bases = new Map(accounts.map(a => [a.id,a.initial_balance_date]))
+    return rows.filter(t => !bases.get(t.account_id) || t.effective_cash_date >= bases.get(t.account_id))
+      .reduce((sum,t) => sum + signedAmount(t.type,t.amount),0)
   }
 }
 

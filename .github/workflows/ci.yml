@@ -21,6 +21,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Audit regressions
+        run: npm run test:audit
+
+      - name: Database isolation checks
+        run: npm run test:database
+
       - name: Type check
         run: npm run type-check
 

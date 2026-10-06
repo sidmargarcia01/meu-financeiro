@@ -6,14 +6,16 @@
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint src --quiet",
     "type-check": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "test:audit": "node scripts/audit-regressions.cjs",
+    "test:database": "node scripts/test-migration.cjs"
   },
   "dependencies": {
     "@emotion/cache": "^11.14.0",
@@ -50,6 +52,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "@tanstack/react-query-devtools": "^5.96.2",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",

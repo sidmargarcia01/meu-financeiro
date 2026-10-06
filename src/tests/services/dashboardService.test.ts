@@ -50,7 +50,11 @@ const mockSumByAccount = (accountId: string, statusFilter?: string[]) => {
 }
 
 describe('dashboardService', () => {
-  beforeEach(() => jest.clearAllMocks())
+  beforeEach(() => { jest.clearAllMocks(); mockAccountRepository.listWithBalances.mockResolvedValue(mockAccounts.map(a => ({
+    ...a, initialBalance: a.initial_balance, userId: 'user-id', isActive: true, createdAt: new Date(),
+    projectedBalance: a.initial_balance + mockTransactionSums.projected,
+    confirmedBalance: a.initial_balance + mockTransactionSums.confirmed, currentBalance: 0,
+  })) as any) })
 
   // ─── WIDGET 1: SALDO CONSOLIDADO ───────────────────────────────────────────
 

@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+import { signedAmount as financialAmount, addMonthsClamped, splitCents, todayInBrazil } from '@/lib/financial'
 /**
  * CAMADA: Service
  * MÓDULO: Transaction
@@ -34,7 +36,7 @@ export class TransactionService {
     this.validateTransactionData(data)
 
     // Verificar limites do plano
-    await this.checkPlanLimits(userId)
+    // Batch checks below use the due month of each generated entry.
 
     // Processar recorrências se houver
     if (data.isRecurring && data.recurrenceData) {
@@ -54,13 +56,14 @@ export class TransactionService {
     // A cor do ponto sera determinada por getStatusDotColor baseado na data
     const autoStatus = data.status || 'PENDENTE'
 
+    await this.checkBatchLimits(userId, [new Date(data.dueDate)])
     return this.transactionRepository.create({
       userId,
       description: data.description,
       amount: signedAmount,
       type: data.type,
       dueDate: new Date(data.dueDate),
-      paymentDate: data.paymentDate ? new Date(data.paymentDate) : undefined,
+      paymentDate: data.paymentDate ? new Date(data.paymentDate) : (autoStatus !== 'PENDENTE' ? new Date(data.dueDate) : undefined),
       competenceDate: data.competenceDate ? new Date(data.competenceDate) : undefined,
       regime: data.regime || 'CAIXA',
       accountId: data.accountId,
@@ -72,6 +75,7 @@ export class TransactionService {
       isRecurring: data.isRecurring || false,
       attachmentUrl: data.attachmentUrl,
       notes: data.notes,
+      tags: data.tags,
     })
   }
 
@@ -86,13 +90,8 @@ export class TransactionService {
       throw new Error('Transação não encontrada')
     }
 
-    // Verificar se é uma transação recorrente
-    if (transaction.recurrenceId) {
-      const recurrence = await this.recurrenceRepository.findById(transaction.recurrenceId, userId)
-      if (recurrence && recurrence.isActive) {
-        throw new Error('Não é possível editar uma transação recorrente ativa. Desative a recorrência primeiro.')
-      }
-    }
+
+    if (transaction.type === 'TRANSFERENCIA') throw new Error('Para corrigir uma transferência, exclua o par e crie novamente.')
 
     // Validações de negócio
     if (data.amount !== undefined) {
@@ -153,7 +152,7 @@ export class TransactionService {
 
     // Aplica sinal ao amount: DESPESA=negativo, outros=positivo
     // Usa o tipo da atualização ou o tipo atual da transação
-    let signedAmount = data.amount
+    let signedAmount = data.amount ?? (data.type ? Math.abs(transaction.amount) : undefined)
     if (signedAmount !== undefined) {
       const effectiveType = data.type ?? transaction.type
       signedAmount = effectiveType === 'DESPESA'
@@ -177,6 +176,7 @@ export class TransactionService {
       status: data.status,
       attachmentUrl: data.attachmentUrl,
       notes: data.notes,
+      tags: data.tags,
     })
   }
 
@@ -187,14 +187,8 @@ export class TransactionService {
       throw new Error('Transação não encontrada')
     }
 
-    // Verificar se é uma transação recorrente
-    if (transaction.recurrenceId) {
-      const recurrence = await this.recurrenceRepository.findById(transaction.recurrenceId, userId)
-      if (recurrence && recurrence.isActive) {
-        throw new Error('Não é possível excluir uma transação recorrente ativa. Desative a recorrência primeiro.')
-      }
-    }
 
+    if (transaction.transferGroupId) return this.transactionRepository.deleteTransfer(transaction.transferGroupId, userId)
     return this.transactionRepository.delete(transactionId, userId)
   }
 
@@ -209,7 +203,7 @@ export class TransactionService {
   }
 
   async deleteTransactionsByDescription(userId: string, accountId: string, baseDescription: string, fromDate?: string) {
-    return this.transactionRepository.deleteByDescriptionPattern(userId, accountId, baseDescription, fromDate)
+    throw new Error('Esta série antiga não tem identificador seguro. Exclua os lançamentos individualmente.')
   }
 
   async confirmTransaction(userId: string, transactionId: string) {
@@ -229,18 +223,11 @@ export class TransactionService {
       throw new Error('Transação conciliada não pode ser confirmada novamente')
     }
 
-    // Verificar se é uma transação recorrente
-    if (transaction.recurrenceId) {
-      const recurrence = await this.recurrenceRepository.findById(transaction.recurrenceId, userId)
-      if (recurrence && recurrence.isActive) {
-        throw new Error('Não é possível confirmar uma transação recorrente ativa. Desative a recorrência primeiro.')
-      }
-    }
 
     // Confirmar transação
     return this.transactionRepository.update(transactionId, userId, {
       status: 'CONFIRMADO',
-      paymentDate: new Date().toISOString()
+      paymentDate: todayInBrazil()
     })
   }
 
@@ -260,18 +247,18 @@ export class TransactionService {
       throw new Error('Transação não encontrada')
     }
 
-    // Verificar se é uma transação recorrente
-    if (transaction.recurrenceId) {
-      const recurrence = await this.recurrenceRepository.findById(transaction.recurrenceId, userId)
-      if (recurrence && recurrence.isActive) {
-        throw new Error('Não é possível conciliar uma transação recorrente ativa. Desative a recorrência primeiro.')
-      }
-    }
 
+    if (data?.amount !== undefined) this.validateAmount(data.amount)
+    if (data?.paymentDate) this.validatePaymentDate(data.paymentDate, transaction.dueDate)
+    if (transaction.transferGroupId) {
+      if (data?.amount !== undefined && Math.abs(data.amount) !== Math.abs(transaction.amount)) throw new Error('Exclua e recrie a transferência para alterar o valor')
+      if (data?.accountId && data.accountId !== transaction.accountId) throw new Error('Exclua e recrie a transferência para alterar as contas')
+      return this.transactionRepository.reconcileTransfer(transaction.transferGroupId, userId, data?.paymentDate || new Date(transaction.paymentDate || todayInBrazil()).toISOString().slice(0,10))
+    }
     // Preparar dados de atualização
     const updateData: any = {
       status: 'CONCILIADO',
-      paymentDate: data?.paymentDate || transaction.paymentDate || new Date().toISOString(),
+      paymentDate: data?.paymentDate || transaction.paymentDate || todayInBrazil(),
     }
 
     if (data?.amount !== undefined && !isNaN(data.amount)) {
@@ -297,7 +284,7 @@ export class TransactionService {
   async listTransactions(
     userId: string,
     filters: TransactionFilters,
-    pagination: { page: number; limit: number }
+    pagination: { page: number; limit?: number }
   ) {
     return this.transactionRepository.list(userId, { ...filters, ...pagination })
   }
@@ -326,7 +313,7 @@ export class TransactionService {
   }
 
   private validateAmount(amount: number) {
-    if (amount <= 0) {
+    if (!Number.isFinite(amount) || amount <= 0) {
       throw new Error('Valor deve ser positivo')
     }
   }
@@ -546,7 +533,8 @@ export class TransactionService {
         type: data.type as 'RECEITA' | 'DESPESA',
         installmentType: 'VALOR_PARCELA',
         regime: data.regime,
-        notes: data.notes
+        notes: data.notes,
+        tags: data.tags
       })
     }
 
@@ -561,10 +549,10 @@ export class TransactionService {
     userId: string,
     data: CreateTransactionInput & {
       isRecurring: boolean;
-      recurrenceData: { type: 'FIXA'; frequency: string; endDate?: string }
+      recurrenceData: { type: 'FIXA'; frequency: string; endDate?: string; months?: number }
     }
   ) {
-    const { frequency, endDate } = data.recurrenceData
+    const { frequency, endDate, months } = data.recurrenceData
 
     // Validações de recorrência
     if (!frequency) {
@@ -582,16 +570,20 @@ export class TransactionService {
 
     const baseDate = new Date(data.dueDate)
     const finalDate = endDate ? new Date(endDate) : new Date(baseDate)
-    finalDate.setMonth(finalDate.getMonth() + 6) // Simplificado: 6 meses sem data fim
+    if (!endDate) finalDate.setTime(addMonthsClamped(baseDate, (months ?? 6) - 1).getTime())
+    if (months !== undefined && (!Number.isInteger(months) || months < 1 || months > 600)) throw new Error('Duração inválida')
+    const recurrence = await this.recurrenceRepository.create({ userId, type: 'FIXA', frequency: frequency as any, isActive: true })
 
     const transactions = []
     const currentDate = new Date(baseDate)
 
     while (currentDate <= finalDate) {
-      const transaction = await this.transactionRepository.create({
+      if (transactions.length >= 600) throw new Error('Recorrência excede 600 ocorrências')
+      const transaction = {
         userId,
         description: data.description,
-        amount: data.amount,
+        amount: financialAmount(data.type, data.amount),
+        recurrenceId: recurrence.id,
         type: data.type,
         dueDate: new Date(currentDate),
         regime: data.regime || 'CAIXA',
@@ -600,24 +592,27 @@ export class TransactionService {
         centerId: data.centerId,
         projectId: data.projectId,
         contactId: data.contactId,
-        status: 'PENDENTE',
+        status: 'PENDENTE' as const,
         isRecurring: true,
         notes: data.notes,
-      })
+      tags: data.tags,
+      }
 
       transactions.push(transaction)
 
       // Avançar para próxima data
       if (frequency === 'MENSAL') {
-        currentDate.setMonth(currentDate.getMonth() + 1)
+        currentDate.setTime(addMonthsClamped(baseDate, transactions.length).getTime())
       } else if (frequency === 'ANUAL') {
-        currentDate.setFullYear(currentDate.getFullYear() + 1)
+        currentDate.setTime(addMonthsClamped(baseDate, transactions.length * 12).getTime())
       } else if (frequency === 'SEMANAL') {
         currentDate.setDate(currentDate.getDate() + 7)
       }
     }
 
-    return transactions[0] // Retornar primeira transação
+    await this.checkBatchLimits(userId, transactions.map(t => t.dueDate))
+    const created = await this.transactionRepository.createMany(transactions)
+    return created[0]
   }
 
   private async createTransferTransaction(
@@ -650,37 +645,20 @@ export class TransactionService {
       throw new Error('Uma ou ambas as contas não foram encontradas')
     }
 
-    // Criar transação de débito na origem (valor negativo = saída da conta)
-    const debitAmount = -Math.abs(data.amount)
-    const creditAmount = Math.abs(data.amount)
-    const debitTransaction = await this.transactionRepository.create({
-      userId,
-      description: `Transferência para ${destinationAccount.name}`,
-      amount: debitAmount,
-      type: 'DESPESA',
-      dueDate: new Date(data.dueDate),
-      regime: data.regime || 'CAIXA',
-      accountId: data.accountId,
-      status: 'CONFIRMADO',
-      isRecurring: false,
-      notes: data.notes,
-    })
-
-    // Criar transação de crédito no destino (valor positivo = entrada na conta)
-    await this.transactionRepository.create({
-      userId,
-      description: `Transferência de ${sourceAccount.name}`,
-      amount: creditAmount,
-      type: 'RECEITA',
-      dueDate: new Date(data.dueDate),
-      regime: data.regime || 'CAIXA',
-      accountId: data.transferData.destinationAccountId,
-      status: 'CONFIRMADO',
-      isRecurring: false,
-      notes: data.notes,
-    })
-
-    return debitTransaction // Retornar transação de débito
+    if (sourceAccount.currency !== destinationAccount.currency) throw new Error('Transferência entre moedas diferentes requer conversão explícita')
+    await this.checkBatchLimits(userId, [new Date(data.dueDate),new Date(data.dueDate)])
+    const transferGroupId = randomUUID()
+    const common = {
+      userId, type: 'TRANSFERENCIA' as const, dueDate: new Date(data.dueDate),
+      paymentDate: new Date(data.paymentDate || data.dueDate), regime: data.regime || 'CAIXA' as const,
+      status: 'CONFIRMADO' as const, isRecurring: false, notes: data.notes, transferGroupId,
+    }
+    // One INSERT statement makes both legs atomic.
+    const transactions = await this.transactionRepository.createMany([
+      { ...common, description: 'Transferência para ' + destinationAccount.name, amount: -Math.abs(data.amount), accountId: data.accountId },
+      { ...common, description: 'Transferência de ' + sourceAccount.name, amount: Math.abs(data.amount), accountId: data.transferData.destinationAccountId },
+    ])
+    return transactions[0]
   }
 
   // Criar transação parcelada
@@ -700,29 +678,22 @@ export class TransactionService {
     installmentType: 'VALOR_TOTAL' | 'VALOR_PARCELA'
     regime?: 'CAIXA' | 'COMPETENCIA'
     notes?: string
+    tags?: string[]
   }) {
     // Validações
-    if (data.installments < 2) {
+    if (!Number.isInteger(data.installments) || data.installments < 2 || data.installments > 600) {
       throw new Error('Número de parcelas deve ser maior que 1')
     }
 
     // Verificar limites do plano
-    await this.checkPlanLimits(data.userId)
+    // Validate every installment month after generating its date.
 
-    // Criar recorrência (opcional: se falhar por RLS/permissão, segue sem o vínculo)
-    let recurrenceId: string | undefined
-    try {
-      const recurrence = await this.recurrenceRepository.create({
-        userId: data.userId,
-        type: 'PARCELADA',
-        totalInstallments: data.installments,
-        currentInstallment: 1,
-        isActive: true
-      })
-      recurrenceId = recurrence.id
-    } catch (recErr: any) {
-      console.warn('[createInstallmentTransaction] recurrences table unavailable, proceeding without recurrenceId:', recErr?.message)
-    }
+    // A série precisa de identidade persistente para editar e excluir com segurança.
+    const recurrence = await this.recurrenceRepository.create({
+      userId: data.userId, type: 'PARCELADA', totalInstallments: data.installments,
+      currentInstallment: 1, isActive: true
+    })
+    const recurrenceId = recurrence.id
 
     // Calcular valor das parcelas
     let installmentValue: number
@@ -735,7 +706,10 @@ export class TransactionService {
     }
 
     // Sinal correto do valor: DESPESA = negativo
-    const signedValue = data.type === 'DESPESA' ? -Math.abs(installmentValue) : Math.abs(installmentValue)
+    this.validateAmount(installmentValue)
+    const values = data.installmentType === 'VALOR_TOTAL'
+      ? splitCents(data.totalAmount!, data.installments)
+      : Array(data.installments).fill(Math.round(installmentValue * 100) / 100)
 
     // Parse da data em fuso local (evita off-by-1-day do new Date('YYYY-MM-DD') UTC)
     const datePart = data.dueDate.split('T')[0]
@@ -745,7 +719,7 @@ export class TransactionService {
     const transactions = []
 
     for (let i = 0; i < data.installments; i++) {
-      const dueDate = new Date(baseYear, baseMonth - 1 + i, baseDay)
+      const dueDate = addMonthsClamped(data.dueDate, i)
 
       transactions.push({
         userId: data.userId,
@@ -756,7 +730,7 @@ export class TransactionService {
         projectId: data.projectId,
         contactId: data.contactId,
         description: `${data.description} - Parcela ${i + 1}/${data.installments}`,
-        amount: signedValue,
+        amount: financialAmount(data.type, values[i]),
         type: data.type,
         dueDate,
         regime: data.regime || 'CAIXA',
@@ -767,6 +741,7 @@ export class TransactionService {
     }
 
     // Criar todas as transações
+    await this.checkBatchLimits(data.userId, transactions.map(t => t.dueDate))
     const createdTransactions = await this.transactionRepository.createMany(transactions)
 
     return {
@@ -775,16 +750,19 @@ export class TransactionService {
     }
   }
 
-  private async checkPlanLimits(userId: string) {
+  private async checkBatchLimits(userId: string, dates: Date[]) {
     const plan = await this.userRepository.getUserPlan(userId)
-    const currentCount = await this.transactionRepository.countByUserMonth(
-      userId,
-      new Date().getMonth() + 1,
-      new Date().getFullYear()
-    )
-
-    if (plan && currentCount >= plan.transactionLimit) {
-      throw new Error(`Limite mensal de lançamentos atingido. Seu plano permite até ${plan.transactionLimit} lançamentos por mês.`)
+    const limit = plan?.transactionLimit ?? 100
+    const months = new Map<string, number>()
+    for (const date of dates) {
+      if (!Number.isFinite(date.getTime())) throw new Error('Data inválida')
+      const key = date.getUTCFullYear() + '-' + (date.getUTCMonth()+1)
+      months.set(key,(months.get(key)||0)+1)
+    }
+    for (const [key, count] of months) {
+      const [year, month] = key.split('-').map(Number)
+      const existing = await this.transactionRepository.countByUserMonth(userId,month,year)
+      if (existing + count > limit) throw new Error('Limite mensal de lançamentos atingido para ' + key)
     }
   }
 }

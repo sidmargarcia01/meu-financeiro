@@ -25,25 +25,10 @@ class DashboardService {
       }
     }
     
-    // Para cada conta, buscar saldos
-    const porConta = await Promise.all(
-      accounts.map(async account => {
-        // Buscar saldo projetado (todas as transações)
-        const projetado = await transactionRepository.sumByAccount(account.id)
-        
-        // Buscar saldo confirmado (apenas transações confirmadas)
-        const confirmado = await transactionRepository.sumByAccount(account.id, ['CONFIRMADO', 'CONCILIADO'])
-        
-        return {
-          account_id: account.id,
-          account_name: account.name,
-          projetado,
-          confirmado,
-          currency: account.currency || 'BRL'
-        }
-      })
-    )
-    
+    const withBalances = await accountRepository.listWithBalances(userId)
+    const porConta = withBalances.map(account => ({ account_id: account.id, account_name: account.name,
+      projetado: account.projectedBalance, confirmado: account.confirmedBalance, currency: account.currency || 'BRL' }))
+
     // Calcular totais
     const total_projetado = porConta.reduce((sum, conta) => sum + conta.projetado, 0)
     const total_confirmado = porConta.reduce((sum, conta) => sum + conta.confirmado, 0)

@@ -11,13 +11,13 @@
 import { ReportService } from './reportService'
 
 // ─── Mock do cliente Supabase ─────────────────────────────────────────────────
-jest.mock('@/lib/supabase', () => ({
+jest.mock('@/lib/requestSupabase', () => ({
   supabase: {
     from: jest.fn(),
   },
 }))
 
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/requestSupabase'
 
 const mockFrom = supabase.from as jest.Mock
 
@@ -28,6 +28,7 @@ function buildDreMock(totalReceitas: number, totalDespesas: number) {
     select: jest.fn().mockReturnThis(),
     eq: jest.fn().mockReturnThis(),
     in: jest.fn().mockReturnThis(),
+    lt: jest.fn().mockResolvedValue({data:[],error:null}),
     gte: jest.fn().mockReturnThis(),
     lte: jest.fn().mockReturnThis(),
     order: jest.fn().mockResolvedValue({
@@ -54,6 +55,7 @@ function buildDfcMock(entradas: number, saidas: number) {
   return {
     select: jest.fn().mockReturnThis(),
     eq: jest.fn().mockReturnThis(),
+    lt: jest.fn().mockResolvedValue({data:[],error:null}),
     gte: jest.fn().mockReturnThis(),
     lte: jest.fn().mockReturnThis(),
     order: jest.fn().mockResolvedValue({
@@ -118,7 +120,8 @@ describe('ReportService.gerarIndicadores', () => {
       select: jest.fn().mockReturnThis(),
       eq: jest.fn().mockReturnThis(),
       in: jest.fn().mockReturnThis(),
-      gte: jest.fn().mockReturnThis(),
+      lt: jest.fn().mockResolvedValue({data:[],error:null}),
+    gte: jest.fn().mockReturnThis(),
       lte: jest.fn().mockReturnThis(),
       is: jest.fn().mockResolvedValue({ data: [], error: null }),
       order: jest.fn().mockResolvedValue({ data: [], error: null }),
@@ -141,7 +144,8 @@ describe('ReportService.gerarIndicadores', () => {
       select: jest.fn().mockReturnThis(),
       eq: jest.fn().mockReturnThis(),
       in: jest.fn().mockReturnThis(),
-      gte: jest.fn().mockReturnThis(),
+      lt: jest.fn().mockResolvedValue({data:[],error:null}),
+    gte: jest.fn().mockReturnThis(),
       lte: jest.fn().mockReturnThis(),
       is: jest.fn().mockResolvedValue({ data: [], error: null }),
       order: jest.fn().mockResolvedValue({ data: [], error: null }),
@@ -163,7 +167,8 @@ describe('ReportService.gerarIndicadores', () => {
       select: jest.fn().mockReturnThis(),
       eq: jest.fn().mockReturnThis(),
       in: jest.fn().mockReturnThis(),
-      gte: jest.fn().mockReturnThis(),
+      lt: jest.fn().mockResolvedValue({data:[],error:null}),
+    gte: jest.fn().mockReturnThis(),
       lte: jest.fn().mockReturnThis(),
       is: jest.fn().mockResolvedValue({ data: [], error: null }),
       order: jest.fn().mockResolvedValue({ data: [], error: null }),
@@ -182,7 +187,8 @@ describe('ReportService.gerarIndicadores', () => {
       select: jest.fn().mockReturnThis(),
       eq: jest.fn().mockReturnThis(),
       in: jest.fn().mockReturnThis(),
-      gte: jest.fn().mockReturnThis(),
+      lt: jest.fn().mockResolvedValue({data:[],error:null}),
+    gte: jest.fn().mockReturnThis(),
       lte: jest.fn().mockReturnThis(),
       is: jest.fn().mockResolvedValue({ data: [], error: null }),
       order: jest.fn().mockResolvedValue({ data: [], error: null }),
@@ -200,7 +206,8 @@ describe('ReportService.gerarIndicadores', () => {
       select: jest.fn().mockReturnThis(),
       eq: jest.fn().mockReturnThis(),
       in: jest.fn().mockReturnThis(),
-      gte: jest.fn().mockReturnThis(),
+      lt: jest.fn().mockResolvedValue({data:[],error:null}),
+    gte: jest.fn().mockReturnThis(),
       lte: jest.fn().mockReturnThis(),
       is: jest.fn().mockResolvedValue({ data: [], error: null }),
       order: jest.fn().mockResolvedValue({ data: [], error: null }),

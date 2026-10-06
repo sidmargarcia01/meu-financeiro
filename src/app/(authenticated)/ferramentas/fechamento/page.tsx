@@ -42,9 +42,9 @@ export default function FechamentoPage() {
       if (!res.ok) throw new Error()
       const data = await res.json()
       setResumo({
-        revenues: data.revenues ?? 0,
-        expenses: data.expenses ?? 0,
-        balance: data.balance ?? 0,
+        revenues: data.receitas ?? 0,
+        expenses: data.despesas ?? 0,
+        balance: data.saldo ?? 0,
         revenuesPrev: data.revenuesPrev,
         expensesPrev: data.expensesPrev,
         balancePrev: data.balancePrev,

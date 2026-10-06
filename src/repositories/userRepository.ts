@@ -6,7 +6,7 @@
  * DEPENDE DE: Supabase, User models
  */
 
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/requestSupabase'
 import { User, UserSettings, UserWithSettings } from '@/models/user'
 
 export class UserRepository {
@@ -118,8 +118,8 @@ export class UserRepository {
 
   // Calcular uso de storage do usuário (em bytes)
   async getStorageUsage(userId: string): Promise<number> {
-    // Simplificado - retornar valor fixo para testes
-    // Em produção, calcularia tamanho real dos anexos e outros dados
-    return 10 * 1024 * 1024 // 10MB padrão
+    const { data, error } = await supabase.rpc('get_my_storage_usage')
+    if (error) throw error
+    return Number(data || 0)
   }
 }

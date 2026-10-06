@@ -1,3 +1,5 @@
+import { supabase } from '@/lib/requestSupabase'
+import { queryAll } from '@/lib/queryAll'
 /**
  * 📄 Descrição: Serviço de Fluxo de Caixa Gerencial — matriz mensal REALIZADO / AV / AH
  * 🧱 Contexto: Módulo Movimentações, rota /api/reports/fluxo-gerencial
@@ -19,7 +21,7 @@ export interface MesFluxo {
 }
 
 export interface ValorFluxo {
-  realizado: number
+  realizado: number | null
   av: number | null
   ah: number | null
 }
@@ -142,7 +144,7 @@ function agruparTransacoes(
   meses: MesFluxo[],
   parentCatMap: Map<string, { nome: string; dreGroup: DreGroup | null }>,
   usarDreGroup: boolean,
-  dateField: 'due_date' | 'competence_date' = 'due_date'
+  dateField: 'due_date' | 'competence_date' | 'payment_date' | 'effective_cash_date' | 'effective_competence_date' = 'due_date'
 ): Map<string, BucketMes> {
   const buckets = new Map<string, BucketMes>()
 
@@ -176,7 +178,7 @@ function agruparTransacoes(
     const valor = Math.abs(Number(tx.amount) || 0)
 
     const ehReceita = tipo === 'RECEITA'
-    const dreGroup: DreGroup | null = cat?.dre_group ?? null
+    const dreGroup: DreGroup | null = (cat?.parent_id ? parentCatMap.get(cat.parent_id)?.dreGroup : undefined) ?? cat?.dre_group ?? null
 
     if (usarDreGroup) {
       switch (dreGroup) {
@@ -184,7 +186,7 @@ function agruparTransacoes(
           bucket.receitaFaturamento += valor
           break
         case 'IMPOSTOS_FATURAMENTO':
-          // Tratado como filha negativa da receita quando expandida
+          bucket.receitaFaturamento -= valor
           break
         case 'CUSTOS_OPERACIONAIS':
           bucket.custosOperacionais += valor
@@ -364,22 +366,22 @@ function calcularLinhaCalculada(
   }
 }
 
-function normalizarZero(valor: number): number {
+function normalizarZero(valor: number | null): number | null {
   return valor === 0 ? 0 : valor
 }
 
-function calcularAV(valor: number, receitaFaturamento: number, avTipo: FluxoLinha['avTipo']): number | null {
-  if (receitaFaturamento === 0) return null
+function calcularAV(valor: number | null, receitaFaturamento: number, avTipo: FluxoLinha['avTipo']): number | null {
+  if (valor === null || receitaFaturamento === 0) return null
 
-  if (avTipo === 'receita') return 100
+  if (avTipo === 'receita') return (valor / receitaFaturamento) * 100
   if (avTipo === 'deducao') return (Math.abs(valor) / receitaFaturamento) * 100
   if (avTipo === 'saldo') return (Math.abs(valor) / receitaFaturamento) * 100
-  if (avTipo === 'nao_aplica') return (Math.abs(valor) / receitaFaturamento) * 100
+  if (avTipo === 'nao_aplica') return null
   return (valor / receitaFaturamento) * 100
 }
 
-function calcularAH(valorAtual: number, valorAnterior: number | null): number | null {
-  if (valorAnterior === null || valorAnterior === 0) return null
+function calcularAH(valorAtual: number | null, valorAnterior: number | null): number | null {
+  if (valorAtual === null || valorAnterior === null || valorAnterior === 0) return null
   return ((valorAtual - valorAnterior) / Math.abs(valorAnterior)) * 100
 }
 
@@ -389,7 +391,7 @@ function criarLinha(
   tipo: FluxoLinha['tipo'],
   nivel: number,
   avTipo: FluxoLinha['avTipo'],
-  valores: number[],
+  valores: (number | null)[],
   receitas: number[],
   destaque: boolean,
   parentId?: string
@@ -431,7 +433,7 @@ export class FluxoGerencialService {
     fim: string,
     regime: 'CAIXA' | 'COMPETENCIA' = 'CAIXA'
   ): Promise<FluxoGerencialRelatorio> {
-    const dateField = regime === 'COMPETENCIA' ? 'competence_date' : 'due_date'
+    const dateField = regime === 'COMPETENCIA' ? 'effective_competence_date' : 'effective_cash_date'
     const statusFilter = regime === 'CAIXA'
       ? ['CONFIRMADO', 'CONCILIADO']
       : ['PENDENTE', 'CONFIRMADO', 'CONCILIADO']
@@ -448,15 +450,17 @@ export class FluxoGerencialService {
     ])
     const saldoInicialInicial = txSaldoInicial + saldoInicialContas
 
-    const parentCatMap = buildParentCategoryMap(transactions)
+    const { data: parents, error: parentError } = await queryAll(supabase.from('categories').select('id,name,dre_group').eq('user_id', userId).is('parent_id', null))
+    if (parentError) throw parentError
+    const parentCatMap = new Map<string, {nome:string;dreGroup:DreGroup|null}>(parents.map(p => [p.id, {nome:p.name,dreGroup:p.dre_group}]))
 
     const hasReceitaDreGroup = transactions.some((tx: any) => {
       const cat = tx.categories as any
-      return tx.type === 'RECEITA' && cat?.dre_group === 'RECEITAS_OPERACIONAIS'
+      return tx.type === 'RECEITA' && (cat?.dre_group || parentCatMap.get(cat?.parent_id)?.dreGroup) === 'RECEITAS_OPERACIONAIS'
     })
     const hasDespesaDreGroup = transactions.some((tx: any) => {
       const cat = tx.categories as any
-      return tx.type === 'DESPESA' && cat?.dre_group
+      return tx.type === 'DESPESA' && (cat?.dre_group || parentCatMap.get(cat?.parent_id)?.dreGroup)
     })
     const usarDreGroup = hasReceitaDreGroup || hasDespesaDreGroup
 
@@ -466,7 +470,7 @@ export class FluxoGerencialService {
     await Promise.all(
       meses.map(async ({ ano, mes }) => {
         const ultimoDia = ultimoDiaDoMes(ano, mes)
-        const proximoDia = addOneDay(ultimoDia)
+        const proximoDia = addOneDay(ultimoDia < fim ? ultimoDia : fim)
         const [txSaldo, contasSaldo] = await Promise.all([
           transactionRepository.sumConfirmedBefore(userId, proximoDia),
           accountRepository.sumInitialBalancesBefore(userId, proximoDia),
@@ -659,7 +663,7 @@ export class FluxoGerencialService {
       'calculado',
       0,
       'saldo',
-      calculosPorMes.map(c => c.pontoEquilibrioAntesInvestimento ?? 0),
+      calculosPorMes.map(c => c.pontoEquilibrioAntesInvestimento),
       receitasPorMes,
       false
     ))
@@ -671,7 +675,7 @@ export class FluxoGerencialService {
       'calculado',
       0,
       'saldo',
-      calculosPorMes.map(c => c.pontoEquilibrioComInvestimento ?? 0),
+      calculosPorMes.map(c => c.pontoEquilibrioComInvestimento),
       receitasPorMes,
       false
     ))
@@ -679,7 +683,7 @@ export class FluxoGerencialService {
     // 13. ACERTO DO CAIXA
     linhas.push(criarLinha(
       'acerto_do_caixa',
-      'ACERTO DO CAIXA',
+      'AJUSTES DE BASE E DIFERENÇAS ENTRE REGIMES',
       'calculado',
       0,
       'nao_aplica',
@@ -712,51 +716,27 @@ export class FluxoGerencialService {
       true
     ))
 
-    // Contas filhas (categorias e subcategorias)
-    for (const m of meses) {
-      const key = chaveMes(m.ano, m.mes)
-      const bucket = buckets.get(key)!
-      const idx = meses.indexOf(m)
-      const receita = receitasPorMes[idx]
-
-      for (const cat of bucket.categorias.values()) {
-        const parentLine = linhas.find(l => l.id === categoriaParaLinhaPai(cat.dreGroup, cat.tipo, usarDreGroup))
-        if (!parentLine) continue
-
-        const catId = `cat:${cat.id}:${key}`
-        linhas.push({
-          id: catId,
-          label: cat.nome,
-          tipo: 'categoria',
-          nivel: 1,
-          parentId: parentLine.id,
-          destaque: false,
-          avTipo: cat.tipo === 'RECEITA' ? 'receita' : 'deducao',
-          valores: meses.map((_, i) => ({
-            realizado: i === idx ? cat.total : 0,
-            av: i === idx ? calcularAV(cat.total, receitasPorMes[i], cat.tipo === 'RECEITA' ? 'receita' : 'deducao') : null,
-            ah: null,
-          })),
-        })
-
-        for (const sub of cat.subcategorias.values()) {
-          linhas.push({
-            id: `sub:${sub.id}:${key}`,
-            label: sub.nome,
-            tipo: 'subcategoria',
-            nivel: 2,
-            parentId: catId,
-            destaque: false,
-            avTipo: sub.tipo === 'RECEITA' ? 'receita' : 'deducao',
-            valores: meses.map((_, i) => ({
-              realizado: i === idx ? sub.total : 0,
-              av: i === idx ? calcularAV(sub.total, receitasPorMes[i], sub.tipo === 'RECEITA' ? 'receita' : 'deducao') : null,
-              ah: null,
-            })),
-          })
-        }
+    const children = new Map<string, FluxoLinha>()
+    const addChild = (node: CategoriaNode, id: string, parentId: string, index: number, level: number) => {
+      let line = children.get(id)
+      if (!line) {
+        line = { id, label: node.nome, tipo: level === 1 ? 'categoria' : 'subcategoria', nivel: level,
+          parentId, destaque: false, avTipo: node.tipo === 'RECEITA' ? 'receita' : 'deducao',
+          valores: meses.map(() => ({ realizado: 0, av: null, ah: null })) }
+        children.set(id, line)
       }
+      line.valores[index].realizado = node.total
+      line.valores[index].av = calcularAV(node.total, receitasPorMes[index], line.avTipo)
     }
+    meses.forEach((m, index) => {
+      for (const cat of buckets.get(chaveMes(m.ano, m.mes))!.categorias.values()) {
+        const parentId = categoriaParaLinhaPai(cat.dreGroup, cat.tipo, usarDreGroup)
+        if (!parentId || !linhas.some(l => l.id === parentId)) continue
+        addChild(cat, 'cat:' + cat.id, parentId, index, 1)
+        for (const sub of cat.subcategorias.values()) addChild(sub, 'sub:' + sub.id, 'cat:' + cat.id, index, 2)
+      }
+    })
+    linhas.push(...children.values())
 
     adicionarAH(linhas.filter(l => l.tipo !== 'categoria' && l.tipo !== 'subcategoria'))
 

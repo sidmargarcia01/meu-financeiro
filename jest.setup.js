@@ -68,3 +68,9 @@ jest.mock('next/server', () => ({
     redirect: jest.fn()
   }
 }))
+
+// Repository unit tests use the same test client for the request-scoped facade.
+jest.mock('@/lib/requestSupabase', () => ({ supabase: jest.requireMock('@/lib/supabase').supabase }))
+
+// Existing repository tests stub one page; pagination has dedicated integration tests.
+jest.mock('@/lib/queryAll', () => ({ queryAll: async query => await query }))

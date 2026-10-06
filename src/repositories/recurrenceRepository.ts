@@ -6,7 +6,7 @@
  * DEPENDE DE: Supabase
  */
 
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/requestSupabase'
 
 export interface Recurrence {
   id: string

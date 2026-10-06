@@ -31,24 +31,14 @@ export class StorageService {
   // Obter uso de armazenamento do usuário
   async getStorageUsage(userId: string): Promise<StorageUsage> {
     const plan = await this.userRepository.getUserPlan(userId)
-    const currentUsage = await this.userRepository.getStorageUsage(userId)
+    const currentUsage = (await this.userRepository.getStorageUsage(userId)) / (1024 * 1024)
     
-    // Se não tem plano, é admin - sem limite
-    if (!plan) {
-      return {
-        usedMb: currentUsage,
-        limitMb: Number.MAX_SAFE_INTEGER,
-        availableMb: Number.MAX_SAFE_INTEGER - currentUsage,
-        usagePercent: 0
-      }
-    }
-    
-    const availableMb = Math.max(0, plan.storageLimitMb - currentUsage)
-    const usagePercent = plan.storageLimitMb > 0 ? (currentUsage / plan.storageLimitMb) * 100 : 0
+    const availableMb = Math.max(0, (plan?.storageLimitMb ?? 0) - currentUsage)
+    const usagePercent = (plan?.storageLimitMb ?? 0) > 0 ? (currentUsage / (plan?.storageLimitMb ?? 0)) * 100 : 0
     
     return {
       usedMb: currentUsage,
-      limitMb: plan.storageLimitMb,
+      limitMb: (plan?.storageLimitMb ?? 0),
       availableMb,
       usagePercent
     }

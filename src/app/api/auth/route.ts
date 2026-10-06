@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { createRequestClient } from '@/lib/requestSupabase'
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 import { withValidation } from '@/middlewares/validation'
 import { z } from 'zod'
@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
 }
 
 async function login(request: NextRequest, body: any) {
+  const supabase = createRequestClient()
   const { email, password } = body
 
   // Validar entrada
@@ -93,6 +94,7 @@ async function login(request: NextRequest, body: any) {
 }
 
 async function register(request: NextRequest, body: any) {
+  const supabase = createRequestClient()
   const { email, password, name, planId } = body
 
   // Validar entrada
@@ -161,7 +163,7 @@ async function register(request: NextRequest, body: any) {
           id: authData.user!.id,
           email: validation.data.email,
           name: validation.data.name,
-          plan_id: validation.data.planId || null,
+          plan_id: null,
           default_currency: 'BRL',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -187,17 +189,7 @@ async function register(request: NextRequest, body: any) {
     }
   } else {
     console.log('✅ User created by trigger')
-    // Atualizar plan_id se necessário
-    if (validation.data.planId) {
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ plan_id: validation.data.planId })
-        .eq('id', authData.user!.id)
 
-      if (updateError) {
-        console.error('Erro ao atualizar plano:', updateError)
-      }
-    }
   }
 
   return NextResponse.json({
@@ -219,6 +211,7 @@ export async function GET(request: NextRequest) {
     }
 
     const token = authHeader.substring(7)
+    const supabase = createRequestClient(token)
 
     // Verificar token com Supabase
     const { data: { user }, error } = await supabase.auth.getUser(token)
@@ -270,9 +263,10 @@ export async function DELETE(request: NextRequest) {
     }
 
     const token = authHeader.substring(7)
+    const supabase = createRequestClient(token)
 
     // Fazer logout no Supabase
-    const { error } = await supabase.auth.signOut()
+    const { error } = await getSupabaseAdmin().auth.admin.signOut(token, 'local')
 
     if (error) {
       return NextResponse.json(

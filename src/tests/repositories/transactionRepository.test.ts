@@ -7,7 +7,7 @@
  */
 
 import { transactionRepository } from '@/repositories/transactionRepository'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/requestSupabase'
 
 jest.mock('@/lib/supabase')
 

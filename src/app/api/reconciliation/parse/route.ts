@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
   return withAuth(request, async (req, user) => {
     try {
       const body = await req.json()
-      if (!body.content) {
+      if (typeof body.content !== 'string' || !body.accountId || body.content.length > 5000000) {
         return NextResponse.json({ error: 'Conteúdo OFX é obrigatório' }, { status: 400 })
       }
 
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Nenhuma transação encontrada no arquivo OFX' }, { status: 422 })
       }
 
-      const matches = await svc.findMatches(user.id, ofxTransactions)
+      const matches = await svc.findMatches(user.id, ofxTransactions, body.accountId)
       return NextResponse.json({ total: matches.length, matches })
     } catch (error: any) {
       return NextResponse.json({ error: error.message || 'Erro ao processar OFX' }, { status: 500 })

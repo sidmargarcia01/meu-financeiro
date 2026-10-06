@@ -1,3 +1,5 @@
+import { queryAll } from '@/lib/queryAll'
+import { signedAmount } from '@/lib/financial'
 /**
  * 📄 Descrição: Serviço de relatórios financeiros — DRE, DFC, Extrato, Balanço e Indicadores
  * 🧱 Contexto: Módulo de relatórios do Meu Financeiro
@@ -8,7 +10,7 @@
  * ✅ Revisado: Sim
  */
 
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/requestSupabase'
 import { classifyDespesaFallback } from '@/services/dreClassifier'
 
 export interface DRELinha {
@@ -141,24 +143,24 @@ export class ReportService {
     fim: string,
     regime: 'CAIXA' | 'COMPETENCIA' = 'CAIXA'
   ): Promise<DRERelatorio> {
-    const dateField = regime === 'COMPETENCIA' ? 'competence_date' : 'due_date'
+    const dateField = regime === 'COMPETENCIA' ? 'effective_competence_date' : 'effective_cash_date'
     const statusFilter = regime === 'CAIXA'
       ? ['CONFIRMADO', 'CONCILIADO']
       : ['PENDENTE', 'CONFIRMADO', 'CONCILIADO']
 
     // Pré-carrega categorias pai para obter dre_group correto via subcategorias
-    const { data: parentCats } = await supabase
+    const { data: parentCats } = await queryAll(supabase
       .from('categories')
       .select('id, name, dre_group')
       .eq('user_id', userId)
-      .is('parent_id', null)
+      .is('parent_id', null))
 
     const parentCatMap = new Map<string, { name: string; dreGroup: string | null }>()
       ; (parentCats || []).forEach((pc: any) => {
         parentCatMap.set(pc.id, { name: pc.name, dreGroup: pc.dre_group ?? null })
       })
 
-    const { data: transactions, error } = await supabase
+    const { data: transactions, error } = await queryAll(supabase
       .from('transactions')
       .select(`
         id, description, amount, type, status,
@@ -170,7 +172,7 @@ export class ReportService {
       .in('status', statusFilter)
       .gte(dateField, inicio)
       .lte(dateField, fim)
-      .order(dateField)
+      .order(dateField))
 
     if (error) throw error
 
@@ -244,80 +246,24 @@ export class ReportService {
       categorias.filter(c => c.dreGroup === g).reduce((s, c) => s + Math.abs(c.total), 0)
     const pctRL = (v: number, rl: number) => rl !== 0 ? (v / rl) * 100 : null
 
-    // Verificar separadamente para RECEITA e DESPESA (evita falso positivo)
-    const hasReceitaDreGroup = categorias.some(c =>
-      c.tipo === 'RECEITA' && c.dreGroup !== null && c.dreGroup !== undefined
-    )
-    const hasDespesaDreGroup = categorias.some(c =>
-      c.tipo === 'DESPESA' && c.dreGroup !== null && c.dreGroup !== undefined
-    )
-
-    let receitasOperacionais: number
-    let impostosFaturamento: number
-    let custosOperacionais: number
-    let despesasVariaveis: number
-    let despesasFixas: number
-    let investimentos: number
-    let receitasNaoOperacionais: number
-    let despesasNaoOperacionais: number
-    let impostosLucro: number
-    let distribuicaoLucros: number
-
-    // ── Receitas ─────────────────────────────────────────────────────────────
-    if (hasReceitaDreGroup) {
-      receitasOperacionais = sumGroup('RECEITAS_OPERACIONAIS')
-      impostosFaturamento = sumGroup('IMPOSTOS_FATURAMENTO')
-      receitasNaoOperacionais = sumGroup('RECEITAS_NAO_OPERACIONAIS')
-    } else {
-      receitasOperacionais = totalReceitas
-      impostosFaturamento = 0
-      receitasNaoOperacionais = 0
-    }
-
-    // ── Despesas ─────────────────────────────────────────────────────────────
-    if (hasDespesaDreGroup) {
-      // Usar classificação por dre_group configurada no banco
-      custosOperacionais = sumGroup('CUSTOS_OPERACIONAIS')
-      despesasVariaveis = sumGroup('DESPESAS_VARIAVEIS')
-      despesasFixas = sumGroup('DESPESAS_FIXAS')
-      investimentos = sumGroup('INVESTIMENTOS')
-      despesasNaoOperacionais = sumGroup('DESPESAS_NAO_OPERACIONAIS')
-      impostosLucro = sumGroup('IMPOSTOS_LUCRO')
-      distribuicaoLucros = sumGroup('DISTRIBUICAO_LUCROS')
-    } else {
-      // Fallback por palavras-chave — default é VARIÁVEL (operacional)
-      const despesasCategorias = categorias.filter(c => c.tipo === 'DESPESA')
-
-      let totalCustos = 0
-      let totalFixas = 0
-      let totalVariaveis = 0
-      let totalInvestimentos = 0
-
-      despesasCategorias.forEach(c => {
-        const valor = Math.abs(c.total)
-        const classificacao = c.dreGroup === 'INVESTIMENTOS'
-          ? 'INVESTIMENTO'
-          : classifyDespesaFallback(c.nome)
-
-        if (classificacao === 'INVESTIMENTO') {
-          totalInvestimentos += valor
-        } else if (classificacao === 'CUSTO') {
-          totalCustos += valor
-        } else if (classificacao === 'FIXA') {
-          totalFixas += valor
-        } else {
-          // DEFAULT: despesa variável (operacional — água, energia, serviços, etc.)
-          totalVariaveis += valor
-        }
-      })
-
-      custosOperacionais = totalCustos
-      despesasVariaveis = totalVariaveis
-      despesasFixas = totalFixas
-      investimentos = totalInvestimentos
-      despesasNaoOperacionais = 0
-      impostosLucro = 0
-      distribuicaoLucros = 0
+    // Classify every category, including mixed legacy/unclassified categories.
+    let receitasOperacionais = sumGroup('RECEITAS_OPERACIONAIS')
+    const impostosFaturamento = sumGroup('IMPOSTOS_FATURAMENTO')
+    let custosOperacionais = sumGroup('CUSTOS_OPERACIONAIS')
+    let despesasVariaveis = sumGroup('DESPESAS_VARIAVEIS')
+    let despesasFixas = sumGroup('DESPESAS_FIXAS')
+    let investimentos = sumGroup('INVESTIMENTOS')
+    const receitasNaoOperacionais = sumGroup('RECEITAS_NAO_OPERACIONAIS')
+    const despesasNaoOperacionais = sumGroup('DESPESAS_NAO_OPERACIONAIS')
+    const impostosLucro = sumGroup('IMPOSTOS_LUCRO')
+    const distribuicaoLucros = sumGroup('DISTRIBUICAO_LUCROS')
+    for (const c of categorias.filter(c => !c.dreGroup)) {
+      if (c.tipo === 'RECEITA') { receitasOperacionais += c.total; continue }
+      switch (classifyDespesaFallback(c.nome)) {
+        case 'CUSTO': custosOperacionais += c.total; break
+        case 'FIXA': despesasFixas += c.total; break
+        default: despesasVariaveis += c.total
+      }
     }
 
     const receitaLiquida = receitasOperacionais - impostosFaturamento
@@ -360,43 +306,53 @@ export class ReportService {
   }
 
   async gerarDFC(userId: string, inicio: string, fim: string): Promise<DFCRelatorio> {
-    const { data: transactions, error } = await supabase
+    const { data: transactions, error } = await queryAll(supabase
       .from('transactions')
       .select(`
-        id, description, amount, type, status,
-        due_date, payment_date,
+        id, account_id, description, amount, type, status,
+        due_date, payment_date, effective_cash_date,
         accounts(name),
         categories(name)
       `)
       .eq('user_id', userId)
       .in('status', ['CONFIRMADO', 'CONCILIADO'])
-      .gte('due_date', inicio)
-      .lte('due_date', fim)
-      .order('due_date')
+      .gte('effective_cash_date', inicio)
+      .lte('effective_cash_date', fim)
+      .order('effective_cash_date'))
 
     if (error) throw error
 
-    let saldo = 0
+    const { data: accounts, error: accountsError } = await queryAll(supabase.from('accounts')
+      .select('id, initial_balance, initial_balance_date, name').eq('user_id', userId))
+    if (accountsError) throw accountsError
+    const { data: previous, error: previousError } = await queryAll(supabase.from('transactions')
+      .select('account_id, type, amount, payment_date, effective_cash_date').eq('user_id', userId)
+      .in('status', ['CONFIRMADO', 'CONCILIADO']).lt('effective_cash_date', inicio))
+    if (previousError) throw previousError
+    const bases = new Map((accounts || []).map(a => [a.id, a.initial_balance_date]))
+    const saldoInicial = (accounts || []).reduce((sum, a) => sum +
+      (!a.initial_balance_date || a.initial_balance_date < inicio ? Number(a.initial_balance || 0) : 0), 0)
+      + (previous || []).filter(t => !bases.get(t.account_id) || t.effective_cash_date >= bases.get(t.account_id))
+        .reduce((sum, t) => sum + signedAmount(t.type, t.amount), 0)
+    let saldo = saldoInicial
     const linhas: DFCLinha[] = []
 
-    for (const tx of (transactions || [])) {
-      const acc = tx.accounts as any
-      const cat = tx.categories as any
-      const entrada = tx.type === 'RECEITA' ? Math.abs(tx.amount) : 0
-      const saida = tx.type === 'DESPESA' ? Math.abs(tx.amount) : 0
-      saldo += (tx.type === 'RECEITA' ? tx.amount : tx.type === 'DESPESA' ? tx.amount : 0)
-
-      linhas.push({
-        data: tx.payment_date ?? tx.due_date,
-        descricao: tx.description,
-        entrada,
-        saida,
-        saldo,
-        tipo: tx.type,
-        status: tx.status,
-        conta: acc?.name || '—',
-        categoria: cat?.name,
-      })
+    const events = [
+      ...(transactions || []).filter(t => !bases.get(t.account_id) || t.effective_cash_date >= bases.get(t.account_id)).map(t => ({date:t.effective_cash_date,tx:t,opening:0,name:''})),
+      ...(accounts || []).filter(a => a.initial_balance_date && a.initial_balance_date >= inicio && a.initial_balance_date <= fim)
+        .map(a => ({date:a.initial_balance_date,tx:null,opening:Number(a.initial_balance||0),name:a.name})),
+    ].sort((a,b) => a.date.localeCompare(b.date) || (a.tx ? 1 : -1))
+    for (const event of events) {
+      const tx=event.tx
+      if (!tx) {
+        saldo += event.opening
+        linhas.push({data:event.date,descricao:'Saldo inicial cadastrado',entrada:0,saida:0,saldo,tipo:'TRANSFERENCIA',status:'SALDO_INICIAL',conta:event.name})
+        continue
+      }
+      saldo += signedAmount(tx.type,tx.amount)
+      linhas.push({ data:event.date, descricao:tx.description,
+        entrada:tx.type==='RECEITA'?Math.abs(tx.amount):0, saida:tx.type==='DESPESA'?Math.abs(tx.amount):0,
+        saldo,tipo:tx.type,status:tx.status,conta:(tx.accounts as any)?.name||'—',categoria:(tx.categories as any)?.name })
     }
 
     const totalEntradas = linhas.reduce((s, l) => s + l.entrada, 0)
@@ -408,7 +364,7 @@ export class ReportService {
       totalEntradas,
       totalSaidas,
       saldoFinal: saldo,
-      saldoInicial: 0,
+      saldoInicial,
     }
   }
 
@@ -417,11 +373,11 @@ export class ReportService {
   // Passivo Circulante = total de DESPESAs pendentes com vencimento <= data
   // PL = AC - PT
   async gerarBalanco(userId: string, data: string): Promise<BalancoRelatorio> {
-    const { data: accounts, error: errAcc } = await supabase
+    const { data: accounts, error: errAcc } = await queryAll(supabase
       .from('accounts')
-      .select('id, initial_balance')
+      .select('id, initial_balance, initial_balance_date')
       .eq('user_id', userId)
-      .eq('is_active', true)
+      .eq('is_active', true))
 
     if (errAcc) throw errAcc
 
@@ -429,39 +385,43 @@ export class ReportService {
 
     // Calcular saldo real de cada conta até a data
     let ativoCirculante = 0
+    let saldoDevedor = 0
 
     if (accountIds.length > 0) {
-      const { data: txPagas } = await supabase
+      const { data: txPagas } = await queryAll(supabase
         .from('transactions')
-        .select('account_id, amount, type')
+        .select('account_id, amount, type, effective_cash_date')
         .eq('user_id', userId)
         .in('status', ['CONFIRMADO', 'CONCILIADO'])
-        .lte('payment_date', data)
-        .in('account_id', accountIds)
+        .lte('effective_cash_date', data)
+        .in('account_id', accountIds))
 
       const saldoMap = new Map<string, number>()
       for (const acc of accounts || []) {
-        saldoMap.set(acc.id, Number(acc.initial_balance ?? 0))
+        saldoMap.set(acc.id, !acc.initial_balance_date || acc.initial_balance_date <= data ? Number(acc.initial_balance ?? 0) : 0)
       }
       for (const tx of txPagas || []) {
+        const base = accounts?.find(a => a.id === tx.account_id)?.initial_balance_date
+        if (base && tx.effective_cash_date < base) continue
         const cur = saldoMap.get(tx.account_id) ?? 0
-        saldoMap.set(tx.account_id, cur + (tx.type === 'RECEITA' ? tx.amount : -tx.amount))
+        saldoMap.set(tx.account_id, cur + signedAmount(tx.type, tx.amount))
       }
       for (const v of saldoMap.values()) {
         if (v > 0) ativoCirculante += v
+        else saldoDevedor += Math.abs(v)
       }
     }
 
     // Passivo Circulante = DESPESAs pendentes até a data
-    const { data: pendentes } = await supabase
+    const { data: pendentes } = await queryAll(supabase
       .from('transactions')
       .select('amount')
       .eq('user_id', userId)
       .eq('type', 'DESPESA')
       .eq('status', 'PENDENTE')
-      .lte('due_date', data)
+      .lte('due_date', data))
 
-    const passivoCirculante = (pendentes || []).reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
+    const passivoCirculante = saldoDevedor + (pendentes || []).reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
     const passivoNaoCirculante = 0
     const passivoTotal = passivoCirculante + passivoNaoCirculante
     const patrimonioLiquido = ativoCirculante - passivoTotal
@@ -489,7 +449,7 @@ export class ReportService {
     ])
 
     const e = dre.estruturado
-    const rl = e.receitaLiquida > 0 ? e.receitaLiquida : dre.totalReceitas
+    const rl = e.receitaLiquida ?? dre.totalReceitas
     const cfo = dfc.totalEntradas - dfc.totalSaidas
     const { ativoCirculante, passivoCirculante, passivoTotal, patrimonioLiquido } = balanco
 
@@ -498,7 +458,7 @@ export class ReportService {
       {
         key: 'receita_operacional_bruta',
         label: 'Receita Operacional Bruta',
-        value: e.receitasOperacionais || dre.totalReceitas,
+        value: e.receitasOperacionais ?? dre.totalReceitas,
         unit: 'R$',
       },
       {
@@ -521,7 +481,7 @@ export class ReportService {
       },
       {
         key: 'margem_ebitda_percent',
-        label: 'Margem EBITDA',
+        label: 'Margem operacional gerencial',
         value: e.ebitdaPercent,
         unit: '%',
       },
@@ -533,8 +493,8 @@ export class ReportService {
       },
       {
         key: 'resultado_liquido',
-        label: 'Resultado Líquido',
-        value: e.resultadoLiquido || dre.resultado,
+        label: 'Resultado gerencial após investimentos e distribuições',
+        value: e.resultadoLiquido ?? dre.resultado,
         unit: 'R$',
       },
     ]
@@ -543,19 +503,19 @@ export class ReportService {
     const secaoEstrutura: IndicatorDto[] = [
       {
         key: 'liquidez_corrente',
-        label: 'Liquidez Corrente',
+        label: 'Caixa positivo / Contas vencidas a pagar',
         value: ratio(ativoCirculante, passivoCirculante),
         unit: 'ratio',
       },
       {
         key: 'endividamento',
-        label: 'Endividamento',
+        label: 'Contas vencidas / Saldo gerencial',
         value: ratio(passivoTotal, patrimonioLiquido),
         unit: 'ratio',
       },
       {
         key: 'participacao_capital_terceiros',
-        label: 'Participação Capital de Terceiros',
+        label: 'Contas vencidas / Caixa positivo',
         value: pct(passivoTotal, passivoTotal + patrimonioLiquido),
         unit: '%',
       },
@@ -565,13 +525,13 @@ export class ReportService {
     const secaoCaixa: IndicatorDto[] = [
       {
         key: 'gco_valor',
-        label: 'Geração de Caixa Operacional',
+        label: 'Variação líquida das movimentações',
         value: cfo,
         unit: 'R$',
       },
       {
         key: 'gco_sobre_receita_percent',
-        label: 'GCO / Receita Líquida',
+        label: 'Movimentação líquida / Receita Líquida',
         value: pct(cfo, rl),
         unit: '%',
       },
@@ -594,42 +554,24 @@ export class ReportService {
   }
 
   async gerarExtrato(userId: string, accountId?: string, inicio?: string, fim?: string): Promise<ExtratoLinha[]> {
-    let query = supabase
-      .from('transactions')
-      .select(`
-        id, description, amount, type, status,
-        due_date, payment_date,
-        accounts(name),
-        categories(name)
-      `)
-      .eq('user_id', userId)
-      .order('due_date')
-
-    if (accountId) query = query.eq('account_id', accountId)
-    if (inicio) query = query.gte('due_date', inicio)
-    if (fim) query = query.lte('due_date', fim)
-
-    const { data, error } = await query
-    if (error) throw error
-
-    let saldoAcumulado = 0
-    return (data || []).map(tx => {
-      const acc = tx.accounts as any
-      const cat = tx.categories as any
-      const valor = tx.type === 'DESPESA' ? -tx.amount : tx.amount
-      saldoAcumulado += valor
-
-      return {
-        id: tx.id,
-        data: tx.due_date,
-        descricao: tx.description,
-        valor,
-        tipo: tx.type,
-        status: tx.status,
-        categoria: cat?.name,
-        conta: acc?.name || '—',
-        saldoAcumulado,
-      }
-    })
+    let txQuery = supabase.from('transactions').select('id,account_id,description,amount,type,status,due_date,payment_date,accounts(name),categories(name)').eq('user_id',userId)
+    let accQuery = supabase.from('accounts').select('id,name,initial_balance,initial_balance_date,currency').eq('user_id',userId)
+    if (accountId) { txQuery=txQuery.eq('account_id',accountId); accQuery=accQuery.eq('id',accountId) }
+    const [{data: rows,error},{data: accounts,error: accError}] = await Promise.all([queryAll(txQuery),queryAll(accQuery)])
+    if (error || accError) throw error || accError
+    if (new Set(accounts.map(a => a.currency || 'BRL')).size > 1) throw new Error('Selecione uma conta: moedas diferentes não podem ser somadas sem conversão')
+    const bases = new Map(accounts.map(a => [a.id,a.initial_balance_date]))
+    const dateOf = (t:any) => t.status==='PENDENTE' ? t.due_date : t.payment_date || t.due_date
+    const eligible = rows.filter(t => (!fim || dateOf(t)<=fim) && (!bases.get(t.account_id) || dateOf(t)>=bases.get(t.account_id)))
+      .sort((a,b)=>dateOf(a).localeCompare(dateOf(b)) || a.id.localeCompare(b.id))
+    let movement = 0
+    return eligible.map(tx => {
+      const date=dateOf(tx)
+      const valor=signedAmount(tx.type,tx.amount)
+      movement+=valor
+      const opening=accounts.filter(a=>!a.initial_balance_date || a.initial_balance_date<=date).reduce((sum,a)=>sum+Number(a.initial_balance||0),0)
+      return {id:tx.id,data:date,descricao:tx.description,valor,tipo:tx.type,status:tx.status,
+        categoria:(tx.categories as any)?.name,conta:(tx.accounts as any)?.name||'—',saldoAcumulado:opening+movement}
+    }).filter(t=>!inicio || t.data>=inicio)
   }
 }

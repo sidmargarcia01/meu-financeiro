@@ -10,7 +10,7 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Layout } from '@/components/Layout'
 import {
   Upload, CheckCircle, XCircle, AlertCircle,
@@ -36,6 +36,9 @@ interface ReconciliationMatch {
 type Step = 'upload' | 'review' | 'done'
 
 export default function ImportPage() {
+  const [accounts, setAccounts] = useState<Array<{id:string;name:string}>>([])
+  const [accountId, setAccountId] = useState('')
+  useEffect(() => { fetch('/api/accounts').then(async r => { if (!r.ok) throw new Error('Não foi possível carregar contas'); return r.json() }).then(setAccounts).catch(e => setError(e.message)) }, [])
   const [step, setStep] = useState<Step>('upload')
   const [matches, setMatches] = useState<ReconciliationMatch[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -49,6 +52,7 @@ export default function ImportPage() {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    if (!accountId) { setError('Selecione a conta antes de importar'); return }
 
     setFileInfo({
       name: file.name,
@@ -62,7 +66,7 @@ export default function ImportPage() {
       const res = await fetch('/api/reconciliation/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, accountId }),
       })
       if (!res.ok) {
         const d = await res.json()
@@ -102,7 +106,10 @@ export default function ImportPage() {
       const res = await fetch('/api/reconciliation/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids }),
+        body: JSON.stringify({ accountId, matches: matches.filter(m => m.suggestion && selectedIds.has(m.suggestion.id)).map(m => ({
+          id: m.suggestion!.id, fitid: m.ofxTransaction.fitid, date: m.ofxTransaction.dtposted,
+          amount: m.ofxTransaction.trnamt * (m.ofxTransaction.trntype === 'DEBIT' ? -1 : 1),
+        })) }),
       })
       if (!res.ok) throw new Error('Erro ao confirmar conciliação')
       const data = await res.json()
@@ -135,6 +142,12 @@ export default function ImportPage() {
           <p className="text-sm text-gray-500 mt-1">Importe extratos bancários no formato OFX para conciliar seus lançamentos</p>
         </div>
 
+        <label className="block">Conta do extrato
+          <select aria-label="Conta do extrato" value={accountId} disabled={step !== 'upload' || parsing} onChange={e => setAccountId(e.target.value)} className="block border rounded p-2">
+            <option value="">Selecione a conta</option>
+            {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+        </label>
         {/* Steps */}
         <div className="flex items-center gap-2">
           {(['upload', 'review', 'done'] as const).map((s, i) => (

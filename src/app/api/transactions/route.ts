@@ -38,10 +38,13 @@ export async function GET(request: NextRequest) {
       const page = parseInt(searchParams.get('page') || '1')
       const limit = parseInt(searchParams.get('limit') || '20')
 
+      if (!Number.isInteger(page) || page < 1 || !Number.isInteger(limit) || limit < 1 || limit > 2000) {
+        return NextResponse.json({ error: 'Paginação inválida' }, { status: 400 })
+      }
       const result = await transactionService.listTransactions(
         user.id,
         filters,
-        { page, limit }
+        { page, limit: searchParams.get('all') === 'true' ? undefined : limit }
       )
 
       return NextResponse.json(result)

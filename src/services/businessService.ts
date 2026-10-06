@@ -8,7 +8,7 @@
  * ✅ Revisado: Sim
  */
 
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/requestSupabase'
 
 // ─── CENTROS DE CUSTO ────────────────────────────────────────────────
 

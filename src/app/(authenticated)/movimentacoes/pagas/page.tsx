@@ -66,7 +66,7 @@ export default function PagasPage() {
     setLoading(true)
     setError(null)
     try {
-      const params = new URLSearchParams({ limit: '100' })
+      const params = new URLSearchParams({ all: 'true' })
       if (filterType) params.set('type', filterType)
       if (searchTerm) params.set('search', searchTerm)
       if (filterDate) {
@@ -103,7 +103,7 @@ export default function PagasPage() {
   useEffect(() => { fetchTransactions() }, [fetchTransactions])
 
   const totalReceitas = transactions.filter(t => t.type === 'RECEITA').reduce((s, t) => s + t.amount, 0)
-  const totalDespesas = transactions.filter(t => t.type === 'DESPESA').reduce((s, t) => s + t.amount, 0)
+  const totalDespesas = transactions.filter(t => t.type === 'DESPESA').reduce((s, t) => s + Math.abs(t.amount), 0)
   const saldo = totalReceitas - totalDespesas
 
   return (

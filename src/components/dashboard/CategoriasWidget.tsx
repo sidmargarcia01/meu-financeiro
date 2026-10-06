@@ -174,7 +174,7 @@ export function CategoriasWidget({ className, mes, ano }: CategoriasWidgetProps)
   }
 
   // Gráfico de pizza simplificado
-  const SimplePieChart = () => {
+  const renderSimplePieChart = () => {
     const total = data.reduce((sum, cat) => sum + cat.total, 0)
     let currentAngle = 0
 
@@ -242,7 +242,7 @@ export function CategoriasWidget({ className, mes, ano }: CategoriasWidgetProps)
         </Typography>
 
         {/* Gráfico */}
-        <SimplePieChart />
+        {renderSimplePieChart()}
 
         {/* Lista de categorias */}
         <Box mt={3}>

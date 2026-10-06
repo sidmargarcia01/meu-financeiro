@@ -149,6 +149,7 @@ interface Account {
   name: string
   type: string
   initialBalance?: number
+  initialBalanceDate?: string
 }
 
 interface Category {
@@ -265,18 +266,7 @@ export default function LancamentosCaixaPage() {
     setError(null)
     try {
       const params = new URLSearchParams()
-      params.set('limit', '2000')
-      if (searchTerm) params.set('search', searchTerm)
-
-      if (viewMode === 'day') {
-        const selectedDate = toLocalDateString(currentDate)
-        const today = toLocalDateString(new Date())
-        params.set('endDate', selectedDate > today ? selectedDate : today)
-      } else {
-        const range = viewMode === 'week' ? getWeekRange(currentDate) : getMonthRange(currentDate)
-        params.set('startDate', toLocalDateString(range.start))
-        params.set('endDate', toLocalDateString(range.end))
-      }
+      params.set('all', 'true')
 
       const res = await fetch(`/api/transactions?${params}`)
       if (!res.ok) throw new Error()
@@ -302,9 +292,9 @@ export default function LancamentosCaixaPage() {
     return transactions.filter(tx => {
       const statusMatch = selectedStatuses.includes(tx.status)
       const accountMatch = selectedAccounts.includes(tx.account_id || '')
-      return statusMatch && accountMatch
+      return statusMatch && accountMatch && tx.description.toLocaleLowerCase().includes(searchTerm.toLocaleLowerCase())
     })
-  }, [transactions, selectedStatuses, selectedAccounts])
+  }, [transactions, selectedStatuses, selectedAccounts, searchTerm])
 
   // Lista de transações com regra de negócio
   const listTransactions = useMemo(() => {
@@ -316,7 +306,7 @@ export default function LancamentosCaixaPage() {
     const startStr = toLocalDateString(range.start)
     const endStr = toLocalDateString(range.end)
     return filteredTransactions.filter(tx => {
-      const effDate = tx.status === 'CONCILIADO' && tx.payment_date ? tx.payment_date : tx.due_date
+      const effDate = tx.status !== 'PENDENTE' && tx.payment_date ? tx.payment_date : tx.due_date
       return effDate >= startStr && effDate <= endStr
     })
   }, [viewMode, filteredTransactions, selectedDateStr, todayStr, currentDate])
@@ -328,20 +318,21 @@ export default function LancamentosCaixaPage() {
     // Soma dos saldos iniciais das contas selecionadas
     const initialBalanceSum = accounts
       .filter(acc => selectedAccounts.includes(acc.id))
-      .reduce((sum, acc) => sum + (acc.initialBalance || 0), 0)
+      .reduce((sum, acc) => sum + (!acc.initialBalanceDate || acc.initialBalanceDate.slice(0,10) <= previousDateStr ? acc.initialBalance || 0 : 0), 0)
 
     // Soma das transações confirmadas/conciliadas até o dia anterior
     const transactionsSum = transactions
       .filter(t => {
-        const effDate = t.status === 'CONCILIADO' && t.payment_date ? t.payment_date : t.due_date
+        const effDate = t.status !== 'PENDENTE' && t.payment_date ? t.payment_date : t.due_date
         return selectedAccounts.includes(t.account_id) &&
           effDate <= previousDateStr &&
+          (!accounts.find(a => a.id === t.account_id)?.initialBalanceDate || effDate >= accounts.find(a => a.id === t.account_id)!.initialBalanceDate!.slice(0,10)) &&
           ['CONFIRMADO', 'CONCILIADO'].includes(t.status)
       })
       .reduce((sum, t) => {
         if (t.type === 'RECEITA') return sum + Math.abs(t.amount)
         if (t.type === 'DESPESA') return sum - Math.abs(t.amount)
-        if (t.type === 'TRANSFERENCIA') return sum - Math.abs(t.amount) // Transferência é saída da conta
+        if (t.type === 'TRANSFERENCIA') return sum + Number(t.amount) // Transferência é saída da conta
         return sum
       }, 0)
 
@@ -353,10 +344,11 @@ export default function LancamentosCaixaPage() {
     const balances: { [accountId: string]: { confirmed: number; projected: number } } = {}
 
     accounts.forEach(acc => {
-      const initial = acc.initialBalance || 0
+      const base = acc.initialBalanceDate?.slice(0,10)
+      const initial = !base || base <= selectedDateStr ? acc.initialBalance || 0 : 0
       const txsUntilDate = transactions.filter(t => {
-        const effDate = t.status === 'CONCILIADO' && t.payment_date ? t.payment_date : t.due_date
-        return effDate <= selectedDateStr && t.account_id === acc.id
+        const effDate = t.status !== 'PENDENTE' && t.payment_date ? t.payment_date : t.due_date
+        return effDate <= selectedDateStr && (!base || effDate >= base) && t.account_id === acc.id
       })
 
       const confirmed = txsUntilDate
@@ -364,7 +356,7 @@ export default function LancamentosCaixaPage() {
         .reduce((sum, t) => {
           if (t.type === 'RECEITA') return sum + Math.abs(t.amount)
           if (t.type === 'DESPESA') return sum - Math.abs(t.amount)
-          if (t.type === 'TRANSFERENCIA') return sum - Math.abs(t.amount) // Transferência é saída da conta
+          if (t.type === 'TRANSFERENCIA') return sum + Number(t.amount) // Transferência é saída da conta
           return sum
         }, initial)
 
@@ -372,7 +364,7 @@ export default function LancamentosCaixaPage() {
         .reduce((sum, t) => {
           if (t.type === 'RECEITA') return sum + Math.abs(t.amount)
           if (t.type === 'DESPESA') return sum - Math.abs(t.amount)
-          if (t.type === 'TRANSFERENCIA') return sum - Math.abs(t.amount) // Transferência é saída da conta
+          if (t.type === 'TRANSFERENCIA') return sum + Number(t.amount) // Transferência é saída da conta
           return sum
         }, initial)
 
@@ -532,12 +524,12 @@ export default function LancamentosCaixaPage() {
         tags: (formData.tags || []).filter(Boolean),
       }
 
-      if (formData.category_id) payload.categoryId = formData.category_id
-      if (formData.center_id) payload.centerId = formData.center_id
-      if (formData.project_id) payload.projectId = formData.project_id
-      if (formData.contact_id) payload.contactId = formData.contact_id
-      if (formData.competence_date) payload.competenceDate = formData.competence_date
-      if (formData.notes) payload.notes = formData.notes
+      payload.categoryId = formData.category_id || (isEdit ? null : undefined)
+      payload.centerId = formData.center_id || (isEdit ? null : undefined)
+      payload.projectId = formData.project_id || (isEdit ? null : undefined)
+      payload.contactId = formData.contact_id || (isEdit ? null : undefined)
+      payload.competenceDate = formData.competence_date || (isEdit ? null : undefined)
+      payload.notes = formData.notes || (isEdit ? null : undefined)
 
       // Transferência: enviar conta destino em transferData
       if (formData.type === 'TRANSFERENCIA' && formData.destination_account_id) {

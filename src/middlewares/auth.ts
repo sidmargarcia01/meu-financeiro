@@ -7,121 +7,35 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import jwt from 'jsonwebtoken'
-import { config } from '@/config'
 import { AuthUser } from '@/models/common'
-import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
+import { createRequestClient, runWithSupabase } from '@/lib/requestSupabase'
 
-// Interface para payload JWT
-interface JWTPayload {
-  userId: string
-  email: string
-  iat: number
-  exp: number
-}
 
-// Extrair token do header Authorization
-function extractToken(request: NextRequest): string | null {
-  const authHeader = request.headers.get('authorization')
-
-  if (!authHeader) {
-    return null
-  }
-
-  // Bearer token format: "Bearer <token>"
-  const parts = authHeader.split(' ')
-
-  if (parts.length !== 2 || parts[0] !== 'Bearer') {
-    return null
-  }
-
-  return parts[1]
-}
-
-// Verificar e decodificar token JWT
-function verifyToken(token: string): JWTPayload | null {
-  try {
-    const decoded = jwt.verify(token, config.jwtSecret) as JWTPayload
-    return decoded
-  } catch (error) {
-    return null
-  }
-}
-
-// Middleware principal de autenticação
 export async function withAuth(
   request: NextRequest,
   handler: (request: NextRequest, user: AuthUser) => Promise<NextResponse>
 ): Promise<NextResponse> {
-  // Prioridade 1: cookie sb-access-token (Supabase JWT do browser)
-  const cookieToken = request.cookies.get('sb-access-token')?.value
-
-  if (cookieToken) {
-    try {
-      const supabaseAdmin = getSupabaseAdmin()
-      const { data: { user: supaUser }, error } = await supabaseAdmin.auth.getUser(cookieToken)
-      if (!error && supaUser) {
-        const user: AuthUser = {
-          id: supaUser.id,
-          email: supaUser.email ?? '',
-        }
-        return handler(request, user)
-      }
-    } catch (_e) {
-      // Supabase não disponível — cair para JWT fallback
-    }
+  const header = request.headers.get('authorization')
+  const token = header?.startsWith('Bearer ') ? header.slice(7) : request.cookies.get('sb-access-token')?.value
+  if (!token) return createAuthError('Não autorizado')
+  const client = createRequestClient(token)
+  let user
+  try {
+    const result = await client.auth.getUser(token)
+    if (result.error || !result.data.user) return createAuthError('Sessão inválida ou expirada')
+    user = result.data.user
+  } catch {
+    return createAuthError('Não foi possível validar a sessão', 503)
   }
-
-  // Prioridade 2: Bearer JWT (fallback para chamadas diretas à API)
-  const token = extractToken(request)
-
-  if (!token) {
-    return NextResponse.json(
-      { error: 'Não autorizado' },
-      { status: 401 }
-    )
-  }
-
-  const payload = verifyToken(token)
-
-  if (!payload) {
-    return NextResponse.json(
-      { error: 'Token inválido ou expirado' },
-      { status: 401 }
-    )
-  }
-
-  const user: AuthUser = {
-    id: payload.userId,
-    email: payload.email,
-  }
-
-  return handler(request, user)
+  return runWithSupabase(client, () => handler(request, { id: user.id, email: user.email ?? '' }))
 }
 
-// Middleware para rotas públicas (opcional)
-export function withOptionalAuth(
-  request: NextRequest,
-  handler: (request: NextRequest, user?: AuthUser) => Promise<NextResponse>
-): Promise<NextResponse> {
-  const token = extractToken(request)
-
-  if (!token) {
+export async function withOptionalAuth(request: NextRequest,
+  handler: (request: NextRequest, user?: AuthUser) => Promise<NextResponse>) {
+  if (!request.cookies.get('sb-access-token')?.value && !request.headers.get('authorization')) {
     return handler(request)
   }
-
-  const payload = verifyToken(token)
-
-  if (!payload) {
-    return handler(request)
-  }
-
-  const user: AuthUser = {
-    id: payload.userId,
-    email: payload.email,
-  }
-
-  return handler(request, user)
+  return withAuth(request, handler)
 }
 
 // Middleware para verificar plano do usuário
