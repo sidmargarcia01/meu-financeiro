@@ -60,3 +60,7 @@ coverage/
 
 # TypeScript incremental build info
 *.tsbuildinfo
+# Never commit environment exports or local credentials
+.env*
+!.env.example
+!.env.local.example

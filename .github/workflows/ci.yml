@@ -34,7 +34,7 @@ jobs:
         run: npm run type-check
 
       - name: Security audit
-        run: npm audit --audit-level=critical
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Run tests
         run: npm run test -- --coverage
@@ -55,6 +55,21 @@ jobs:
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
           NODE_ENV: production
 
+      - name: Authenticated integration smoke
+        run: |
+          npm start > /tmp/meu-financeiro-server.log 2>&1 &
+          APP_PID=$!
+          trap 'kill "$APP_PID" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:3000/login > /dev/null; then break; fi
+            sleep 1
+          done
+          node scripts/smoke-financial.cjs
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
   deploy-preview:
     needs: quality
     runs-on: ubuntu-latest
@@ -71,7 +86,6 @@ jobs:
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           vercel-args: '--scope sidmargarcia01s-projects'
-        continue-on-error: true
 
   deploy-production:
     needs: quality
@@ -90,7 +104,6 @@ jobs:
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           vercel-args: '--prod --scope sidmargarcia01s-projects'
           github-token: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
 
   security-scan:
     needs: quality

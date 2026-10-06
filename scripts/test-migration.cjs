@@ -10,6 +10,7 @@ const root=path.join(__dirname,'..');
  grant usage on schema auth,storage to anon,authenticated; grant select on storage.objects to authenticated;`);
  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20260404125007_initial_schema.sql'),'utf8'));
  await db.exec(`create table public.payment_methods(id text primary key default gen_random_uuid()::text,user_id text references users(id),name text,type text,created_at timestamptz default now()); grant all on all tables in schema public to anon,authenticated;`);
+ await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261006203405_audit_expand_compatibility.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261006194244_audit_financial_integrity.sql'),'utf8'));
  const u1='11111111-1111-4111-8111-111111111111',u2='22222222-2222-4222-8222-222222222222';
  await db.exec(`insert into auth.users values('${u1}','audit-a@example.invalid','{}'),('${u2}','audit-b@example.invalid','{}');
