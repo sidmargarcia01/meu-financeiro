@@ -143,7 +143,7 @@ export class AccountRepository {
 
     if (error) throw error
 
-    return (accounts || []).map(account => ({
+    return (accounts || []).map((account: any) => ({
       id: account.id,
       userId: account.user_id,
       name: account.name,
@@ -506,7 +506,7 @@ export class AccountRepository {
 
     if (error) throw error
 
-    return (data || []).reduce((sum, a) => sum + Number(a.initial_balance || 0), 0)
+    return (data || []).reduce((sum: number, a: any) => sum + Number(a.initial_balance || 0), 0)
   }
 }
 

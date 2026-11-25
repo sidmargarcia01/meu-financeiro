@@ -20,7 +20,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+
 import {
   AppBar, Toolbar, IconButton, Badge, Menu, MenuItem,
   Box, Typography, Divider, Avatar, Tooltip,
@@ -57,19 +57,11 @@ export function Header({ userName, userEmail, onMenuClick }: HeaderProps) {
   const totalAlertas = alertsData?.total ?? 0
   const temAlertas = totalAlertas > 0
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setProfileAnchor(null)
-    // Limpa o cookie imediatamente (middleware usa este cookie para verificar autenticação)
-    document.cookie = 'sb-access-token=; path=/; max-age=0; SameSite=Lax'
-    // Dispara limpeza em background — NÃO await para evitar que onAuthStateChange
-    // acione router.push('/login') ao mesmo tempo que o hard redirect abaixo,
-    // o que causava dupla navegação e tela escura/travada
-    fetch('/api/auth/logout', { method: 'POST' }).catch(() => null)
-    supabase.auth.signOut().catch(() => null)
-    // Hard redirect imediato — destrói a árvore React antes de qualquer re-render
-    window.location.href = '/login'
+    const response = await fetch('/api/auth/logout', { method: 'POST' })
+    if (response.ok) window.location.href = '/login'
   }
-
   return (
     <>
       {/* Modal de busca — ativado por CTRL+K conforme documentado */}

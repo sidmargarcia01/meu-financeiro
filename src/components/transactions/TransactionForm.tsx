@@ -40,7 +40,7 @@ import {
 
 const transactionSchema = z.object({
   type: z.enum(['RECEITA', 'DESPESA', 'TRANSFERENCIA']),
-  amount: z.coerce.number().positive('Valor deve ser maior que zero'),
+  amount: z.coerce.number<number>().positive('Valor deve ser maior que zero'),
   description: z.string().min(1, 'Descrição é obrigatória'),
   due_date: z.string().min(1, 'Data é obrigatória'),
   account_id: z.string().min(1, 'Conta é obrigatória'),
@@ -50,9 +50,9 @@ const transactionSchema = z.object({
   competence_date: z.string().optional(),
   regime: z.enum(['CAIXA', 'COMPETENCIA']),
   repetition_type: z.enum(['NONE', 'FIXO', 'PARCELADO']),
-  installments: z.coerce.number().min(2).optional(),
-  installment_amount: z.coerce.number().positive().optional(),
-  fixed_months: z.coerce.number().min(1).optional(),
+  installments: z.coerce.number<number>().min(2).optional(),
+  installment_amount: z.coerce.number<number>().positive().optional(),
+  fixed_months: z.coerce.number<number>().min(1).optional(),
   center_id: z.string().optional(),
   project_id: z.string().optional(),
   contact_id: z.string().optional(),

@@ -15,7 +15,7 @@ export const createPaymentMethodSchema = z.object({
     .max(50, 'Nome deve ter no máximo 50 caracteres')
     .trim(),
   type: z.enum(paymentTypes, {
-    errorMap: () => ({ message: 'Tipo de pagamento inválido' })
+    error: () => ({ message: 'Tipo de pagamento inválido' })
   })
 })
 
@@ -26,7 +26,7 @@ export const updatePaymentMethodSchema = z.object({
     .trim()
     .optional(),
   type: z.enum(paymentTypes, {
-    errorMap: () => ({ message: 'Tipo de pagamento inválido' })
+    error: () => ({ message: 'Tipo de pagamento inválido' })
   }).optional()
 })
 

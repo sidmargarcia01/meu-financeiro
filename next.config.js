@@ -16,7 +16,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self'",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+      "connect-src 'self' ",
       "frame-ancestors 'self'",
     ].join('; '),
   },
@@ -40,7 +40,8 @@ const nextConfig = {
     ]
   },
   // Packages que devem rodar no servidor (Next.js 15+)
-  serverExternalPackages: ['@supabase/supabase-js'],
+  output: 'standalone',
+  serverExternalPackages: ['pg'],
   // Otimizações de performance e bundle
   poweredByHeader: false,
   compress: true,

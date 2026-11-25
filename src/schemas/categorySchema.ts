@@ -42,7 +42,7 @@ export const createCategorySchema = z.object({
     .max(100, 'Nome deve ter no máximo 100 caracteres')
     .trim(),
   type: z.enum(['RECEITA', 'DESPESA'], {
-    errorMap: () => ({ message: 'Tipo deve ser RECEITA ou DESPESA' })
+    error: () => ({ message: 'Tipo deve ser RECEITA ou DESPESA' })
   }),
   parent_id: z.string().optional().nullable(),
   dre_group: z.enum(DRE_GROUPS).optional().nullable(),

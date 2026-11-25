@@ -4,7 +4,7 @@ import { supabase } from '@/lib/requestSupabase'
 import { z } from 'zod'
 
 const allowed = new Set(['metas-economia', 'metas-centros', 'planejamento'])
-const bodySchema = z.object({ version: z.number().int().nonnegative(), items: z.array(z.record(z.unknown())).max(1000) })
+const bodySchema = z.object({ version: z.number().int().nonnegative(), items: z.array(z.record(z.string(),z.unknown())).max(1000) })
 
 export async function GET(request: NextRequest, context: { params: Promise<{ name: string }> }) {
   return withAuth(request, async (_req, user) => {

@@ -48,7 +48,7 @@ export async function withValidation<T>(
   } catch (error) {
     if (error instanceof ZodError) {
       // Erro de validação Zod
-      const details = error.errors.map(err => ({
+      const details = error.issues.map(err => ({
         field: err.path.join('.'),
         message: err.message,
       }))
@@ -89,7 +89,7 @@ export async function withQueryValidation<T>(
 
   } catch (error) {
     if (error instanceof ZodError) {
-      const details = error.errors.map(err => ({
+      const details = error.issues.map(err => ({
         field: err.path.join('.'),
         message: err.message,
       }))
@@ -127,7 +127,7 @@ export async function withParamsValidation<T>(
 
   } catch (error) {
     if (error instanceof ZodError) {
-      const details = error.errors.map(err => ({
+      const details = error.issues.map(err => ({
         field: err.path.join('.'),
         message: err.message,
       }))

@@ -222,7 +222,7 @@ export class TransactionRepository {
     if (filters?.categoryId) {
       const { data: children, error: childError } = await supabase.from('categories').select('id').eq('user_id', userId).eq('parent_id', filters.categoryId)
       if (childError) throw childError
-      query = query.in('category_id', [filters.categoryId, ...(children || []).map(c => c.id)])
+      query = query.in('category_id', [filters.categoryId, ...(children || []).map((c: {id: string}) => c.id)])
     }
     if (filters?.type) {
       query = query.eq('type', filters.type)

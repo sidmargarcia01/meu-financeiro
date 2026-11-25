@@ -7,33 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import * as Sentry from '@sentry/nextjs'
-
-// Configuração do Sentry para monitoramento de erros
-export function initMonitoring() {
-  if (typeof window !== 'undefined') {
-    // Client-side
-    Sentry.init({
-      dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
-      environment: process.env.NODE_ENV,
-      tracesSampleRate: 1.0,
-      beforeSend(event) {
-        // Filtrar dados sensíveis
-        if (event.exception) {
-          const exception = event.exception.values?.[0]
-          if (exception?.stacktrace) {
-            // Remover informações sensíveis do stacktrace
-            exception.stacktrace.frames = exception.stacktrace.frames?.map(frame => ({
-              ...frame,
-              vars: undefined // Remover variáveis locais
-            }))
-          }
-        }
-        return event
-      }
-    })
-  }
-}
+export function initMonitoring() { /* Logs remain on the own server. */ }
 
 // Logger estruturado para tracking
 export class Logger {
@@ -69,12 +43,7 @@ export class Logger {
       timestamp: new Date().toISOString()
     }))
 
-    // Enviar para Sentry em produção
-    if (process.env.NODE_ENV === 'production' && error) {
-      Sentry.captureException(error, {
-        contexts: { custom: context }
-      })
-    }
+
   }
 
   static debug(message: string, context?: Record<string, any>) {
