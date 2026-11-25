@@ -86,6 +86,8 @@ node scripts/manage-user.cjs reset-password EMAIL ARQUIVO_PRIVADO_DA_SENHA
 node scripts/manage-user.cjs approve EMAIL
 ```
 
+No servidor 122, a ferramenta já está instalada em C:\ProgramData\MeuFinanceiro\admin\admin-users.ps1. Ela carrega a credencial administrativa privada apenas durante o comando. Execute em sessão administrativa com os parâmetros -Action, -Email, -Name (para criar) e -PasswordFile (para criar ou redefinir).
+
 O administrador deve conferir a identidade do solicitante. Senhas novas têm
 pelo menos 12 caracteres e até 72 bytes UTF-8. Redefinições revogam sessões.
 Não disponibilizar esses comandos em rotas HTTP nem colocar a URL administrativa
