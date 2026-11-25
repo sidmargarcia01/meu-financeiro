@@ -13,7 +13,7 @@ import type { NextRequest } from 'next/server'
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
-  const hasSession = !!req.cookies.get('sb-access-token')?.value
+  const hasSession = !!req.cookies.get('mf-session')?.value
 
   // Rotas de autenticação — redirecionar se já tem cookie de sessão
   // IMPORTANTE: usar match preciso (exato ou subrota com /) para evitar que
@@ -23,7 +23,7 @@ export function middleware(req: NextRequest) {
     route => pathname === route || pathname.startsWith(route + '/')
   )
   if (isAuthRoute) {
-    if (hasSession) return NextResponse.redirect(new URL('/dashboard', req.url))
+    // Login validates the session through the local API.
     return NextResponse.next()
   }
 

@@ -21,11 +21,6 @@ export const config = {
   isProduction,
   isTest,
 
-  // Supabase
-  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
-
   // Database
   databaseUrl: process.env.DATABASE_URL!,
   directUrl: process.env.DIRECT_URL!,
@@ -49,10 +44,7 @@ export const config = {
 // Validação de variáveis — apenas WARN no console, nunca lançar em module-level
 // Isso evita quebrar o build estático do Next.js quando as vars não estão disponíveis
 // O erro real ocorre em runtime nas funções que tentam usar os valores
-const requiredVars = [
-  { name: 'NEXT_PUBLIC_SUPABASE_URL', value: config.supabaseUrl },
-  { name: 'NEXT_PUBLIC_SUPABASE_ANON_KEY', value: config.supabaseAnonKey },
-]
+const requiredVars: Array<{name: string; value?: string}> = []
 
 const missingVars = requiredVars.filter(v => !v.value || v.value === 'undefined' || v.value === 'null')
 

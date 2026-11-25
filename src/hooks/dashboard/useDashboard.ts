@@ -102,7 +102,7 @@ export function useDashboard(params?: UseDashboardParams): UseDashboardReturn {
       setLoading(true)
       setError(null)
 
-      const token = session?.access_token
+      const token = session
       if (!token) {
         throw new Error('Não autenticado')
       }
@@ -115,9 +115,7 @@ export function useDashboard(params?: UseDashboardParams): UseDashboardReturn {
       const url = `/api/dashboard${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
 
       const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        credentials: 'same-origin'
       })
 
       if (!response.ok) {

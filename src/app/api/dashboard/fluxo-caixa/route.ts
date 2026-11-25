@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
       const validation = fluxoCaixaSchema.safeParse(queryParams)
       if (!validation.success) {
         return NextResponse.json(
-          { error: 'Parâmetros inválidos', details: validation.error.errors },
+          { error: 'Parâmetros inválidos', details: validation.error.issues },
           { status: 400 }
         )
       }

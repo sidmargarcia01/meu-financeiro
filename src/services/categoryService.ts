@@ -12,7 +12,7 @@
 
 import { categoryRepository } from '@/repositories/categoryRepository'
 import type { CreateCategoryInput, UpdateCategoryInput, DreGroup } from '@/schemas/categorySchema'
-import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
+import { getRequestSupabase } from '@/lib/requestSupabase'
 
 export interface CategoryWithChildren {
   id: string
@@ -232,7 +232,7 @@ export const categoryService = {
 
   // Garante que o usuário existe na tabela users com o auth UUID correto
   async ensureUserExists(userId: string, email: string = 'user@example.com') {
-    const supabase = getSupabaseAdmin()
+    const supabase = getRequestSupabase()
 
     // 1. Verifica se já existe com o id correto (auth UUID)
     const { data: existingById } = await supabase
@@ -279,7 +279,7 @@ export const categoryService = {
     try {
       const existentes = await categoryRepository.findAllByUser(userId, {})
       console.log('[SERVICE] Categorias existentes:', existentes.length)
-      const nomesExistentes = new Set(existentes.map(c => c.name.toLowerCase()))
+      const nomesExistentes = new Set(existentes.map((c: {name: string}) => c.name.toLowerCase()))
 
       let criadas = 0
       let ignoradas = 0

@@ -1,3 +1,5 @@
+> **Produção migrada em 25/11/2026:** [financeiro.msassist.com.br](https://financeiro.msassist.com.br). Aplicação, autenticação e PostgreSQL no servidor 122. Consulte [operação e recuperação](docs/SERVIDOR-122.md). As instruções antigas de Supabase/Vercel abaixo são históricas.
+
 # 🏦 Meu Financeiro
 
 Sistema completo de gestão financeira pessoal e empresarial, construído com **Next.js 14**, **TypeScript**, **Tailwind CSS** e **Supabase**, seguindo a metodologia **Anti Vibe Coding** e arquitetura em camadas.
