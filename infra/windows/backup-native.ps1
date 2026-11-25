@@ -8,6 +8,10 @@ $env:PGPASSWORD=[IO.File]::ReadAllText((Join-Path $root 'secrets\postgres.pw'))
 try{
  & (Join-Path $root 'runtime\bin\pg_dump.exe') -h 127.0.0.1 -p 5440 -U postgres -d meu_financeiro -Fc -f $file
  if($LASTEXITCODE -ne 0){throw 'BACKUP_FAILED'}
+ $globals=Join-Path $directory ('meu-financeiro-'+$stamp+'.globals.sql')
+ & (Join-Path $root 'runtime\bin\pg_dumpall.exe') -h 127.0.0.1 -p 5440 -U postgres --globals-only --no-role-passwords -f $globals
+ if($LASTEXITCODE -ne 0){throw 'BACKUP_ROLES_FAILED'}
+ (Get-FileHash $globals -Algorithm SHA256).Hash | Set-Content ($globals+'.sha256')
  & (Join-Path $root 'runtime\bin\pg_restore.exe') --list $file *> (Join-Path $directory ($stamp+'.contents.txt'))
  if($LASTEXITCODE -ne 0){throw 'BACKUP_ARCHIVE_INVALID'}
  (Get-FileHash $file -Algorithm SHA256).Hash | Set-Content ($file+'.sha256')
@@ -16,7 +20,7 @@ try{
  foreach($item in Get-ChildItem -LiteralPath $directory -File){
   $resolved=[IO.Path]::GetFullPath($item.FullName)
   if(!$resolved.StartsWith($directory+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'INVALID_BACKUP_PATH'}
-  if($item.Name -match '^meu-financeiro-\d{8}-\d{6}\.dump(\.sha256)?$' -and $item.LastWriteTimeUtc -lt [DateTime]::UtcNow.AddDays(-30)){Remove-Item -LiteralPath $resolved -Force}
+  if(($item.Name -match '^meu-financeiro-\d{8}-\d{6}\.(dump|globals\.sql)(\.sha256)?$' -or $item.Name -match '^\d{8}-\d{6}\.contents\.txt$') -and $item.LastWriteTimeUtc -lt [DateTime]::UtcNow.AddDays(-30)){Remove-Item -LiteralPath $resolved -Force}
  }
  Write-Output 'BACKUP_VERIFIED'
 }finally{$env:PGPASSWORD=$null}
