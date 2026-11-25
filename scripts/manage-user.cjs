@@ -5,7 +5,8 @@ const {Pool}=require('pg'),bcrypt=require('bcryptjs'),fs=require('node:fs'),{ran
  if(!['create','reset-password','approve'].includes(action)||!email?.includes('@'))throw new Error('Usage: manage-user.cjs create EMAIL NAME PASSWORD_FILE | reset-password EMAIL PASSWORD_FILE | approve EMAIL');
  const url=new URL(process.env.ADMIN_DATABASE_URL||'');
  if(!['127.0.0.1','localhost','[::1]'].includes(url.hostname))throw new Error('Run on the database server through loopback');
- const db=new Pool({connectionString:url.toString()});
+ const pool=new Pool({connectionString:url.toString()});
+ const db=await pool.connect();
  try{
   let hash;
   if(action!=='approve'){
@@ -24,5 +25,5 @@ const {Pool}=require('pg'),bcrypt=require('bcryptjs'),fs=require('node:fs'),{ran
   }
   await db.query('DELETE FROM app_private.sessions WHERE user_id=$1',[id]);await db.query('COMMIT');
   console.log('Account updated locally; existing sessions revoked.');
- }catch(e){await db.query('ROLLBACK');throw e}finally{await db.end()}
+ }catch(e){await db.query('ROLLBACK');throw e}finally{db.release();await pool.end()}
 })().catch(e=>{console.error(e.message);process.exitCode=1});

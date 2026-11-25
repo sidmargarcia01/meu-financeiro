@@ -3,6 +3,8 @@ import { Pool, types } from 'pg'
 
 // Keep date-only financial values independent of the machine's time zone.
 types.setTypeParser(1082, (value: string) => value)
+// Preserve the numeric API contract used by the existing financial services.
+types.setTypeParser(1700, (value: string) => Number(value))
 const state = globalThis as unknown as { financeiroPool?: Pool }
 export function pool(): Pool {
   if (!state.financeiroPool) {

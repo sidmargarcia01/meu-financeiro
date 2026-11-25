@@ -41,7 +41,7 @@ ficou sem sua identidade de autenticação.
 A restauração foi comparada com a exportação usando diferenças de conjuntos
 com multiplicidade (`EXCEPT ALL`) de todas as colunas, nas 58 tabelas. Nenhuma
 diferença. Uma segunda leitura do Supabase após pausar a versão antiga da
-Vercel também não encontrou alterações. A aplicação nova passou por 15 testes
+Vercel também não encontrou alterações. A aplicação nova passou por 17 testes
 HTTP de integração em banco isolado e 51 leituras autenticadas em produção.
 Essas leituras recuperaram os 596 lançamentos, incluindo a paginação acima de
 500 linhas. Os testes de gravação usaram somente o banco de teste separado.

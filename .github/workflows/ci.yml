@@ -46,7 +46,7 @@ jobs:
       - run: npm run build
       - name: Native authentication and financial integration
         run: |
-          cp -r public .next/standalone/public
+          if [ -d public ]; then cp -r public .next/standalone/public; fi
           cp -r .next/static .next/standalone/.next/static
           HOSTNAME=127.0.0.1 PORT=3000 node .next/standalone/server.js > /tmp/meu-financeiro-server.log 2>&1 &
           APP_PID=$!

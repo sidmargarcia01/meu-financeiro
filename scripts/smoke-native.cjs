@@ -50,9 +50,18 @@ async function request(path, token, method='GET', body) {
   const rows=await request('/api/transactions?all=true',ta);
   const installments=rows.filter(x=>x.description.startsWith('Parcelas teste'));
   assert.deepEqual(installments.map(x=>x.due_date).sort(),['2026-01-31','2026-02-28','2026-03-31']);pass('month-end installments persist correctly');
+  await request('/api/investments',ta,'POST',{name:'Ativo teste A',type:'ACOES',quantity:2,averagePrice:50,currentPrice:60});
+  await request('/api/investments',ta,'POST',{name:'Ativo teste B',type:'FII',quantity:3,averagePrice:40,currentPrice:50});
+  const portfolio=await request('/api/investments?portfolio=true',ta);
+  assert.equal(portfolio.totalInvested,220);assert.equal(portfolio.currentValue,270);
+  assert.ok(portfolio.investments.every(i=>typeof i.quantity==='number'&&typeof i.totalInvested==='number'));
+  pass('PostgreSQL decimals remain numbers and investment totals add correctly');
   const saved=await request('/api/collections/planejamento',ta);
   await request('/api/collections/planejamento',ta,'PUT',{items:[{id:'audit',nome:'Teste'}],version:saved.version});
-  assert.equal((await request('/api/collections/planejamento',ta)).items.length,1);
+  const persisted=await request('/api/collections/planejamento',ta);
+  assert.equal(persisted.items.length,1);
+  await request('/api/collections/planejamento',ta,'PUT',{items:[{id:'audit',nome:'Atualizado'}],version:persisted.version});
+  assert.equal((await request('/api/collections/planejamento',ta)).items[0].nome,'Atualizado');
   assert.equal((await request('/api/collections/planejamento',tb)).items.length,0);pass('planning persistence and isolation');
   const runtime=new Pool({connectionString:runtimeUrl});
   const c=await runtime.connect();
@@ -61,6 +70,10 @@ async function request(path, token, method='GET', body) {
     await c.query("SELECT set_config('request.jwt.claim.sub',$1,true)",[users[1].id]);
     assert.equal((await c.query('SELECT id FROM public.accounts WHERE id=$1',[account.id])).rowCount,0);
     await c.query('ROLLBACK');pass('PostgreSQL RLS blocks cross-user access');
+    await c.query('BEGIN');await c.query('SET LOCAL ROLE financeiro_app');
+    await c.query("SELECT set_config('request.jwt.claim.sub',$1,true)",[users[1].id]);
+    await assert.rejects(c.query('UPDATE public.users SET plan_id=plan_id WHERE id=$1',[users[1].id]),error=>error.code==='42501');
+    await c.query('ROLLBACK');pass('native privileges prevent users from changing their own plan');
   }finally{c.release();await runtime.end()}
   const match={id:expense.id,fitid:'audit-'+randomUUID(),date:'2026-02-02',amount:-300};
   await request('/api/reconciliation/confirm',ta,'POST',{accountId:account.id,matches:[match]});

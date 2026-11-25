@@ -11,7 +11,8 @@ try {
  $password=[IO.File]::ReadAllText((Join-Path $root 'secrets\postgres.pw'))
  $env:ADMIN_DATABASE_URL='postgresql://postgres:'+ [Uri]::EscapeDataString($password)+'@127.0.0.1:5440/meu_financeiro'
  $password=$null
- $env:NODE_PATH=Join-Path $root 'releases\20261125-native-02\node_modules'
+ $release=[IO.File]::ReadAllText((Join-Path $root 'current-release.txt')).Trim()
+ $env:NODE_PATH=Join-Path $release 'node_modules'
  $arguments=@($Action,$Email)
  if($Action -eq 'create'){
   if([string]::IsNullOrWhiteSpace($Name) -or !$PasswordFile){throw 'NAME_AND_PRIVATE_PASSWORD_FILE_REQUIRED'}
