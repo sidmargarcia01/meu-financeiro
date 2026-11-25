@@ -46,7 +46,9 @@ jobs:
       - run: npm run build
       - name: Native authentication and financial integration
         run: |
-          npm start > /tmp/meu-financeiro-server.log 2>&1 &
+          cp -r public .next/standalone/public
+          cp -r .next/static .next/standalone/.next/static
+          HOSTNAME=127.0.0.1 PORT=3000 node .next/standalone/server.js > /tmp/meu-financeiro-server.log 2>&1 &
           APP_PID=$!
           trap 'kill "$APP_PID" 2>/dev/null || true' EXIT
           for attempt in $(seq 1 40); do
